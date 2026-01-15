@@ -12,7 +12,8 @@ import { checkLimit } from './plan'
 export async function createAutomationTask(data: {
     name: string;
     siteId: string;
-    keywordGroupId: string;
+    keywordGroupId?: string;
+    keywords?: string[];
     promptId: string;
     scheduleCron: string;
     aiModel: any;
@@ -35,6 +36,7 @@ export async function createAutomationTask(data: {
                 name: data.name,
                 siteId: data.siteId,
                 keywordGroupId: data.keywordGroupId,
+                keywords: data.keywords, // Manual keywords
                 promptId: data.promptId,
                 scheduleCron: data.scheduleCron,
                 aiModel: data.aiModel,
@@ -73,6 +75,7 @@ export async function updateAutomationTask(id: string, data: {
     name?: string;
     siteId?: string;
     keywordGroupId?: string;
+    keywords?: string[];
     promptId?: string;
     scheduleCron?: string;
     aiModel?: any;
@@ -87,6 +90,7 @@ export async function updateAutomationTask(id: string, data: {
                 name: data.name,
                 siteId: data.siteId,
                 keywordGroupId: data.keywordGroupId,
+                keywords: data.keywords,
                 promptId: data.promptId,
                 scheduleCron: data.scheduleCron,
                 aiModel: data.aiModel,

@@ -133,7 +133,8 @@ model AutomationJob {
   userId          String
   name            String
   siteId          String
-  keywordGroupId  String
+  keywordGroupId  String?
+  keywords        String[] // Manual keywords if no group
   promptId        String?
   
   // 설정값
@@ -153,7 +154,7 @@ model AutomationJob {
 
   user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   site            Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  keywordGroup    KeywordGroup @relation(fields: [keywordGroupId], references: [id], onDelete: Cascade)
+  keywordGroup    KeywordGroup? @relation(fields: [keywordGroupId], references: [id], onDelete: Cascade)
   prompt          Prompt?      @relation(fields: [promptId], references: [id])
   logs            PostLog[]
 

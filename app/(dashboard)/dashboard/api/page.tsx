@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Key, Save, AlertCircle, Info, Loader2, CheckCircle2, XCircle, Sparkles, Brain, Image as ImageIcon, Globe } from 'lucide-react'
+import { Key, Save, AlertCircle, Info, Loader2, CheckCircle2, XCircle, Sparkles, Brain, Image as ImageIcon, Globe, ExternalLink } from 'lucide-react'
 import { updateUserSettings, getUserSettings, validateOpenAI, validateGemini, validatePiApi } from '@/app/actions/user'
 import { clsx } from 'clsx'
 
@@ -148,6 +148,42 @@ export default function ApiManagementPage() {
                             icon={<ImageIcon className="h-5 w-5 text-purple-500" />}
                             placeholder="API Key from piapi.ai"
                         />
+
+                        {/* Quick Link Buttons */}
+                        <div className="grid grid-cols-2 gap-3 h-full">
+                            <a
+                                href="https://auth.openai.com/log-in"
+                                target="_blank"
+                                className="bg-[#10a37f] hover:bg-[#0d8a6a] text-white rounded-2xl flex flex-col items-center justify-center gap-1 shadow-sm transition-all hover:scale-[1.02] active:scale-95 p-4 text-center border border-transparent dark:border-white/10"
+                            >
+                                <Brain className="h-6 w-6 mb-1" />
+                                <span className="text-xs font-bold">OpenAI 키 발급</span>
+                            </a>
+                            <a
+                                href="https://aistudio.google.com/"
+                                target="_blank"
+                                className="bg-[#4285f4] hover:bg-[#3367d6] text-white rounded-2xl flex flex-col items-center justify-center gap-1 shadow-sm transition-all hover:scale-[1.02] active:scale-95 p-4 text-center border border-transparent dark:border-white/10"
+                            >
+                                <Sparkles className="h-6 w-6 mb-1" />
+                                <span className="text-xs font-bold">Gemini 키 발급</span>
+                            </a>
+                            <a
+                                href="https://piapi.ai/workspace/flux"
+                                target="_blank"
+                                className="bg-[#8e24aa] hover:bg-[#7b1fa2] text-white rounded-2xl flex flex-col items-center justify-center gap-1 shadow-sm transition-all hover:scale-[1.02] active:scale-95 p-4 text-center border border-transparent dark:border-white/10"
+                            >
+                                <ImageIcon className="h-6 w-6 mb-1" />
+                                <span className="text-xs font-bold">FLUX 키 발급</span>
+                            </a>
+                            <a
+                                href="https://console.cloud.google.com/welcome?hl=ko&project=gen-lang-client-0554382059"
+                                target="_blank"
+                                className="bg-[#fbbc04] hover:bg-[#f9ab00] text-black rounded-2xl flex flex-col items-center justify-center gap-1 shadow-sm transition-all hover:scale-[1.02] active:scale-95 p-4 text-center border border-transparent dark:border-white/10"
+                            >
+                                <Globe className="h-6 w-6 mb-1 opacity-80" />
+                                <span className="text-xs font-bold">Google Cloud</span>
+                            </a>
+                        </div>
                     </div>
 
                     <div className="space-y-6">

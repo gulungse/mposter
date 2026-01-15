@@ -106,7 +106,7 @@ export default async function TasksPage() {
                         name={task.name}
                         siteName={task.site.name}
                         siteType={task.site.type as 'WORDPRESS' | 'BLOGSPOT'}
-                        keywordGroupName={task.keywordGroup.name}
+                        keywordGroupName={task.keywordGroup?.name || '수동 입력'}
                         promptTitle={task.prompt?.title || '프롬프트 없음'}
                         schedule={formatSchedule(task.scheduleCron)}
                         status={task.isActive}

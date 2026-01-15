@@ -176,7 +176,8 @@ async function generateFluxImage(apiKey: string, prompt: string) {
  */
 export async function testPublishAction(data: {
     siteId: string;
-    keywordGroupId: string;
+    keywordGroupId?: string;
+    keywords?: string[];
     promptId: string;
     aiModel: 'GPT4O' | 'GEMINI';
     imageSource: 'SCRAP' | 'DALLE' | 'FLUX' | 'NONE';
@@ -192,7 +193,7 @@ export async function testPublishAction(data: {
 
         const [site, keywordGroup, prompt] = await Promise.all([
             prisma.site.findUnique({ where: { id: data.siteId, userId: user.id } }),
-            prisma.keywordGroup.findUnique({ where: { id: data.keywordGroupId, userId: user.id } }),
+            data.keywordGroupId ? prisma.keywordGroup.findUnique({ where: { id: data.keywordGroupId, userId: user.id } }) : Promise.resolve(null),
             prisma.prompt.findFirst({
                 where: {
                     id: data.promptId,
@@ -204,9 +205,11 @@ export async function testPublishAction(data: {
             })
         ])
 
-        if (!site || !keywordGroup || !prompt) throw new Error('대상 사이트, 키워드, 또는 프롬프트 데이터를 찾을 수 없습니다.')
+        if (!site || (!keywordGroup && !data.keywords?.length) || !prompt) throw new Error('대상 사이트, 키워드, 또는 프롬프트 데이터를 찾을 수 없습니다.')
 
-        const keywords = keywordGroup.keywords as string[]
+        const keywords = (data.keywords && data.keywords.length > 0) ? data.keywords : (keywordGroup?.keywords as string[] || [])
+        if (keywords.length === 0) throw new Error('사용 가능한 키워드가 없습니다.')
+
         const targetKeyword = keywords[Math.floor(Math.random() * keywords.length)]
 
         let title = ''
@@ -363,7 +366,12 @@ export async function runAutomationTask(jobId: string) {
 
         if (!job) return { success: false, error: '작업 데이터를 찾을 수 없습니다.' }
 
-        const keywords = job.keywordGroup.keywords as string[]
+        const keywords = ((job as any).keywords && (job as any).keywords.length > 0)
+            ? (job as any).keywords
+            : (job.keywordGroup?.keywords as string[] || [])
+
+        if (!keywords || keywords.length === 0) return { success: false, error: '사용 가능한 키워드가 없습니다.' }
+
         const targetKeyword = keywords[Math.floor(Math.random() * keywords.length)]
 
         const log = await prisma.postLog.create({

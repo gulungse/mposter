@@ -14,7 +14,7 @@ import {
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getSites, getWordPressCategories } from '@/app/actions/site'
-import { getKeywordGroups, createKeywordGroup } from '@/app/actions/keyword'
+import { getKeywordGroups } from '@/app/actions/keyword'
 import { getPrompts } from '@/app/actions/prompt'
 import { createAutomationTask, getAutomationTask, updateAutomationTask } from '@/app/actions/task'
 import { testPublishAction } from '@/app/actions/worker'
@@ -114,21 +114,16 @@ function TaskForm() {
     }, [formData.siteId, sites])
 
     const handleTestPublish = async () => {
-        let finalGroupId = formData.keywordGroupId
+        let finalGroupId: string | undefined = formData.keywordGroupId
+        let finalKeywords: string[] | undefined = undefined
 
         if (keywordMode === 'MANUAL') {
             if (!manualKeywords.trim()) { alert('키워드를 입력해주세요.'); return; }
             const kws = manualKeywords.split(/[\n,]+/).map(k => k.trim()).filter(k => k);
             if (kws.length === 0) { alert('유효한 키워드가 없습니다.'); return; }
 
-            setTesting(true)
-            const groupRes = await createKeywordGroup(`Manual-${new Date().toLocaleTimeString()}`, kws)
-            if (!groupRes.success || !groupRes.data) {
-                setTesting(false)
-                alert(groupRes.message || '키워드 그룹 생성 실패')
-                return
-            }
-            finalGroupId = groupRes.data.id
+            finalGroupId = undefined
+            finalKeywords = kws
         } else {
             if (!formData.siteId || !formData.keywordGroupId || !formData.promptId) {
                 alert('사이트, 키워드, 지시사항을 모두 선택해주세요.')
@@ -139,7 +134,8 @@ function TaskForm() {
         setTesting(true)
         const result = await testPublishAction({
             siteId: formData.siteId,
-            keywordGroupId: finalGroupId,
+            keywordGroupId: finalGroupId as any,
+            keywords: finalKeywords,
             promptId: formData.promptId,
             aiModel: formData.aiModel as any,
             imageSource: formData.imageSource as any,
@@ -154,21 +150,16 @@ function TaskForm() {
     }
 
     const handleSubmit = async () => {
-        let finalGroupId = formData.keywordGroupId
+        let finalGroupId: string | undefined = formData.keywordGroupId
+        let finalKeywords: string[] | undefined = undefined
 
         if (keywordMode === 'MANUAL') {
             if (!manualKeywords.trim()) { alert('키워드를 입력해주세요.'); return; }
             const kws = manualKeywords.split(/[\n,]+/).map(k => k.trim()).filter(k => k);
             if (kws.length === 0) { alert('유효한 키워드가 없습니다.'); return; }
 
-            setSubmitting(true)
-            const groupRes = await createKeywordGroup(`Manual-${new Date().toLocaleTimeString()}`, kws)
-            if (!groupRes.success || !groupRes.data) {
-                setSubmitting(false)
-                alert(groupRes.message || '키워드 그룹 생성 실패')
-                return
-            }
-            finalGroupId = groupRes.data.id
+            finalGroupId = undefined
+            finalKeywords = kws
         } else {
             if (!formData.name || !formData.siteId || !formData.keywordGroupId || !formData.promptId) {
                 alert('필수 항목을 모두 입력해주세요.')
@@ -177,7 +168,11 @@ function TaskForm() {
         }
 
         setSubmitting(true)
-        const submitData = { ...formData, keywordGroupId: finalGroupId }
+        const submitData = {
+            ...formData,
+            keywordGroupId: finalGroupId,
+            keywords: finalKeywords
+        }
 
         let result
         if (editTaskId) {
