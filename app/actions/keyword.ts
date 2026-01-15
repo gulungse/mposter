@@ -40,7 +40,7 @@ export async function createKeywordGroup(name: string, keywords: string[]) {
             return { success: false, message: limitRes.error }
         }
 
-        await prisma.keywordGroup.create({
+        const group = await prisma.keywordGroup.create({
             data: {
                 userId: user.id,
                 name,
@@ -49,7 +49,7 @@ export async function createKeywordGroup(name: string, keywords: string[]) {
         })
 
         revalidatePath('/dashboard/keywords')
-        return { success: true, message: '키워드 그룹이 생성되었습니다.' }
+        return { success: true, message: '키워드 그룹이 생성되었습니다.', data: group }
     } catch (error) {
         console.error('Failed to create keyword group:', error)
         return { success: false, message: '키워드 그룹 생성 실패' }

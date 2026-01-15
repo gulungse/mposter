@@ -14,7 +14,7 @@ import {
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getSites, getWordPressCategories } from '@/app/actions/site'
-import { getKeywordGroups } from '@/app/actions/keyword'
+import { getKeywordGroups, createKeywordGroup } from '@/app/actions/keyword'
 import { getPrompts } from '@/app/actions/prompt'
 import { createAutomationTask, getAutomationTask, updateAutomationTask } from '@/app/actions/task'
 import { testPublishAction } from '@/app/actions/worker'
@@ -45,6 +45,17 @@ function TaskForm() {
         imageSource: 'DALLE',
         wpCategoryId: undefined as number | undefined
     })
+
+    const [keywordMode, setKeywordMode] = useState<'GROUP' | 'MANUAL'>('GROUP')
+    const [manualKeywords, setManualKeywords] = useState('')
+
+    useEffect(() => {
+        const urlKeyword = searchParams.get('keyword')
+        if (urlKeyword) {
+            setKeywordMode('MANUAL')
+            setManualKeywords(urlKeyword)
+        }
+    }, [searchParams])
 
     useEffect(() => {
         const loadInitialData = async () => {
@@ -103,14 +114,32 @@ function TaskForm() {
     }, [formData.siteId, sites])
 
     const handleTestPublish = async () => {
-        if (!formData.siteId || !formData.keywordGroupId || !formData.promptId) {
-            alert('사이트, 키워드, 지시사항을 모두 선택해주세요.')
-            return
+        let finalGroupId = formData.keywordGroupId
+
+        if (keywordMode === 'MANUAL') {
+            if (!manualKeywords.trim()) { alert('키워드를 입력해주세요.'); return; }
+            const kws = manualKeywords.split(/[\n,]+/).map(k => k.trim()).filter(k => k);
+            if (kws.length === 0) { alert('유효한 키워드가 없습니다.'); return; }
+
+            setTesting(true)
+            const groupRes = await createKeywordGroup(`Manual-${new Date().toLocaleTimeString()}`, kws)
+            if (!groupRes.success || !groupRes.data) {
+                setTesting(false)
+                alert(groupRes.message || '키워드 그룹 생성 실패')
+                return
+            }
+            finalGroupId = groupRes.data.id
+        } else {
+            if (!formData.siteId || !formData.keywordGroupId || !formData.promptId) {
+                alert('사이트, 키워드, 지시사항을 모두 선택해주세요.')
+                return
+            }
         }
+
         setTesting(true)
         const result = await testPublishAction({
             siteId: formData.siteId,
-            keywordGroupId: formData.keywordGroupId,
+            keywordGroupId: finalGroupId,
             promptId: formData.promptId,
             aiModel: formData.aiModel as any,
             imageSource: formData.imageSource as any,
@@ -125,17 +154,36 @@ function TaskForm() {
     }
 
     const handleSubmit = async () => {
-        if (!formData.name || !formData.siteId || !formData.keywordGroupId || !formData.promptId) {
-            alert('필수 항목을 모두 입력해주세요.')
-            return
+        let finalGroupId = formData.keywordGroupId
+
+        if (keywordMode === 'MANUAL') {
+            if (!manualKeywords.trim()) { alert('키워드를 입력해주세요.'); return; }
+            const kws = manualKeywords.split(/[\n,]+/).map(k => k.trim()).filter(k => k);
+            if (kws.length === 0) { alert('유효한 키워드가 없습니다.'); return; }
+
+            setSubmitting(true)
+            const groupRes = await createKeywordGroup(`Manual-${new Date().toLocaleTimeString()}`, kws)
+            if (!groupRes.success || !groupRes.data) {
+                setSubmitting(false)
+                alert(groupRes.message || '키워드 그룹 생성 실패')
+                return
+            }
+            finalGroupId = groupRes.data.id
+        } else {
+            if (!formData.name || !formData.siteId || !formData.keywordGroupId || !formData.promptId) {
+                alert('필수 항목을 모두 입력해주세요.')
+                return
+            }
         }
+
         setSubmitting(true)
+        const submitData = { ...formData, keywordGroupId: finalGroupId }
 
         let result
         if (editTaskId) {
-            result = await updateAutomationTask(editTaskId, formData)
+            result = await updateAutomationTask(editTaskId, submitData)
         } else {
-            result = await createAutomationTask(formData as any)
+            result = await createAutomationTask(submitData as any)
         }
 
         if (result.success) {
@@ -217,26 +265,41 @@ function TaskForm() {
                     </div>
                     <div className="pl-9 space-y-4">
                         <div className="bg-card border border-border rounded-lg p-1 inline-flex">
-                            <button className="px-4 py-1.5 bg-primary text-primary-foreground rounded text-xs font-bold shadow-sm">키워드 그룹</button>
-                            <button className="px-4 py-1.5 text-muted-foreground hover:text-foreground text-xs font-bold transition-colors">수동 입력</button>
+                            <button onClick={() => setKeywordMode('GROUP')} type="button" className={`px-4 py-1.5 rounded text-xs font-bold shadow-sm transition-all ${keywordMode === 'GROUP' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>키워드 그룹</button>
+                            <button onClick={() => setKeywordMode('MANUAL')} type="button" className={`px-4 py-1.5 rounded text-xs font-bold shadow-sm transition-all ${keywordMode === 'MANUAL' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>수동 입력</button>
                         </div>
 
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-medium text-muted-foreground">키워드 그룹 선택</label>
-                            <select
-                                value={formData.keywordGroupId}
-                                onChange={e => setFormData({ ...formData, keywordGroupId: e.target.value })}
-                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
-                            >
-                                <option value="">여기를 클릭해서 키워드그룹을 선택하세요</option>
-                                {keywordGroups.map(k => (
-                                    <option key={k.id} value={k.id}>{k.name} ({k.keywords?.length || 0} 키워드)</option>
-                                ))}
-                            </select>
-                            <p className="text-[10px] text-muted-foreground pt-1">
-                                이 그룹에는 {keywordGroups.find(k => k.id === formData.keywordGroupId)?.keywords?.length || 0}개의 키워드가 있습니다. 각 키워드마다 별도의 포스팅이 생성됩니다.
-                            </p>
-                        </div>
+                        {keywordMode === 'GROUP' ? (
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-muted-foreground">키워드 그룹 선택</label>
+                                <select
+                                    value={formData.keywordGroupId}
+                                    onChange={e => setFormData({ ...formData, keywordGroupId: e.target.value })}
+                                    className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                                >
+                                    <option value="">여기를 클릭해서 키워드그룹을 선택하세요</option>
+                                    {keywordGroups.map(k => (
+                                        <option key={k.id} value={k.id}>{k.name} ({k.keywords?.length || 0} 키워드)</option>
+                                    ))}
+                                </select>
+                                <p className="text-[10px] text-muted-foreground pt-1">
+                                    이 그룹에는 {keywordGroups.find(k => k.id === formData.keywordGroupId)?.keywords?.length || 0}개의 키워드가 있습니다. 각 키워드마다 별도의 포스팅이 생성됩니다.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-muted-foreground">키워드 입력 (쉼표나 줄바꿈으로 구분)</label>
+                                <textarea
+                                    value={manualKeywords}
+                                    onChange={e => setManualKeywords(e.target.value)}
+                                    placeholder={`아이폰 16 출시일\n갤럭시 S24 울트라\n...`}
+                                    className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all min-h-[120px]"
+                                />
+                                <p className="text-[10px] text-muted-foreground pt-1">
+                                    입력한 키워드로 목록이 자동 생성되며, 저장 시 새로운 그룹으로 등록됩니다.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </section>
 
