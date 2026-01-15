@@ -1,0 +1,341 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import {
+    ArrowLeft as ArrowLeftIcon,
+    Globe as GlobeIcon,
+    Hash as HashIcon,
+    MonitorPlay as MonitorPlayIcon,
+    Zap as ZapIcon,
+    Loader2 as Loader2Icon,
+    Save as SaveIcon,
+    Sparkles as SparklesIcon,
+    Image as ImageIcon2,
+    Clock as ClockIcon,
+    Layers as LayersIcon,
+    LayoutGrid as LayoutGridIcon,
+    CheckCircle2 as CheckCircle2Icon,
+    PlayCircle as PlayCircleIcon
+} from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { getSites, getWordPressCategories } from '@/app/actions/site'
+import { getKeywordGroups } from '@/app/actions/keyword'
+import { getPrompts } from '@/app/actions/prompt'
+import { createAutomationTask } from '@/app/actions/task'
+import { testPublishAction } from '@/app/actions/worker'
+
+export default function NewTaskPage() {
+    const router = useRouter()
+    const [loading, setLoading] = useState(true)
+    const [submitting, setSubmitting] = useState(false)
+    const [testing, setTesting] = useState(false)
+    const [fetchingCategories, setFetchingCategories] = useState(false)
+
+    // Data lists
+    const [sites, setSites] = useState<any[]>([])
+    const [keywordGroups, setKeywordGroups] = useState<any[]>([])
+    const [prompts, setPrompts] = useState<any[]>([])
+    const [categories, setCategories] = useState<{ id: number, name: string }[]>([])
+
+    const [formData, setFormData] = useState({
+        name: '',
+        siteId: '',
+        keywordGroupId: '',
+        promptId: '',
+        scheduleCron: '0 * * * *',
+        aiModel: 'GPT4O',
+        imageSource: 'DALLE',
+        wpCategoryId: undefined as number | undefined
+    })
+
+    useEffect(() => {
+        const loadInitialData = async () => {
+            const [sitesRes, keywordsRes, promptsRes] = await Promise.all([
+                getSites(),
+                getKeywordGroups(),
+                getPrompts()
+            ])
+            if (sitesRes.success) setSites(sitesRes.data || [])
+            if (keywordsRes.success) setKeywordGroups(keywordsRes.data || [])
+            if (promptsRes.success) setPrompts(promptsRes.data || [])
+            setLoading(false)
+        }
+        loadInitialData()
+    }, [])
+
+    useEffect(() => {
+        const fetchCats = async () => {
+            if (!formData.siteId) {
+                setCategories([])
+                return
+            }
+            const selectedSite = sites.find(s => s.id === formData.siteId)
+            if (selectedSite?.type === 'WORDPRESS') {
+                setFetchingCategories(true)
+                const res = await getWordPressCategories(formData.siteId)
+                if (res.success) setCategories(res.data)
+                else setCategories([])
+                setFetchingCategories(false)
+            } else {
+                setCategories([])
+            }
+        }
+        fetchCats()
+    }, [formData.siteId, sites])
+
+    const handleTestPublish = async () => {
+        if (!formData.siteId || !formData.keywordGroupId || !formData.promptId) {
+            alert('사이트, 키워드, 지시사항을 모두 선택해주세요.')
+            return
+        }
+        setTesting(true)
+        const result = await testPublishAction({
+            siteId: formData.siteId,
+            keywordGroupId: formData.keywordGroupId,
+            promptId: formData.promptId,
+            aiModel: formData.aiModel as any,
+            imageSource: formData.imageSource as any,
+            wpCategoryId: formData.wpCategoryId
+        })
+        if (result.success) {
+            alert('테스트 발행 성공! 실제 사이트에서 확인해 보세요.')
+        } else {
+            alert(result.error || '테스트 발행 실패')
+        }
+        setTesting(false)
+    }
+
+    const handleSubmit = async () => {
+        if (!formData.name || !formData.siteId || !formData.keywordGroupId || !formData.promptId) {
+            alert('필수 항목을 모두 입력해주세요.')
+            return
+        }
+        setSubmitting(true)
+        const result = await createAutomationTask(formData as any)
+        if (result.success) {
+            router.push('/dashboard/tasks')
+        } else {
+            alert(result.error || '작업 생성 실패')
+            setSubmitting(false)
+        }
+    }
+
+    if (loading) return <div className="p-12 text-center text-slate-500 font-bold">로딩 중...</div>
+
+    return (
+        <div className="p-8 max-w-5xl mx-auto">
+            {/* Header */}
+            <div className="mb-4">
+                <nav className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                    <Link href="/dashboard/tasks" className="hover:text-foreground transition-colors">Automations</Link>
+                    <span>/</span>
+                    <span className="text-foreground font-medium">New Task</span>
+                </nav>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h1 className="text-2xl font-black tracking-tight text-foreground font-sans">Create New Automation</h1>
+                        <p className="text-muted-foreground mt-1 text-sm">Configure your AI-powered content workflow and destinations.</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Main Form Container */}
+            <div className="space-y-6 pb-24">
+
+                {/* Step 1: Destination */}
+                <section className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-black text-xs">1</div>
+                        <h3 className="text-lg font-bold text-foreground">Destination & Category</h3>
+                    </div>
+                    <div className="pl-9 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground">Target Site</label>
+                            <select
+                                value={formData.siteId}
+                                onChange={e => setFormData({ ...formData, siteId: e.target.value })}
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                            >
+                                <option value="">Select a destination site...</option>
+                                {sites.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name} ({s.type})</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground">Category</label>
+                            <select
+                                value={formData.wpCategoryId || ''}
+                                onChange={e => setFormData({ ...formData, wpCategoryId: Number(e.target.value) })}
+                                disabled={!categories.length}
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer disabled:opacity-50"
+                            >
+                                <option value="">{fetchingCategories ? 'Loading...' : 'Select Category (Optional)'}</option>
+                                {categories.map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                <div className="w-full h-px bg-border pl-9" />
+
+                {/* Step 2: Keyword Source */}
+                <section className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-black text-xs">2</div>
+                        <h3 className="text-lg font-bold text-foreground">Keyword Source</h3>
+                    </div>
+                    <div className="pl-9 space-y-4">
+                        <div className="bg-card border border-border rounded-lg p-1 inline-flex">
+                            <button className="px-4 py-1.5 bg-primary text-primary-foreground rounded text-xs font-bold shadow-sm">Keyword Group</button>
+                            <button className="px-4 py-1.5 text-muted-foreground hover:text-foreground text-xs font-bold transition-colors">Manual Input</button>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground">Select Group</label>
+                            <select
+                                value={formData.keywordGroupId}
+                                onChange={e => setFormData({ ...formData, keywordGroupId: e.target.value })}
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                            >
+                                <option value="">Select a keyword group...</option>
+                                {keywordGroups.map(k => (
+                                    <option key={k.id} value={k.id}>{k.name} ({k.keywords?.length || 0} keywords)</option>
+                                ))}
+                            </select>
+                            <p className="text-[10px] text-muted-foreground pt-1">This group contains {keywordGroups.find(k => k.id === formData.keywordGroupId)?.keywords?.length || 0} keywords. Each will trigger a separate post creation.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <div className="w-full h-px bg-border pl-9" />
+
+                {/* Step 3: AI Configuration */}
+                <section className="space-y-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-black text-xs">3</div>
+                        <h3 className="text-lg font-bold text-foreground">AI Engine Configuration</h3>
+                    </div>
+                    <div className="pl-9 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div
+                            onClick={() => setFormData({ ...formData, aiModel: 'GPT4O' })}
+                            className={`cursor-pointer rounded-lg border p-4 flex items-start gap-3 transition-all ${formData.aiModel === 'GPT4O' ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-primary/50'}`}
+                        >
+                            <div className="h-8 w-8 rounded bg-green-500/10 flex items-center justify-center text-green-500 shrink-0">
+                                <SparklesIcon className="h-4 w-4" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm text-foreground">ChatGPT-4o</h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">Best for creative, engaging content with high nuance.</p>
+                            </div>
+                            {formData.aiModel === 'GPT4O' && <CheckCircle2Icon className="ml-auto h-4 w-4 text-primary" />}
+                        </div>
+
+                        <div
+                            onClick={() => setFormData({ ...formData, aiModel: 'GEMINI' })}
+                            className={`cursor-pointer rounded-lg border p-4 flex items-start gap-3 transition-all ${formData.aiModel === 'GEMINI' ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-primary/50'}`}
+                        >
+                            <div className="h-8 w-8 rounded bg-purple-500/10 flex items-center justify-center text-purple-500 shrink-0">
+                                <ZapIcon className="h-4 w-4" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm text-foreground">Gemini 1.5 Pro</h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">Ideal for factual, data-heavy articles and analysis.</p>
+                            </div>
+                            {formData.aiModel === 'GEMINI' && <CheckCircle2Icon className="ml-auto h-4 w-4 text-primary" />}
+                        </div>
+                    </div>
+
+                    <div className="pl-9 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground">System Prompt</label>
+                            <select
+                                value={formData.promptId}
+                                onChange={e => setFormData({ ...formData, promptId: e.target.value })}
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                            >
+                                <option value="">Select AI behavior...</option>
+                                {prompts.map(p => (
+                                    <option key={p.id} value={p.id}>{p.title}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground">Task Name</label>
+                            <input
+                                type="text"
+                                value={formData.name}
+                                onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                placeholder="e.g. Daily Tech News Run"
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all placeholder:text-muted-foreground"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="pl-9 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground">Publish Schedule</label>
+                            <select
+                                value={formData.scheduleCron}
+                                onChange={e => setFormData({ ...formData, scheduleCron: e.target.value })}
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                            >
+                                <option value="*/5 * * * *">🔥 Every 5 mins</option>
+                                <option value="*/30 * * * *">⏰ Every 30 mins</option>
+                                <option value="0 * * * *">🕒 Hourly</option>
+                                <option value="0 0 * * *">🌙 Daily</option>
+                                <option value="MANUAL">🕹️ Manual Only</option>
+                            </select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground">Image Source</label>
+                            <select
+                                value={formData.imageSource}
+                                onChange={e => setFormData({ ...formData, imageSource: e.target.value as any })}
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                            >
+                                <option value="DALLE">DALL-E 3</option>
+                                <option value="FLUX">FLUX Pro</option>
+                                <option value="SCRAP">Web Scraping</option>
+                                <option value="NONE">No Images</option>
+                            </select>
+                        </div>
+                    </div>
+
+                </section>
+            </div>
+
+            {/* Sticky Bottom Actions */}
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/90 backdrop-blur border-t border-border z-20 pl-64">
+                <div className="max-w-5xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                        <span className="text-[10px] font-medium text-muted-foreground">Auto-save: <span className="text-foreground">Enabled</span></span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleTestPublish}
+                            disabled={testing || submitting}
+                            className="px-4 py-2 bg-card hover:bg-muted border border-border text-foreground rounded-lg text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50"
+                        >
+                            {testing ? <Loader2Icon className="h-3.5 w-3.5 animate-spin" /> : <LayersIcon className="h-3.5 w-3.5" />}
+                            Test Publish
+                        </button>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={submitting || testing}
+                            className="px-6 py-2 bg-primary hover:opacity-90 text-primary-foreground rounded-lg text-xs font-bold shadow-lg shadow-blue-500/20 flex items-center gap-2 transition-all disabled:opacity-50"
+                        >
+                            {submitting ? <Loader2Icon className="h-3.5 w-3.5 animate-spin" /> : <SaveIcon className="h-3.5 w-3.5" />}
+                            Save Task
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div className="h-24" /> {/* Spacer for fixed bottom bar */}
+        </div>
+    )
+}

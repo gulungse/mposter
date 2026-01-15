@@ -1,0 +1,251 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// 사용자 모델 (Supabase Auth와 연동)
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  role          UserRole  @default(USER)
+  tokenBalance  Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // 플랜 및 구독 정보
+  planId        String?
+  plan          Plan?     @relation(fields: [planId], references: [id])
+  subscriptionEnd DateTime? // 구독 종료일
+  
+  // 설정 및 API 키 정보 (JSON으로 안전하게 관리)
+  limits        Json?     // { siteLimit: 3, keywordGroupLimit: 5, ... } -> DEPRECATED (Use Plan)
+  settings      Json?     // { openaiApiKey: '...', ... }
+
+  // 관계 설정
+  sites         Site[]
+  keywordGroups KeywordGroup[]
+  prompts       Prompt[]
+  automationJobs AutomationJob[]
+  postLogs      PostLog[]
+  transactions  Transaction[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+// 요금제 플랜 모델
+model Plan {
+  id                String   @id @default(uuid())
+  name              String   // Free, Basic, Pro 등
+  price             Int      @default(0) // 월 정액 가격 (KRW)
+  siteLimit         Int      @default(2)
+  keywordGroupLimit Int      @default(3)
+  promptLimit       Int      @default(2)
+  taskLimit         Int      @default(2)
+  description       String?
+  monthlyTokens     Int      @default(0) // 매월 제공되는 토큰
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  users             User[]
+
+  @@map("plans")
+}
+
+// 사이트 모델 (WordPress, Blogspot)
+model Site {
+  id          String   @id @default(uuid())
+  userId      String
+  type        SiteType
+  name        String
+  url         String
+  username    String?
+  apiToken    String?  // App Password or OAuth Token (Encrypted ideally)
+  refreshToken String? // OAuth Refresh Token for Blogspot
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs        AutomationJob[]
+
+  @@map("sites")
+}
+
+enum SiteType {
+  WORDPRESS
+  BLOGSPOT
+}
+
+// 키워드 그룹 모델
+model KeywordGroup {
+  id          String   @id @default(uuid())
+  userId      String
+  name        String
+  keywords    String[] // PostgreSQL array support
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs        AutomationJob[]
+
+  @@map("keyword_groups")
+}
+
+// 프롬프트 모델
+model Prompt {
+  id          String   @id @default(uuid())
+  userId      String?  // Null means System Prompt
+  type        PromptType @default(USER)
+  title       String
+  content     String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobs        AutomationJob[]
+
+  @@map("prompts")
+}
+
+enum PromptType {
+  SYSTEM
+  USER
+}
+
+// 자동화 작업 모델
+model AutomationJob {
+  id              String   @id @default(uuid())
+  userId          String
+  name            String
+  siteId          String
+  keywordGroupId  String
+  promptId        String?
+  
+  // 설정값
+  scheduleCron    String?  // Cron expression e.g., "0 9 * * *"
+  aiModel         AIModel      @default(GPT4O)
+  imageSource     ImageSource  @default(DALLE)
+  isActive        Boolean  @default(true)
+  
+  // 워드프레스 전용
+  wpCategoryId    Int?
+  wpCategoryName  String?
+  
+  lastRunAt       DateTime?
+  nextRunAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  site            Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  keywordGroup    KeywordGroup @relation(fields: [keywordGroupId], references: [id], onDelete: Cascade)
+  prompt          Prompt?      @relation(fields: [promptId], references: [id])
+  logs            PostLog[]
+
+  @@map("automation_jobs")
+}
+
+enum ImageSource {
+  DALLE
+  FLUX
+  SCRAP
+  NONE
+}
+
+enum AIModel {
+  GPT4O
+  GEMINI
+}
+
+// 발행 로그 모델
+model PostLog {
+  id              String   @id @default(uuid())
+  userId          String
+  jobId           String?
+  
+  keyword         String
+  title           String?
+  status          PostStatus @default(PENDING)
+  postUrl         String?    // Published URL
+  tokensUsed      Int        @default(0)
+  errorMessage    String?
+  
+  createdAt       DateTime @default(now())
+
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job             AutomationJob? @relation(fields: [jobId], references: [id])
+
+  @@map("post_logs")
+}
+
+enum PostStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+}
+
+// 토큰 트랜잭션 기록
+model Transaction {
+  id          String   @id @default(uuid())
+  userId      String
+  amount      Int      // Positive for credit, negative for debit
+  description String
+  type        TransactionType
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("transactions")
+}
+
+enum TransactionType {
+  CHARGE
+  USAGE
+  BONUS
+  REFUND
+}
+
+// 사이드바 메뉴 모델 (관리자 전용 설정)
+model SidebarMenu {
+  id        String   @id @default(uuid())
+  label     String
+  href      String
+  icon      String   @default("LayoutDashboard")
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+
+  @@map("sidebar_menus")
+}
+
+// 전역 시스템 설정 (토큰 비용 등)
+model GlobalSetting {
+  id        String   @id @default("SYSTEM") // 단일 레코드 (ID: SYSTEM)
+  
+  costPerPost      Int @default(1)
+  costPerScrap     Int @default(1)
+  costPerAIImage   Int @default(2) // DALLE or FLUX
+  
+  updatedAt        DateTime @updatedAt
+
+  @@map("global_settings")
+}

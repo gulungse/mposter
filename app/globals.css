@@ -1,0 +1,168 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter), var(--font-noto-sans-kr), sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0
+    }
+
+    to {
+      height: var(--radix-accordion-content-height)
+    }
+  }
+
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height)
+    }
+
+    to {
+      height: 0
+    }
+  }
+}
+
+/* Base Styles - Defaulting to Dark Blue Theme */
+:root {
+  --background: #0f172a;
+  /* Slate 900 */
+  --foreground: #f8fafc;
+  /* Slate 50 */
+
+  --card: #1e293b;
+  /* Slate 800 */
+  --card-foreground: #f8fafc;
+  /* Slate 50 */
+
+  --popover: #0f172a;
+  /* Slate 900 */
+  --popover-foreground: #f8fafc;
+  /* Slate 50 */
+
+  --primary: #3b82f6;
+  /* Blue 500 */
+  --primary-foreground: #ffffff;
+
+  --secondary: #334155;
+  /* Slate 700 */
+  --secondary-foreground: #f8fafc;
+
+  --muted: #1e293b;
+  /* Slate 800 */
+  --muted-foreground: #94a3b8;
+  /* Slate 400 */
+
+  --accent: #1e293b;
+  /* Slate 800 */
+  --accent-foreground: #f8fafc;
+
+  --destructive: #ef4444;
+  /* Red 500 */
+  --destructive-foreground: #f8fafc;
+
+  --border: #1e293b;
+  /* Slate 800 - Subtle border */
+  --input: #1e293b;
+  /* Slate 800 */
+  --ring: #3b82f6;
+  /* Blue 500 */
+
+  --radius: 0.75rem;
+  /* Rounded-xl look */
+}
+
+/* Global Scale Adjustment: 14px base helps fit more content (approx 87.5% scale) */
+html {
+  font-size: 14px;
+}
+
+/* Optional Light Mode Overrides (if user explicitly requests light mode via system, though design is dark-focused) */
+@media (prefers-color-scheme: light) {
+  /* Commenting out typical light mode to enforce the "Brand Style" requested (Dark Blue) */
+  /* If strict light mode is needed, restore typical light values here. 
+     For now, we enforce the brand look. */
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+
+  /* Force Visible Form Elements: Light Background, Black Text */
+  input,
+  textarea,
+  select {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    /* Slate 900 - Black */
+    border-color: #cbd5e1 !important;
+    /* Slate 300 */
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #94a3b8 !important;
+    /* Slate 400 */
+  }
+
+  /* Ensure container backgrounds don't conflict, but keep input fields light */
+  .dark input,
+  .dark textarea,
+  .dark select {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+}
+
+/* Hide Next.js Development/Route Indicators that overlap with UI */
+body>[data-nextjs-toast],
+body>[data-nextjs-toast-wrapper],
+nextjs-portal,
+#__next-build-watcher {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
