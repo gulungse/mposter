@@ -1,7 +1,11 @@
 
+'use client'
+
 import { Copy as CopyIcon, Edit as EditIcon, MoreHorizontal as MoreHorizontalIcon, Shield as ShieldIcon, Sparkles as SparklesIcon, Trash2 as Trash2Icon, User as UserIcon } from 'lucide-react'
 import Link from 'next/link'
 import { clsx } from 'clsx'
+import { deletePrompt } from '@/app/actions/prompt'
+import { useRouter } from 'next/navigation'
 
 interface PromptCardProps {
     id: string
@@ -11,8 +15,21 @@ interface PromptCardProps {
 }
 
 export function PromptCard({ id, title, preview, type }: PromptCardProps) {
+    const router = useRouter()
+
+    const handleDelete = async () => {
+        if (!confirm('정말 이 프롬프트를 삭제하시겠습니까?')) return
+
+        const res = await deletePrompt(id)
+        if (res.success) {
+            router.refresh()
+        } else {
+            alert('삭제 실패: ' + res.error)
+        }
+    }
+
     return (
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/50 group">
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/50 group h-full">
             <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
                     <div className={clsx(
@@ -41,16 +58,23 @@ export function PromptCard({ id, title, preview, type }: PromptCardProps) {
             </div>
 
             <div className="flex-1 bg-muted/30 rounded-lg p-3 border border-border/50">
-                <p className="text-[11px] text-muted-foreground font-mono line-clamp-3 leading-relaxed">
-                    {preview}
-                </p>
+                {type === 'SYSTEM' ? (
+                    <div className="flex items-center justify-center h-full text-xs text-muted-foreground italic">
+                        <SparklesIcon className="h-3 w-3 mr-1" />
+                        시스템 전용 (내용 숨김)
+                    </div>
+                ) : (
+                    <p className="text-[11px] text-muted-foreground font-mono line-clamp-3 leading-relaxed">
+                        {preview}
+                    </p>
+                )}
             </div>
 
-            <div className="flex items-center gap-2 pt-2 border-t border-border">
+            <div className="flex items-center gap-2 pt-2 border-t border-border mt-auto">
                 {type === 'SYSTEM' ? (
-                    <button className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-xs font-bold text-secondary-foreground transition-colors hover:bg-secondary/80 border border-border">
-                        <CopyIcon className="h-3.5 w-3.5" />
-                        복제하기
+                    <button className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-xs font-bold text-secondary-foreground transition-colors hover:bg-secondary/80 border border-border opacity-50 cursor-not-allowed">
+                        <ShieldIcon className="h-3.5 w-3.5" />
+                        시스템 보호됨
                     </button>
                 ) : (
                     <>
@@ -58,7 +82,10 @@ export function PromptCard({ id, title, preview, type }: PromptCardProps) {
                             <EditIcon className="h-3.5 w-3.5" />
                             수정
                         </Link>
-                        <button className="flex items-center justify-center rounded-xl bg-secondary p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive border border-border">
+                        <button
+                            onClick={handleDelete}
+                            className="flex items-center justify-center rounded-xl bg-secondary p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive border border-border"
+                        >
                             <Trash2Icon className="h-3.5 w-3.5" />
                         </button>
                     </>

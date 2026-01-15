@@ -24,30 +24,6 @@ export default async function PromptsPage() {
                         시스템 프리셋 및 나만의 AI 프롬프트를 관리하세요.
                     </p>
                 </div>
-                <Link
-                    href="/dashboard/prompts/new"
-                    className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-primary/90 shadow-lg shadow-blue-500/20 transition-all w-fit"
-                >
-                    <PlusIcon className="h-4 w-4" />
-                    새 프롬프트 만들기
-                </Link>
-            </div>
-
-            {/* Filters & Tabs (Visual only for now) */}
-            <div className="flex flex-col sm:flex-row gap-4">
-                <label className="relative flex-1 max-w-sm">
-                    <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <input
-                        type="text"
-                        placeholder="프롬프트 검색..."
-                        className="w-full pl-9 pr-4 py-2 rounded-xl bg-card border border-border text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 text-foreground placeholder:text-muted-foreground"
-                    />
-                </label>
-                <div className="flex bg-muted p-1 rounded-xl border border-border">
-                    <button className="px-4 py-1.5 rounded-lg bg-card shadow-sm text-xs font-bold text-foreground">전체</button>
-                    <button className="px-4 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">시스템</button>
-                    <button className="px-4 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">내 프롬프트</button>
-                </div>
             </div>
 
             <div className="space-y-6">
