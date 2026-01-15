@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import {
     LayoutDashboard, Globe, Key, Terminal, Cpu, Code2,
     Plus, Save, Trash2, MoveUp, MoveDown, Loader2,
-    CheckCircle2, AlertCircle, Menu as MenuIcon, Eye, EyeOff
+    CheckCircle2, AlertCircle, Menu as MenuIcon, Eye, EyeOff, Edit
 } from 'lucide-react'
 import { getSidebarMenus, createSidebarMenu, updateSidebarMenu, deleteSidebarMenu, seedDefaultMenus } from '@/app/actions/menu'
 import { clsx } from 'clsx'
@@ -51,6 +51,21 @@ export default function MenuManagementPage() {
         })
         if (res.success) loadMenus()
         else alert(res.error)
+    }
+
+    const handleEdit = async (menu: any) => {
+        const newLabel = prompt('새 메뉴 이름을 입력하세요:', menu.label)
+        if (newLabel === null) return
+        const newHref = prompt('새 연결 주소(href)를 입력하세요:', menu.href)
+        if (newHref === null) return
+
+        if (newLabel === menu.label && newHref === menu.href) return
+
+        setSaving(menu.id)
+        const res = await updateSidebarMenu(menu.id, { label: newLabel, href: newHref })
+        if (res.success) loadMenus()
+        else alert(res.error)
+        setSaving(null)
     }
 
     const handleToggleActive = async (menu: any) => {
@@ -134,9 +149,9 @@ export default function MenuManagementPage() {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             <span className="text-xs font-bold text-slate-500 w-4">{menu.order}</span>
-                                            <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={() => handleMove(index, 'up')} disabled={index === 0} className="hover:text-blue-600 disabled:opacity-30"><MoveUp className="h-3 w-3" /></button>
-                                                <button onClick={() => handleMove(index, 'down')} disabled={index === menus.length - 1} className="hover:text-blue-600 disabled:opacity-30"><MoveDown className="h-3 w-3" /></button>
+                                            <div className="flex flex-col gap-1 text-slate-400">
+                                                <button onClick={() => handleMove(index, 'up')} disabled={index === 0} className="hover:text-blue-600 disabled:opacity-20"><MoveUp className="h-3 w-3" /></button>
+                                                <button onClick={() => handleMove(index, 'down')} disabled={index === menus.length - 1} className="hover:text-blue-600 disabled:opacity-20"><MoveDown className="h-3 w-3" /></button>
                                             </div>
                                         </div>
                                     </td>
@@ -165,13 +180,22 @@ export default function MenuManagementPage() {
                                         </button>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <button
-                                            onClick={() => handleDelete(menu.id)}
-                                            disabled={saving === menu.id}
-                                            className="p-2 text-slate-400 hover:text-red-500 transition-colors"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
+                                        <div className="flex items-center justify-end gap-1">
+                                            <button
+                                                onClick={() => handleEdit(menu)}
+                                                disabled={saving === menu.id}
+                                                className="p-2 text-slate-400 hover:text-blue-500 transition-colors"
+                                            >
+                                                <Edit className="h-4 w-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(menu.id)}
+                                                disabled={saving === menu.id}
+                                                className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             )
