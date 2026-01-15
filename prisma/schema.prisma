@@ -244,6 +244,7 @@ model GlobalSetting {
   costPerPost      Int @default(1)
   costPerScrap     Int @default(1)
   costPerAIImage   Int @default(2) // DALLE or FLUX
+  isUpgradeEnabled Boolean @default(false) // 사이드바 업그레이드 버튼 표시 여부
   
   updatedAt        DateTime @updatedAt
 

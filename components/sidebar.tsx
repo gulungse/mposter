@@ -21,6 +21,7 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { getUserProfile } from '@/app/actions/user'
 import { getActiveSidebarMenus } from '@/app/actions/menu'
+import { getGlobalSettings } from '@/app/actions/settings'
 
 const ICON_MAP: Record<string, any> = {
     LayoutDashboard, Globe, Key, Terminal, Cpu, Code2, MenuIcon
@@ -30,6 +31,7 @@ export function Sidebar({ className }: { className?: string }) {
     const pathname = usePathname()
     const [user, setUser] = useState<{ name: string | null; email: string; role: string } | null>(null)
     const [menus, setMenus] = useState<any[]>([])
+    const [showUpgrade, setShowUpgrade] = useState(false)
 
     useEffect(() => {
         async function loadProfile() {
@@ -46,11 +48,9 @@ export function Sidebar({ className }: { className?: string }) {
                 { href: '/dashboard/keywords', icon: 'Key', label: '키워드 관리' },
                 { href: '/dashboard/prompts', icon: 'Terminal', label: '프롬프트 관리' },
                 { href: '/dashboard/tasks', icon: 'Cpu', label: '자동화 작업' },
-                // { href: '/dashboard/api', icon: 'Code2', label: 'API 관리' },
             ]
 
             if (res.success && res.data && res.data.length > 0) {
-                // 기본 메뉴와 DB 메뉴 중복 제거 (href 기준)
                 const dbMenus = res.data
                 const merged = [...defaultMenus]
 
@@ -64,8 +64,16 @@ export function Sidebar({ className }: { className?: string }) {
                 setMenus(defaultMenus)
             }
         }
+        async function loadSettings() {
+            const res = await getGlobalSettings()
+            if (res.success && res.data) {
+                // @ts-ignore
+                setShowUpgrade(!!res.data.isUpgradeEnabled)
+            }
+        }
         loadProfile()
         loadMenus()
+        loadSettings()
     }, [])
 
     return (
@@ -161,14 +169,16 @@ export function Sidebar({ className }: { className?: string }) {
             {/* Footer / Profile Section */}
             <div className="p-4 border-t border-[#1F2937] bg-[#0A0C10]">
 
-                <Link
-                    href="/dashboard/upgrade"
-                    className="group relative w-full flex items-center justify-center rounded-xl h-11 mb-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold tracking-wide overflow-hidden transition-all hover:shadow-lg hover:shadow-blue-500/25"
-                >
-                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                    <Sparkles className="h-3.5 w-3.5 mr-2 fill-white/20" />
-                    UPGRADE TO PRO
-                </Link>
+                {showUpgrade && (
+                    <Link
+                        href="/dashboard/upgrade"
+                        className="group relative w-full flex items-center justify-center rounded-xl h-11 mb-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold tracking-wide overflow-hidden transition-all hover:shadow-lg hover:shadow-blue-500/25"
+                    >
+                        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                        <Sparkles className="h-3.5 w-3.5 mr-2 fill-white/20" />
+                        UPGRADE TO PRO
+                    </Link>
+                )}
 
                 <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-[#1F2937] transition-colors cursor-pointer group">
                     <div className="h-9 w-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold shrink-0 overflow-hidden">

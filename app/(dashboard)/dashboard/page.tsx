@@ -49,24 +49,7 @@ export default async function DashboardPage() {
     return (
         <>
             {/* Top Navbar */}
-            <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur px-6 py-3">
-                <div className="flex items-center gap-4 flex-1">
-                    {/* Search bar removed */}
-                </div>
-                <div className="flex items-center gap-3">
-                    {/* Icons removed */}
-                    <div className="h-6 w-[1px] bg-border mx-1" />
-                    <div className="flex items-center gap-3">
-                        <div className="text-right hidden sm:block">
-                            <p className="text-xs font-bold text-foreground uppercase truncate max-w-[100px]">{user.name}</p>
-                            <p className="text-[10px] text-muted-foreground truncate max-w-[100px]">{user.email}</p>
-                        </div>
-                        <div className="bg-muted rounded-lg size-9 border border-primary/20 overflow-hidden relative">
-                            {user.image ? <img src={user.image} alt="User" className="absolute inset-0 object-cover" /> : <div className="flex items-center justify-center h-full w-full bg-primary/10 text-primary font-bold text-xs">{user.name?.[0] || 'U'}</div>}
-                        </div>
-                    </div>
-                </div>
-            </header>
+
 
             <div className="p-5 space-y-5 pb-10">
                 {/* Header */}

@@ -11,7 +11,8 @@ export default function AdminSettingsPage() {
     const [settings, setSettings] = useState({
         costPerPost: 1,
         costPerScrap: 1,
-        costPerAIImage: 2
+        costPerAIImage: 2,
+        isUpgradeEnabled: false
     })
 
     useEffect(() => {
@@ -21,7 +22,8 @@ export default function AdminSettingsPage() {
                 setSettings({
                     costPerPost: res.data.costPerPost,
                     costPerScrap: res.data.costPerScrap,
-                    costPerAIImage: res.data.costPerAIImage
+                    costPerAIImage: res.data.costPerAIImage,
+                    isUpgradeEnabled: res.data.isUpgradeEnabled
                 })
             }
             setLoading(false)
@@ -111,6 +113,29 @@ export default function AdminSettingsPage() {
                                 onChange={e => setSettings({ ...settings, costPerAIImage: parseInt(e.target.value) || 0 })}
                                 className="w-full px-4 py-3 rounded-lg bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-[#324467] font-bold text-right focus:ring-2 focus:ring-blue-500/50 outline-none"
                             />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 mb-4 pt-6 border-t border-slate-100 dark:border-[#2a364d]">
+                        <SettingsIcon className="h-5 w-5 text-purple-500" />
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white">베타 기능 설정</h2>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-slate-50 dark:bg-[#1a2333] border border-slate-100 dark:border-[#2a364d]">
+                            <div>
+                                <label className="text-sm font-bold text-slate-700 dark:text-slate-200">결제 시스템 (Upgrade Pro)</label>
+                                <p className="text-xs text-slate-400 mt-1">사이드바에 업그레이드 버튼을 표시하고 결제 페이지 접근을 허용합니다.</p>
+                            </div>
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    className="sr-only peer"
+                                    checked={settings.isUpgradeEnabled}
+                                    onChange={e => setSettings({ ...settings, isUpgradeEnabled: e.target.checked })}
+                                />
+                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                            </label>
                         </div>
                     </div>
 
