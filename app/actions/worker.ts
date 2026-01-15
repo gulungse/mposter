@@ -9,21 +9,21 @@ import { revalidatePath } from 'next/cache'
 /**
  * 블로거(Blogger)의 만료된 Access Token을 Refresh Token으로 갱신합니다.
  */
-async function refreshBloggerToken(site: any) {
+async function refreshBloggerToken(site: any, clientId?: string, clientSecret?: string) {
     const refreshToken = site.refreshToken || (site as any).refreshToken;
     if (!refreshToken) throw new Error('Refresh Token이 없어 토큰을 갱신할 수 없습니다. 사이트를 다시 연결해 주세요.');
 
-    const clientId = process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const finalClientId = clientId || process.env.GOOGLE_CLIENT_ID;
+    const finalClientSecret = clientSecret || process.env.GOOGLE_CLIENT_SECRET;
 
-    if (!clientId || !clientSecret) {
-        throw new Error('토큰이 만료되었으나 자동 갱신을 위한 설정(GOOGLE_CLIENT_ID)이 없습니다. 사이트 설정에서 액세스 토큰을 수동으로 갱신해주세요.');
+    if (!finalClientId || !finalClientSecret) {
+        throw new Error('토큰이 만료되었으나 자동 갱신을 위한 설정(Google Client ID/Secret)이 없습니다. API 관리 메뉴에서 설정을 확인하거나 사이트를 다시 연결해 주세요.');
     }
 
     try {
         const response = await axios.post('https://oauth2.googleapis.com/token', {
-            client_id: clientId,
-            client_secret: clientSecret,
+            client_id: finalClientId,
+            client_secret: finalClientSecret,
             refresh_token: refreshToken,
             grant_type: 'refresh_token',
         });
@@ -131,11 +131,14 @@ async function generateGeminiContent(apiKey: string, systemPrompt: string, targe
  * piAPI (FLUX)를 사용하여 이미지를 생성하고 결과를 가져옵니다.
  */
 async function generateFluxImage(apiKey: string, prompt: string) {
-    const headers = { 'X-API-Key': apiKey, 'Content-Type': 'application/json' };
+    const trimmedKey = apiKey.trim();
+    const headers = { 'X-API-Key': trimmedKey, 'Content-Type': 'application/json' };
+
+    console.log(`[Flux] Starting generation with prompt: "${prompt.substring(0, 50)}..."`);
 
     // 1. 작업 생성
     const taskRes = await axios.post('https://api.piapi.ai/api/v1/task', {
-        model: 'Qubico/flux1-dev',
+        model: 'Qubico/flux1-schnell',
         task_type: 'txt2img',
         input: {
             prompt: prompt,
@@ -145,7 +148,9 @@ async function generateFluxImage(apiKey: string, prompt: string) {
     }, { headers });
 
     const taskId = taskRes.data?.data?.task_id;
-    if (!taskId) throw new Error('FLUX 작업 생성에 실패했습니다.');
+    if (!taskId) throw new Error('FLUX 작업 생성에 실패했습니다. (Task ID 없음)');
+
+    console.log(`[Flux] Task Created: ${taskId}`);
 
     // 2. 결과 폴링 (최대 60초)
     for (let i = 0; i < 12; i++) {
@@ -154,14 +159,16 @@ async function generateFluxImage(apiKey: string, prompt: string) {
         const task = statusRes.data?.data;
 
         if (task.status === 'completed') {
+            console.log(`[Flux] Task Completed: ${taskId}`);
             return task.output?.image_url || task.output?.images?.[0] || '';
         }
         if (task.status === 'failed') {
-            throw new Error(`FLUX 이미지 생성 실패: ${task.error?.message || '알 수 없는 오류'}`);
+            console.error(`[Flux] Task Failed: ${taskId}`, task.error);
+            throw new Error(`FLUX 이미지 생성 실패 (Task ID: ${taskId}): ${task.error?.message || '알 수 없는 오류'}`);
         }
     }
 
-    throw new Error('FLUX 이미지 생성 시간 초과 (60초)');
+    throw new Error(`FLUX 이미지 생성 시간 초과 (60초, Task ID: ${taskId})`);
 }
 
 /**
@@ -294,7 +301,7 @@ export async function testPublishAction(data: {
                     await postToBlogger(site.apiToken || '');
                 } catch (err: any) {
                     if (err.response?.status === 401 && (site as any).refreshToken) {
-                        const newToken = await refreshBloggerToken(site);
+                        const newToken = await refreshBloggerToken(site, settings.googleClientId, settings.googleClientSecret);
                         await postToBlogger(newToken);
                     } else {
                         throw err;
@@ -440,7 +447,7 @@ export async function runAutomationTask(jobId: string) {
                 postUrl = res.data.url;
             } catch (err: any) {
                 if (err.response?.status === 401 && (job.site as any).refreshToken) {
-                    const newToken = await refreshBloggerToken(job.site);
+                    const newToken = await refreshBloggerToken(job.site, settings.googleClientId, settings.googleClientSecret);
                     const res = await postToBlogger(newToken);
                     postUrl = res.data.url;
                 } else {
