@@ -1,13 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { ArrowLeft, Hash, Plus, X, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
 import { createKeywordGroup, fetchTrendingKeywords } from '@/app/actions/keyword'
 
-export default function NewKeywordGroupPage() {
+function NewKeywordGroupContent() {
     const router = useRouter()
     const searchParams = useSearchParams()
     const [loading, setLoading] = useState(false)
@@ -216,5 +215,13 @@ export default function NewKeywordGroupPage() {
                 </form>
             </div>
         </div>
+    )
+}
+
+export default function NewKeywordGroupPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <NewKeywordGroupContent />
+        </Suspense>
     )
 }

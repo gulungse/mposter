@@ -3,10 +3,27 @@
 import { useState, useEffect } from 'react'
 import { Plus, Save, Trash2, Edit2, ShieldAlert, Sparkles, MessageSquare, RotateCcw, Zap } from 'lucide-react'
 import { getSystemPromptsAdmin, createSystemPrompt, updatePrompt, deletePrompt, seedDefaultSystemPrompts } from '@/app/actions/prompt'
-import { clsx } from 'clsx'
+
+import { clsx } from "clsx"
+
+interface Prompt {
+    id: string
+    title: string
+    content: string
+    [key: string]: any
+}
+
+interface AdminPromptCardProps {
+    prompt: Prompt
+    isEditing: boolean
+    onEdit: () => void
+    onCancel: () => void
+    onSave: (data: Prompt) => void
+    onDelete: () => void
+}
 
 export default function AdminPromptsPage() {
-    const [prompts, setPrompts] = useState<any[]>([])
+    const [prompts, setPrompts] = useState<Prompt[]>([])
     const [loading, setLoading] = useState(true)
     const [isSeeding, setIsSeeding] = useState(false)
     const [isAdding, setIsAdding] = useState(false)
@@ -36,7 +53,8 @@ export default function AdminPromptsPage() {
         }
     }
 
-    async function handleUpdate(id: string, data: any) {
+
+    async function handleUpdate(id: string, data: Prompt) {
         const res = await updatePrompt(id, data)
         if (res.success) {
             setEditingId(null)
@@ -159,7 +177,8 @@ export default function AdminPromptsPage() {
     )
 }
 
-function AdminPromptCard({ prompt, isEditing, onEdit, onCancel, onSave, onDelete }: any) {
+
+function AdminPromptCard({ prompt, isEditing, onEdit, onCancel, onSave, onDelete }: AdminPromptCardProps) {
     const [formData, setFormData] = useState({ ...prompt })
 
     return (
