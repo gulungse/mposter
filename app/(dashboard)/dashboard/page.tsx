@@ -5,34 +5,45 @@ import {
     Search,
     Bell,
     Settings,
-    Globe as GlobeIcon,
     FileText as FileTextIcon,
     Hash as HashIcon,
     Coins as CoinsIcon,
-    BarChart3 as BarChart3Icon,
     Activity as ActivityIcon,
-    Cpu as CpuIcon,
-    AlertCircle as AlertCircleIcon,
     Zap as ZapIcon,
-    MoreHorizontal as MoreHorizontalIcon,
-    ArrowRight as ArrowRightIcon
+    LayoutList as LayoutListIcon, // Using LayoutList for logs
+    Cpu as CpuIcon,
+    AlertCircle as AlertCircleIcon
 } from 'lucide-react'
-import clsx from 'clsx'
+import { BuyTokensButton } from '@/components/dashboard/buy-tokens-button'
 
 export default async function DashboardPage() {
     const user = await getOrCreateUser()
 
-    // 통계 데이터 조회
-    const [successPosts, activeJobs, tokens] = await Promise.all([
+    // 통계 데이터 및 최근 로그 조회
+    const [successPosts, activeJobs, recentLogs] = await Promise.all([
         prisma.postLog.count({ where: { userId: user.id, status: 'SUCCESS' } }),
         prisma.automationJob.count({ where: { userId: user.id, isActive: true } }),
-        Promise.resolve(user.tokenBalance)
+        prisma.postLog.findMany({
+            where: { userId: user.id },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+            include: {
+                job: {
+                    include: {
+                        site: true
+                    }
+                }
+            }
+        })
     ])
 
+    // 키워드 그룹 수 조회 (별도 쿼리로 분리)
+    const totalKeywords = await prisma.keywordGroup.count({ where: { userId: user.id } })
+
     const stats = {
-        activeSites: activeJobs, // Using active jobs as proxy for active sites or just 0
+        activeSites: activeJobs,
         totalPosts: successPosts,
-        totalKeywords: 0 // Placeholder as we didn't fetch this yet
+        totalKeywords: totalKeywords
     }
 
     return (
@@ -40,25 +51,10 @@ export default async function DashboardPage() {
             {/* Top Navbar */}
             <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur px-6 py-3">
                 <div className="flex items-center gap-4 flex-1">
-                    <label className="flex flex-col w-full max-w-md h-9">
-                        <div className="flex w-full items-stretch rounded-lg h-full bg-card border border-border transition-colors focus-within:ring-2 focus-within:ring-primary/20">
-                            <div className="text-muted-foreground flex items-center justify-center pl-3">
-                                <Search className="h-4 w-4" />
-                            </div>
-                            <input
-                                className="w-full bg-transparent border-none focus:ring-0 focus:outline-none text-xs placeholder:text-muted-foreground px-3 text-foreground"
-                                placeholder="Search tasks, sites, or prompts..."
-                            />
-                        </div>
-                    </label>
+                    {/* Search bar removed */}
                 </div>
                 <div className="flex items-center gap-3">
-                    <button className="flex items-center justify-center rounded-lg size-9 bg-card border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                        <Bell className="h-4 w-4" />
-                    </button>
-                    <button className="flex items-center justify-center rounded-lg size-9 bg-card border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-                        <Settings className="h-4 w-4" />
-                    </button>
+                    {/* Icons removed */}
                     <div className="h-6 w-[1px] bg-border mx-1" />
                     <div className="flex items-center gap-3">
                         <div className="text-right hidden sm:block">
@@ -76,36 +72,36 @@ export default async function DashboardPage() {
                 {/* Header */}
                 <div className="mb-5 flex items-end justify-between">
                     <div>
-                        <h1 className="text-2xl font-black tracking-tight text-foreground">Dashboard Overview</h1>
-                        <p className="text-muted-foreground text-sm font-medium mt-1">Monitor your AI-driven content engine and task performance.</p>
+                        <h1 className="text-2xl font-black tracking-tight text-foreground">종합상황대기실 [DashBoard]</h1>
+                        <p className="text-muted-foreground text-sm font-medium mt-1">자동화 작업 및 블로그 발행 현황을 한눈에 확인하세요.</p>
                     </div>
                     <Link href="/dashboard/tasks/new" className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg shadow-blue-500/20 flex items-center gap-2 transition-all active:scale-95">
                         <ZapIcon className="h-4 w-4" />
-                        New Task
+                        새 작업 만들기
                     </Link>
                 </div>
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-5">
                     <StatCard
-                        title="Active Tasks"
+                        title="활성화된 자동화 작업"
                         value={stats.activeSites}
                         icon={ActivityIcon}
-                        trend="+2 new"
+                        trend="Active Jobs"
                         trendUp={true}
                     />
                     <StatCard
-                        title="Total Posts"
+                        title="총 발행포스트"
                         value={stats.totalPosts}
                         icon={FileTextIcon}
-                        trend="+124 today"
+                        trend="Total Posted"
                         trendUp={true}
                     />
                     <StatCard
-                        title="Keywords Tracked"
+                        title="등록한 키워드"
                         value={stats.totalKeywords}
                         icon={HashIcon}
-                        trend="98% coverage"
+                        trend="Target Keywords"
                         trendUp={true}
                     />
 
@@ -114,119 +110,90 @@ export default async function DashboardPage() {
                         <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-primary/20"></div>
                         <div className="flex justify-between items-start mb-3 relative z-10">
                             <div>
-                                <p className="text-xs font-bold text-primary uppercase tracking-wider">Token Balance</p>
-                                <h3 className="text-2xl font-black text-foreground mt-1">{user?.tokenBalance || 0}</h3>
+                                <p className="text-xs font-bold text-primary uppercase tracking-wider">토큰 보유량</p>
+                                <h3 className="text-2xl font-black text-foreground mt-1">{user?.tokenBalance?.toLocaleString() || 0}</h3>
                             </div>
                             <div className="h-10 w-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-blue-600/30">
                                 <CoinsIcon className="h-5 w-5" />
                             </div>
                         </div>
-                        <p className="text-xs text-muted-foreground mb-4 relative z-10">
-                            {user?.tokenBalance === 0 ? 'Recharge needed to continue.' : 'Sufficient for ~120 posts.'}
+                        <p className="text-xs text-muted-foreground mb-4 relative z-10 h-4">
+                            {/* Empty placeholder for spacing or remove completely if not needed */}
                         </p>
-                        <button className="w-full py-2 bg-primary text-primary-foreground rounded-lg text-xs font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity relative z-10">
-                            Buy Tokens <ArrowRightIcon className="h-3 w-3" />
-                        </button>
+                        <BuyTokensButton />
                     </div>
                 </div>
 
-                {/* Main Content Grid */}
+                {/* Main Content Grid - Merged View */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-                    {/* Left Column: Activity & Health */}
-                    <div className="lg:col-span-2 space-y-5">
-                        {/* Graph */}
-                        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm">
-                            <div className="flex items-center justify-between mb-6">
-                                <h3 className="font-bold text-foreground flex items-center gap-2 text-sm">
-                                    <BarChart3Icon className="h-4 w-4 text-primary" />
-                                    Publishing Activity
-                                </h3>
-                                <select className="bg-muted text-muted-foreground text-xs rounded-lg px-2 py-1 outline-none border-none">
-                                    <option>Last 7 Days</option>
-                                    <option>Last 30 Days</option>
-                                </select>
-                            </div>
-                            <div className="h-[250px] w-full flex items-end justify-between gap-2 px-2">
-                                {/* Mock Chart Bars */}
-                                {[40, 65, 30, 85, 50, 90, 60].map((h, i) => (
-                                    <div key={i} className="flex-1 flex flex-col justify-end gap-2 group cursor-pointer">
-                                        <div
-                                            className="w-full bg-primary/20 rounded-t-lg relative transition-all duration-500 group-hover:bg-primary"
-                                            style={{ height: `${h}%` }}
-                                        >
-                                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-popover text-popover-foreground text-[10px] font-bold px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity shadow-sm">
-                                                {h} posts
-                                            </div>
-                                        </div>
-                                        <span className="text-[10px] text-center text-muted-foreground font-medium">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i]}</span>
-                                    </div>
-                                ))}
-                            </div>
+                    {/* Automation Status Table */}
+                    <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-5 shadow-sm overflow-hidden min-h-[400px]">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-foreground flex items-center gap-2 text-sm">
+                                <LayoutListIcon className="h-4 w-4 text-primary" />
+                                자동화 작업 현황
+                            </h3>
+                            <Link href="/dashboard/history" className="text-xs font-bold text-primary hover:underline">
+                                전체 내역 보기
+                            </Link>
                         </div>
-
-                        {/* Recent Tasks Table */}
-                        <div className="bg-card border border-border rounded-2xl p-5 shadow-sm overflow-hidden">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-bold text-foreground flex items-center gap-2 text-sm">
-                                    <ActivityIcon className="h-4 w-4 text-green-500" />
-                                    Recent Automation Tasks
-                                </h3>
-                                <Link href="/dashboard/tasks" className="text-xs font-bold text-primary hover:underline">View All</Link>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead>
-                                        <tr className="border-b border-border text-left">
-                                            <th className="pb-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider pl-2">Task Name</th>
-                                            <th className="pb-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider">Status</th>
-                                            <th className="pb-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider">Schedule</th>
-                                            <th className="pb-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider text-right pr-2">Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="text-xs">
-                                        {[1, 2, 3].map((_, i) => (
-                                            <tr key={i} className="group border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
-                                                <td className="py-3 pl-2">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
-                                                            <ZapIcon className="h-4 w-4" />
-                                                        </div>
-                                                        <span className="font-bold text-foreground">Tech News Daily #{i + 1}</span>
-                                                    </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full">
+                                <thead>
+                                    <tr className="border-b border-border text-left">
+                                        <th className="pb-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider pl-2">사이트명</th>
+                                        <th className="pb-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider">발행된 제목</th>
+                                        <th className="pb-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider">상태</th>
+                                        <th className="pb-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider">발행 시간</th>
+                                        <th className="pb-3 text-[10px] font-black text-muted-foreground uppercase tracking-wider text-right pr-2">소모 토큰</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="text-xs">
+                                    {recentLogs.length > 0 ? (
+                                        recentLogs.map((log) => (
+                                            <tr key={log.id} className="group border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors">
+                                                <td className="py-3 pl-2 font-bold text-foreground">
+                                                    {log.job?.site?.name || 'Unknown Site'}
+                                                </td>
+                                                <td className="py-3 text-foreground/90 max-w-[200px] truncate" title={log.title || ''}>
+                                                    {log.title || '(No Title)'}
                                                 </td>
                                                 <td className="py-3">
-                                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/10 text-green-500 font-bold text-[10px]">
-                                                        <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
-                                                        Active
-                                                    </span>
+                                                    <StatusBadge status={log.status} />
                                                 </td>
-                                                <td className="py-3 text-muted-foreground font-medium">Every 3 hours</td>
-                                                <td className="py-3 text-right pr-2">
-                                                    <button className="text-muted-foreground hover:text-foreground transition-colors">
-                                                        <MoreHorizontalIcon className="h-4 w-4" />
-                                                    </button>
+                                                <td className="py-3 text-muted-foreground">
+                                                    {new Date(log.createdAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                </td>
+                                                <td className="py-3 text-right pr-2 font-medium">
+                                                    - {log.tokensUsed}
                                                 </td>
                                             </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                                                아직 발행된 작업 기록이 없습니다.
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
 
-                    {/* Right Column: System Health & Resources */}
+                    {/* Right Column: System Health & Resources (Restored) */}
                     <div className="space-y-5">
                         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm h-full">
                             <h3 className="font-bold text-foreground flex items-center gap-2 mb-5 text-sm">
                                 <CpuIcon className="h-4 w-4 text-orange-500" />
-                                Resource Health
+                                시스템 리소스 상태
                             </h3>
 
                             <div className="space-y-5">
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-xs font-bold">
-                                        <span className="text-muted-foreground">API Quota (OpenAI)</span>
+                                        <span className="text-muted-foreground">API 사용량 (OpenAI)</span>
                                         <span className="text-foreground">85%</span>
                                     </div>
                                     <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
@@ -235,7 +202,7 @@ export default async function DashboardPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-xs font-bold">
-                                        <span className="text-muted-foreground">Server Load</span>
+                                        <span className="text-muted-foreground">서버 부하</span>
                                         <span className="text-foreground">12%</span>
                                     </div>
                                     <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
@@ -244,7 +211,7 @@ export default async function DashboardPage() {
                                 </div>
                                 <div className="space-y-2">
                                     <div className="flex justify-between text-xs font-bold">
-                                        <span className="text-muted-foreground">Storage</span>
+                                        <span className="text-muted-foreground">스토리지 공간</span>
                                         <span className="text-foreground">45%</span>
                                     </div>
                                     <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
@@ -254,25 +221,26 @@ export default async function DashboardPage() {
                             </div>
 
                             <div className="mt-8 pt-6 border-t border-border">
-                                <h4 className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-3">System Alerts</h4>
+                                <h4 className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-3">시스템 알림</h4>
                                 <div className="space-y-3">
                                     <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 border border-border/50">
                                         <AlertCircleIcon className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                                         <div>
-                                            <p className="text-xs font-bold text-foreground">Blogger Token Expiring</p>
-                                            <p className="text-[10px] text-muted-foreground mt-0.5">Reconnect 'My Tech Blog' within 2 days.</p>
+                                            <p className="text-xs font-bold text-foreground">블로그 연결 만료 임박</p>
+                                            <p className="text-[10px] text-muted-foreground mt-0.5">'My Tech Blog' 연결이 2일 내 만료됩니다.</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
+
                 </div>
                 <footer className="mt-auto py-4 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
-                    <p>© 2026 ContentAI - MediPoster Service</p>
+                    <p>© 2026 MediPoster Service</p>
                     <div className="flex gap-4">
-                        <Link href="#" className="hover:text-foreground">Support</Link>
-                        <Link href="#" className="hover:text-foreground">Documentation</Link>
+                        <Link href="#" className="hover:text-foreground">고객지원</Link>
+                        <Link href="#" className="hover:text-foreground">매뉴얼</Link>
                     </div>
                 </footer>
             </div>
@@ -287,7 +255,7 @@ function StatCard({ title, value, icon: Icon, trend, trendUp }: { title: string,
                 <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-all">
                     <Icon className="h-5 w-5" />
                 </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${trendUp ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/5 text-primary`}>
                     {trend}
                 </span>
             </div>
@@ -296,5 +264,35 @@ function StatCard({ title, value, icon: Icon, trend, trendUp }: { title: string,
                 <h3 className="text-2xl font-black text-foreground mt-1">{value?.toLocaleString()}</h3>
             </div>
         </div>
+    )
+}
+
+function StatusBadge({ status }: { status: string }) {
+    let classes = "bg-gray-500/10 text-gray-500"
+    let label = status
+
+    switch (status) {
+        case 'SUCCESS':
+            classes = "bg-green-500/10 text-green-500"
+            label = "발행 성공"
+            break
+        case 'FAILED':
+            classes = "bg-red-500/10 text-red-500"
+            label = "실패"
+            break
+        case 'PROCESSING':
+            classes = "bg-blue-500/10 text-blue-500"
+            label = "작업중"
+            break
+        case 'PENDING':
+            classes = "bg-yellow-500/10 text-yellow-500"
+            label = "대기중"
+            break
+    }
+
+    return (
+        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] ${classes}`}>
+            {label}
+        </span>
     )
 }

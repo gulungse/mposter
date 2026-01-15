@@ -12,7 +12,9 @@ import {
     ShieldCheck,
     Menu as MenuIcon,
     CreditCard,
-    Settings as SettingsIcon
+    Settings as SettingsIcon,
+    LogOut,
+    ChevronsUpDown
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -44,7 +46,7 @@ export function Sidebar({ className }: { className?: string }) {
                 { href: '/dashboard/keywords', icon: 'Key', label: '키워드 관리' },
                 { href: '/dashboard/prompts', icon: 'Terminal', label: '프롬프트 관리' },
                 { href: '/dashboard/tasks', icon: 'Cpu', label: '자동화 작업' },
-                { href: '/dashboard/api', icon: 'Code2', label: 'API 관리' },
+                // { href: '/dashboard/api', icon: 'Code2', label: 'API 관리' },
             ]
 
             if (res.success && res.data && res.data.length > 0) {
@@ -69,22 +71,35 @@ export function Sidebar({ className }: { className?: string }) {
     return (
         <aside
             className={cn(
-                'w-64 flex flex-col bg-background border-r border-border transition-colors duration-300',
+                'w-[280px] flex flex-col bg-[#0F1117] border-r border-[#1F2937] transition-all duration-300 relative z-50',
                 className
             )}
         >
-            <div className="p-6 flex items-center gap-3">
-                <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-                    <Sparkles className="h-5 w-5" />
-                </div>
-                <h2 className="text-xl font-black tracking-tight text-foreground font-sans">
-                    Marketing AI
-                </h2>
+            {/* Logo Section */}
+            <div className="h-[70px] flex items-center px-6 border-b border-[#1F2937]/50">
+                <Link href="/dashboard" className="flex items-center gap-3 hover:opacity-80 transition-opacity group">
+                    <div className="h-9 w-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/20 group-hover:shadow-blue-500/30 transition-shadow">
+                        <Sparkles className="h-5 w-5 fill-white/20" />
+                    </div>
+                    <div className="flex flex-col">
+                        <h2 className="text-lg font-black tracking-tight text-white leading-none">
+                            MediPoster
+                        </h2>
+                        <span className="text-[10px] font-medium text-muted-foreground mt-1 tracking-wide">
+                            AI Automation Workspace
+                        </span>
+                    </div>
+                </Link>
             </div>
 
-            <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
-                <div className="mb-2">
-                    <p className="px-3 text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Main Menu</p>
+            {/* Navigation Section */}
+            <nav className="flex-1 px-4 py-6 space-y-8 overflow-y-auto no-scrollbar">
+
+                {/* Main Menu */}
+                <div className="space-y-1">
+                    <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">
+                        Platform
+                    </p>
                     {menus.map((item) => {
                         const isActive = pathname === item.href
                         const IconComp = ICON_MAP[item.icon] || LayoutDashboard
@@ -92,7 +107,7 @@ export function Sidebar({ className }: { className?: string }) {
                             <NavItem
                                 key={item.href}
                                 href={item.href}
-                                icon={<IconComp className="h-5 w-5" />}
+                                icon={<IconComp className="h-[18px] w-[18px]" />}
                                 label={item.label}
                                 isActive={isActive}
                             />
@@ -102,32 +117,39 @@ export function Sidebar({ className }: { className?: string }) {
 
                 {/* Admin Menu - Only visible to ADMIN role */}
                 {user?.role === 'ADMIN' && (
-                    <div className="mt-6 pt-4 border-t border-border space-y-1">
-                        <p className="px-3 text-xs font-bold text-amber-500 uppercase tracking-widest mb-2">Administration</p>
+                    <div className="space-y-1">
+                        <div className="flex items-center px-4 mb-3">
+                            <div className="h-px bg-[#1F2937] flex-1" />
+                            <p className="px-2 text-[10px] font-bold text-amber-500/80 uppercase tracking-widest">
+                                Admin
+                            </p>
+                            <div className="h-px bg-[#1F2937] flex-1" />
+                        </div>
+
                         <NavItem
                             href="/dashboard/admin"
-                            icon={<ShieldCheck className="h-5 w-5" />}
+                            icon={<ShieldCheck className="h-[18px] w-[18px]" />}
                             label="사용자 관리"
                             isActive={pathname === '/dashboard/admin'}
                             variant="admin"
                         />
                         <NavItem
                             href="/dashboard/admin/plans"
-                            icon={<CreditCard className="h-5 w-5" />}
+                            icon={<CreditCard className="h-[18px] w-[18px]" />}
                             label="요금제 관리"
                             isActive={pathname === '/dashboard/admin/plans'}
                             variant="admin"
                         />
                         <NavItem
                             href="/dashboard/admin/prompts"
-                            icon={<Terminal className="h-5 w-5" />}
+                            icon={<Terminal className="h-[18px] w-[18px]" />}
                             label="시스템 프롬프트"
                             isActive={pathname === '/dashboard/admin/prompts'}
                             variant="admin"
                         />
                         <NavItem
                             href="/dashboard/admin/settings"
-                            icon={<SettingsIcon className="h-5 w-5" />}
+                            icon={<SettingsIcon className="h-[18px] w-[18px]" />}
                             label="시스템 설정"
                             isActive={pathname === '/dashboard/admin/settings'}
                             variant="admin"
@@ -136,24 +158,32 @@ export function Sidebar({ className }: { className?: string }) {
                 )}
             </nav>
 
-            <div className="p-3 border-t border-border mt-auto">
-                <div className="flex items-center gap-3 mb-4 p-2 rounded-xl bg-card border border-border">
-                    <div className="h-9 w-9 rounded-lg bg-blue-600/20 flex items-center justify-center text-blue-500 font-bold shrink-0">
-                        {user?.name?.[0] || 'U'}
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                        <p className="text-sm font-bold truncate text-foreground">
-                            {user?.name || 'User'}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground truncate">{user?.email || 'Loading...'}</p>
-                    </div>
-                </div>
+            {/* Footer / Profile Section */}
+            <div className="p-4 border-t border-[#1F2937] bg-[#0A0C10]">
+
                 <Link
                     href="/dashboard/upgrade"
-                    className="w-full flex items-center justify-center rounded-xl h-10 px-4 bg-primary text-primary-foreground text-sm font-bold tracking-wide transition-all hover:opacity-90 shadow-lg shadow-blue-500/10"
+                    className="group relative w-full flex items-center justify-center rounded-xl h-11 mb-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-xs font-bold tracking-wide overflow-hidden transition-all hover:shadow-lg hover:shadow-blue-500/25"
                 >
-                    Upgrade Pro
+                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
+                    <Sparkles className="h-3.5 w-3.5 mr-2 fill-white/20" />
+                    UPGRADE TO PRO
                 </Link>
+
+                <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-[#1F2937] transition-colors cursor-pointer group">
+                    <div className="h-9 w-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold shrink-0 overflow-hidden">
+                        {user?.name?.[0] || 'U'}
+                    </div>
+                    <div className="flex flex-col min-w-0 flex-1">
+                        <p className="text-sm font-bold truncate text-slate-200 group-hover:text-white transition-colors">
+                            {user?.name || 'User'}
+                        </p>
+                        <p className="text-[10px] text-slate-500 truncate group-hover:text-slate-400 transition-colors">
+                            {user?.email || 'Loading...'}
+                        </p>
+                    </div>
+                    <ChevronsUpDown className="h-4 w-4 text-slate-600 group-hover:text-slate-400 transition-colors" />
+                </div>
             </div>
         </aside>
     )
@@ -176,18 +206,36 @@ function NavItem({
         <Link
             href={href}
             className={cn(
-                'flex items-center gap-3 px-3 py-1.5 rounded-xl transition-all duration-200 group',
+                'group relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 overflow-hidden',
                 isActive
                     ? variant === 'admin'
                         ? 'bg-amber-500/10 text-amber-500'
-                        : 'bg-primary text-primary-foreground shadow-md shadow-blue-500/20'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        : 'bg-white/5 text-white shadow-inner shadow-white/5'
+                    : 'text-slate-400 hover:text-slate-100 hover:bg-white/5'
             )}
         >
-            <div className={cn("transition-colors", isActive ? "text-inherit" : "text-muted-foreground group-hover:text-foreground")}>
+            {/* Active Indicator Bar */}
+            {isActive && variant !== 'admin' && (
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.6)]" />
+            )}
+
+            <div className={cn(
+                "relative z-10 transition-colors duration-200",
+                isActive ? (variant === 'admin' ? "text-amber-500" : "text-blue-400") : "text-slate-500 group-hover:text-slate-300"
+            )}>
                 {icon}
             </div>
-            <span className="text-[15px] font-bold">{label}</span>
+            <span className={cn(
+                "relative z-10 text-sm font-medium transition-colors duration-200",
+                isActive ? "font-bold" : ""
+            )}>
+                {label}
+            </span>
+
+            {/* Hover Glow Effect */}
+            {!isActive && (
+                <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            )}
         </Link>
     )
 }
