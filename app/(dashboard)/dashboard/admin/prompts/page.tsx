@@ -20,7 +20,7 @@ export default function AdminPromptsPage() {
     async function loadPrompts() {
         setLoading(true)
         const res = await getSystemPromptsAdmin()
-        if (res.success) setPrompts(res.data)
+        if (res.success) setPrompts(res.data || [])
         setLoading(false)
     }
 
