@@ -4,6 +4,8 @@ import { Plus as PlusIcon, Search as SearchIcon, Sparkles as SparklesIcon } from
 import Link from 'next/link'
 import { getPrompts } from '@/app/actions/prompt'
 
+export const dynamic = 'force-dynamic'
+
 export default async function PromptsPage() {
     const { data: prompts = [] } = await getPrompts()
 

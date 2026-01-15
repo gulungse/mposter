@@ -4,6 +4,8 @@ import { MonitorPlay as MonitorPlayIcon, Plus as PlusIcon, Search as SearchIcon 
 import Link from 'next/link'
 import { getAutomationTasks } from '@/app/actions/task'
 
+export const dynamic = 'force-dynamic'
+
 export default async function TasksPage() {
     const { data: tasks = [] } = await getAutomationTasks()
 

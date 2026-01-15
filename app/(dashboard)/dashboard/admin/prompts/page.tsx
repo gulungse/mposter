@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import { useState, useEffect } from 'react'
 import { Plus, Save, Trash2, Edit2, ShieldAlert, Sparkles, MessageSquare, RotateCcw, Zap } from 'lucide-react'
 import { getSystemPromptsAdmin, createSystemPrompt, updatePrompt, deletePrompt, seedDefaultSystemPrompts } from '@/app/actions/prompt'
