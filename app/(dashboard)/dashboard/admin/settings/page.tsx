@@ -12,7 +12,9 @@ export default function AdminSettingsPage() {
         costPerPost: 1,
         costPerScrap: 1,
         costPerAIImage: 2,
-        isUpgradeEnabled: false
+        isUpgradeEnabled: false,
+        googleClientId: '',
+        googleClientSecret: ''
     })
 
     useEffect(() => {
@@ -23,7 +25,9 @@ export default function AdminSettingsPage() {
                     costPerPost: res.data.costPerPost,
                     costPerScrap: res.data.costPerScrap,
                     costPerAIImage: res.data.costPerAIImage,
-                    isUpgradeEnabled: res.data.isUpgradeEnabled
+                    isUpgradeEnabled: res.data.isUpgradeEnabled,
+                    googleClientId: (res.data as any).googleClientId || '',
+                    googleClientSecret: (res.data as any).googleClientSecret || ''
                 })
             }
             setLoading(false)
@@ -113,6 +117,38 @@ export default function AdminSettingsPage() {
                                 onChange={e => setSettings({ ...settings, costPerAIImage: parseInt(e.target.value) || 0 })}
                                 className="w-full px-4 py-3 rounded-lg bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-[#324467] font-bold text-right focus:ring-2 focus:ring-blue-500/50 outline-none"
                             />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 mb-4 pt-6 border-t border-slate-100 dark:border-[#2a364d]">
+                        <SettingsIcon className="h-5 w-5 text-green-500" />
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white">Google OAuth 설정</h2>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#1a2333] border border-slate-100 dark:border-[#2a364d] space-y-4">
+                            <div>
+                                <label className="text-sm font-bold text-slate-700 dark:text-slate-200">Google Client ID</label>
+                                <p className="text-xs text-slate-400 mt-1">GCP 콘솔에서 발급받은 OAuth 2.0 클라이언트 ID</p>
+                                <input
+                                    type="text"
+                                    value={settings.googleClientId}
+                                    onChange={e => setSettings({ ...settings, googleClientId: e.target.value })}
+                                    className="mt-2 w-full px-4 py-2 rounded-lg bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-[#324467] text-sm focus:ring-2 focus:ring-blue-500/50 outline-none"
+                                    placeholder="example.apps.googleusercontent.com"
+                                />
+                            </div>
+                            <div>
+                                <label className="text-sm font-bold text-slate-700 dark:text-slate-200">Google Client Secret</label>
+                                <p className="text-xs text-slate-400 mt-1">OAuth 2.0 클라이언트 보안 비밀번호</p>
+                                <input
+                                    type="password"
+                                    value={settings.googleClientSecret}
+                                    onChange={e => setSettings({ ...settings, googleClientSecret: e.target.value })}
+                                    className="mt-2 w-full px-4 py-2 rounded-lg bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-[#324467] text-sm focus:ring-2 focus:ring-blue-500/50 outline-none"
+                                    placeholder="****************"
+                                />
+                            </div>
                         </div>
                     </div>
 

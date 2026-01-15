@@ -1,93 +1,165 @@
+'use client'
 
-import { MoreHorizontal as MoreHorizontalIcon, Play as PlayIcon, Pause as PauseIcon, Clock as ClockIcon, ArrowRight as ArrowRightIcon, Image as ImageIcon } from 'lucide-react'
+import { useState } from 'react'
+import { MoreHorizontal as MoreHorizontalIcon, Play as PlayIcon, Pause as PauseIcon, Clock as ClockIcon, Calendar as CalendarIcon, Edit as EditIcon, Trash2 as Trash2Icon, Loader2 as Loader2Icon, Hash as HashIcon, Terminal as TerminalIcon, Globe as GlobeIcon, ExternalLink as ExternalLinkIcon } from 'lucide-react'
 import { clsx } from 'clsx'
 import Link from 'next/link'
+import { toggleTaskStatus, deleteAutomationTask } from '@/app/actions/task'
+import { useRouter } from 'next/navigation'
 
 interface TaskCardProps {
     id: string
     name: string
     siteName: string
+    siteType: 'WORDPRESS' | 'BLOGSPOT'
     keywordGroupName: string
+    promptTitle: string
     schedule: string
-    status: 'RUNNING' | 'PAUSED' | 'COMPLETED'
-    lastRun?: string
+    status: boolean // isActive
     nextRun?: string
-    totalPosts: number
 }
 
 export function TaskCard({
     id,
     name,
     siteName,
+    siteType,
     keywordGroupName,
+    promptTitle,
     schedule,
     status,
-    lastRun,
-    nextRun,
-    totalPosts
+    nextRun
 }: TaskCardProps) {
+    const router = useRouter()
+    const [isToggling, setIsToggling] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
+
+    const handleToggle = async () => {
+        setIsToggling(true)
+        try {
+            await toggleTaskStatus(id, status)
+            router.refresh()
+        } catch (error) {
+            alert('상태 변경 실패')
+        } finally {
+            setIsToggling(false)
+        }
+    }
+
+    const handleDelete = async () => {
+        if (!confirm('정말로 이 작업을 삭제하시겠습니까?')) return
+        setIsDeleting(true)
+        try {
+            await deleteAutomationTask(id)
+            router.refresh()
+        } catch (error) {
+            alert('삭제 실패')
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
     return (
-        <div className="flex flex-col rounded-2xl border border-border bg-card shadow-sm transition-all hover:shadow-md hover:border-primary/50 group">
-            <div className="p-5 pb-4">
-                <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                        <div className={clsx(
-                            "flex h-9 w-9 items-center justify-center rounded-lg transition-colors",
-                            status === 'RUNNING'
-                                ? "bg-green-500/10 text-green-500"
-                                : status === 'PAUSED'
-                                    ? "bg-orange-500/10 text-orange-500"
-                                    : "bg-muted text-muted-foreground"
-                        )}>
-                            {status === 'RUNNING' ? <PlayIcon className="h-4 w-4 fill-current" /> :
-                                status === 'PAUSED' ? <PauseIcon className="h-4 w-4 fill-current" /> :
-                                    <ClockIcon className="h-4 w-4" />}
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-foreground line-clamp-1 text-sm">{name}</h3>
-                            <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground">
-                                <span className={clsx(
-                                    "font-bold",
-                                    status === 'RUNNING' ? "text-green-500" : "text-orange-500"
-                                )}>{status}</span>
-                                <span>•</span>
-                                <span>{schedule}</span>
+        <div className="flex flex-col rounded-2xl border border-border bg-card shadow-sm hover:shadow-xl hover:border-primary/30 transition-all duration-300 group overflow-hidden">
+            {/* Header Area */}
+            <div className="p-6 pb-4 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <div className={clsx(
+                                "text-[10px] px-2 py-0.5 rounded-full font-black tracking-tighter",
+                                siteType === 'WORDPRESS' ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400" : "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400"
+                            )}>
+                                {siteType === 'WORDPRESS' ? 'WORDPRESS' : 'BLOGSPOT'}
                             </div>
+                            <span className={clsx("h-2 w-2 rounded-full animate-pulse", status ? "bg-green-500" : "bg-orange-500")} />
+                        </div>
+                        <h3 className="text-lg font-black text-foreground leading-tight line-clamp-2" title={name}>
+                            {name}
+                        </h3>
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <GlobeIcon className="h-3 w-3" />
+                            <span className="truncate max-w-[200px]">{siteName}</span>
                         </div>
                     </div>
-                    <button className="text-muted-foreground hover:text-foreground transition-colors">
-                        <MoreHorizontalIcon className="h-4 w-4" />
-                    </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-xs mb-4">
-                    <div className="p-2.5 rounded-lg bg-muted/50">
-                        <span className="text-[10px] text-muted-foreground block mb-0.5">Target Site</span>
-                        <span className="font-semibold text-foreground line-clamp-1">{siteName}</span>
-                    </div>
-                    <div className="p-2.5 rounded-lg bg-muted/50">
-                        <span className="text-[10px] text-muted-foreground block mb-0.5">Keyword Group</span>
-                        <span className="font-semibold text-foreground line-clamp-1">{keywordGroupName}</span>
-                    </div>
-                </div>
+                <div className="w-full h-px bg-gradient-to-r from-border/50 to-transparent" />
 
-                <div className="flex items-center justify-between text-[10px] text-muted-foreground border-t border-border pt-3">
-                    <div className="flex items-center gap-3">
-                        <span>Last: {lastRun || 'Never'}</span>
-                        <span>Next: {nextRun || 'Manual'}</span>
+                {/* Info Grid */}
+                {/* Info Grid */}
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="flex flex-col gap-1 p-3 rounded-lg bg-muted/30">
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <HashIcon className="h-3.5 w-3.5" />
+                            <span className="text-[10px] font-bold">키워드 그룹</span>
+                        </div>
+                        <span className="font-semibold truncate text-foreground text-xs">{keywordGroupName}</span>
                     </div>
-                    <div className="flex items-center gap-1 font-semibold text-foreground">
-                        <ImageIcon className="h-3 w-3" />
-                        {totalPosts} Posts
+
+                    <div className="flex flex-col gap-1 p-3 rounded-lg bg-muted/30">
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <TerminalIcon className="h-3.5 w-3.5" />
+                            <span className="text-[10px] font-bold">사용 프롬프트</span>
+                        </div>
+                        <span className="font-semibold truncate text-foreground text-xs">{promptTitle}</span>
+                    </div>
+
+                    <div className="flex flex-col gap-1 p-3 rounded-lg bg-muted/30">
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <ClockIcon className="h-3.5 w-3.5" />
+                            <span className="text-[10px] font-bold">발행 주기</span>
+                        </div>
+                        <span className="font-semibold truncate text-foreground text-xs">{schedule}</span>
+                    </div>
+
+                    <div className="flex flex-col gap-1 p-3 rounded-lg bg-muted/30">
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                            <CalendarIcon className="h-3.5 w-3.5" />
+                            <span className="text-[10px] font-bold">다음 실행</span>
+                        </div>
+                        <span className="font-semibold truncate text-foreground text-xs">{nextRun || '-'}</span>
                     </div>
                 </div>
             </div>
 
-            <div className="flex items-center border-t border-border">
-                <Link href={`/dashboard/tasks/${id}`} className="flex-1 py-2.5 text-center text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors rounded-b-xl flex items-center justify-center gap-1.5 group/link">
-                    View Details
-                    <ArrowRightIcon className="h-3.5 w-3.5 transition-transform group-hover/link:translate-x-0.5" />
-                </Link>
+            {/* Actions Footer */}
+            <div className="mt-auto p-4 pt-0 space-y-3">
+                {/* Main Toggle Button */}
+                <button
+                    onClick={handleToggle}
+                    disabled={isToggling}
+                    className={clsx(
+                        "w-full h-14 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all shadow-lg hover:brightness-110 active:scale-[0.98]",
+                        status
+                            ? "bg-green-500 text-white shadow-green-500/20"
+                            : "bg-orange-500 text-white shadow-orange-500/20",
+                        isToggling && "opacity-70 cursor-not-allowed"
+                    )}
+                >
+                    {isToggling ? <Loader2Icon className="h-5 w-5 animate-spin" /> :
+                        status ? <PauseIcon className="h-5 w-5 fill-current" /> : <PlayIcon className="h-5 w-5 fill-current" />}
+                    {status ? '동작중 (클릭하여 일시정지)' : '일시정지됨 (클릭하여 시작)'}
+                </button>
+
+                {/* Sub Actions */}
+                <div className="grid grid-cols-2 gap-3">
+                    <Link
+                        href={`/dashboard/tasks/new?edit=${id}`}
+                        className="h-12 rounded-xl bg-blue-600 border border-blue-700 hover:bg-blue-700 text-white font-bold flex items-center justify-center gap-2 transition-colors text-sm shadow-lg shadow-blue-500/20"
+                    >
+                        <EditIcon className="h-4 w-4" />
+                        수정
+                    </Link>
+                    <button
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        className="h-12 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 font-bold flex items-center justify-center gap-2 transition-colors hover:bg-red-100 dark:hover:bg-red-900/30 text-sm"
+                    >
+                        {isDeleting ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <Trash2Icon className="h-4 w-4" />}
+                        삭제
+                    </button>
+                </div>
             </div>
         </div>
     )

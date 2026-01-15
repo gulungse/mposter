@@ -95,7 +95,7 @@ export default function SitesPage() {
                         url={site.url}
                         type={site.type}
                         status="ACTIVE"
-                        postCount={0}
+                        createdAt={site.createdAt}
                         onCreateTask={() => openCreateTask(site.id)}
                     />
                 ))}

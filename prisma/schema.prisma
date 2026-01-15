@@ -246,6 +246,10 @@ model GlobalSetting {
   costPerAIImage   Int @default(2) // DALLE or FLUX
   isUpgradeEnabled Boolean @default(false) // 사이드바 업그레이드 버튼 표시 여부
   
+  // Google OAuth 설정
+  googleClientId     String?
+  googleClientSecret String?
+  
   updatedAt        DateTime @updatedAt
 
   @@map("global_settings")

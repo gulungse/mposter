@@ -17,7 +17,7 @@ async function refreshBloggerToken(site: any) {
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
-        throw new Error('관리자 설정(GOOGLE CLIENT ID/SECRET)이 누락되었습니다. 수동으로 사이트를 다시 연결해 주세요.');
+        throw new Error('토큰이 만료되었으나 자동 갱신을 위한 설정(GOOGLE_CLIENT_ID)이 없습니다. 사이트 설정에서 액세스 토큰을 수동으로 갱신해주세요.');
     }
 
     try {

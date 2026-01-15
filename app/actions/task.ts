@@ -67,6 +67,46 @@ export async function createAutomationTask(data: {
 }
 
 /**
+ * 자동화 작업 수정
+ */
+export async function updateAutomationTask(id: string, data: {
+    name?: string;
+    siteId?: string;
+    keywordGroupId?: string;
+    promptId?: string;
+    scheduleCron?: string;
+    aiModel?: any;
+    imageSource?: any;
+    wpCategoryId?: number;
+}) {
+    try {
+        const user = await getOrCreateUser()
+        await (prisma.automationJob as any).update({
+            where: { id, userId: user.id },
+            data: {
+                name: data.name,
+                siteId: data.siteId,
+                keywordGroupId: data.keywordGroupId,
+                promptId: data.promptId,
+                scheduleCron: data.scheduleCron,
+                aiModel: data.aiModel,
+                imageSource: data.imageSource,
+                wpCategoryId: data.wpCategoryId,
+            }
+        })
+
+        revalidatePath('/dashboard/tasks')
+        return { success: true }
+    } catch (error: any) {
+        console.error('자동화 작업 수정 실패:', error)
+        return {
+            success: false,
+            error: `작업을 수정하는 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`
+        }
+    }
+}
+
+/**
  * 자동화 작업 목록 조회
  */
 export async function getAutomationTasks() {

@@ -6,6 +6,21 @@ import { getAutomationTasks } from '@/app/actions/task'
 
 export const dynamic = 'force-dynamic'
 
+function formatSchedule(cron: string | null) {
+    if (!cron) return '수동'
+    if (cron === '*/5 * * * *') return '5분 간격'
+    if (cron === '*/10 * * * *') return '10분 간격'
+    if (cron === '*/30 * * * *') return '30분 간격'
+    if (cron === '0 * * * *') return '1시간 간격'
+    if (cron === '0 */3 * * *') return '3시간 간격'
+    if (cron === '0 */6 * * *') return '6시간 간격'
+    if (cron === '0 */12 * * *') return '12시간 간격'
+    if (cron === '0 0 * * *') return '24시간 간격'
+    if (cron === '0 0 */2 * *') return '48시간 간격'
+    if (cron === 'MANUAL') return '수동'
+    return cron
+}
+
 export default async function TasksPage() {
     const { data: tasks = [] } = await getAutomationTasks()
 
@@ -83,19 +98,19 @@ export default async function TasksPage() {
             </div>
 
             {/* Task Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 text-foreground">
+            <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-4 text-foreground">
                 {tasks.map(task => (
                     <TaskCard
                         key={task.id}
                         id={task.id}
                         name={task.name}
                         siteName={task.site.name}
+                        siteType={task.site.type as 'WORDPRESS' | 'BLOGSPOT'}
                         keywordGroupName={task.keywordGroup.name}
-                        schedule={task.scheduleCron === '0 * * * *' ? '매 시간' : task.scheduleCron === '0 9 * * *' ? '매일 오전 9시' : task.scheduleCron || '수동'}
-                        status={task.isActive ? 'RUNNING' : 'PAUSED'}
-                        lastRun={task.lastRunAt ? new Date(task.lastRunAt).toLocaleString('ko-KR') : '기록 없음'}
+                        promptTitle={task.prompt?.title || '프롬프트 없음'}
+                        schedule={formatSchedule(task.scheduleCron)}
+                        status={task.isActive}
                         nextRun={task.nextRunAt ? new Date(task.nextRunAt).toLocaleString('ko-KR') : '-'}
-                        totalPosts={0} // 추후 연동 데이터
                     />
                 ))}
 

@@ -177,3 +177,84 @@ export async function getWordPressCategories(siteId: string) {
         return { success: false, error: '카테고리를 가져올 수 없습니다. 연결 정보를 확인해주세요.' }
     }
 }
+
+/**
+ * Google OAuth 인증 URL 생성
+ */
+export async function getBloggerAuthUrl() {
+    try {
+        const user = await getOrCreateUser() as any
+        const clientId = user.settings?.googleClientId
+
+        if (!clientId) {
+            return { success: false, error: 'Google Client ID가 설정되지 않았습니다. API 관리 메뉴에서 설정해 주세요.' }
+        }
+
+        const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/sites/new`
+        const scope = 'https://www.googleapis.com/auth/blogger'
+
+        const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&access_type=offline&prompt=consent`
+
+        return { success: true, url }
+    } catch (error: any) {
+        return { success: false, error: '인증 URL 생성 중 오류가 발생했습니다.' }
+    }
+}
+
+/**
+ * Blogger 인증 코드 교환 및 블로그 목록 조회
+ */
+export async function exchangeBloggerCode(code: string) {
+    try {
+        const user = await getOrCreateUser() as any
+        const clientId = user.settings?.googleClientId
+        const clientSecret = user.settings?.googleClientSecret
+
+        if (!clientId || !clientSecret) {
+            return { success: false, error: 'Google API 설정이 누락되었습니다.' }
+        }
+
+        const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/sites/new`
+
+        // 1. 토큰 교환
+        const tokenRes = await axios.post('https://oauth2.googleapis.com/token', {
+            code,
+            client_id: clientId,
+            client_secret: clientSecret,
+            redirect_uri: redirectUri,
+            grant_type: 'authorization_code'
+        })
+
+        const { access_token, refresh_token } = tokenRes.data
+
+        // 2. 블로그 목록 조회
+        const blogsRes = await axios.get('https://www.googleapis.com/blogger/v3/users/self/blogs', {
+            headers: { Authorization: `Bearer ${access_token}` }
+        })
+
+        const blogs = blogsRes.data.items || []
+
+        if (blogs.length === 0) {
+            return { success: false, error: '연동된 블로그(Blogspot)가 없습니다.' }
+        }
+
+        // 블로그 정보와 토큰 반환
+        return {
+            success: true,
+            data: {
+                blogs: blogs.map((b: any) => ({
+                    id: b.id,
+                    name: b.name,
+                    url: b.url,
+                    blogId: b.id // API 호출 시 필요한 블로그 ID
+                })),
+                accessToken: access_token,
+                refreshToken: refresh_token
+            }
+        }
+
+    } catch (error: any) {
+        console.error('Blogger Auth Error:', error.response?.data || error.message)
+        return { success: false, error: `인증 처리에 실패했습니다: ${error.response?.data?.error_description || error.message}` }
+    }
+}

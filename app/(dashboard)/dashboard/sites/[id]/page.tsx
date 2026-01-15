@@ -127,24 +127,40 @@ export default function SiteDetailPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <label className="text-sm font-bold text-slate-900 dark:text-white">아이디 / ID</label>
+                            <label className="text-sm font-bold text-slate-900 dark:text-white">
+                                {site.type === 'WORDPRESS' ? '아이디 (Username)' : '블로그 ID (Blog ID)'}
+                            </label>
                             <input
                                 type="text"
                                 name="username"
                                 defaultValue={site.username}
                                 required
-                                className="w-full px-4 py-2.5 rounded-lg bg-slate-50 dark:bg-[#101622] border border-slate-200 dark:border-[#324467] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium"
+                                readOnly={site.type === 'BLOGSPOT'}
+                                className={clsx(
+                                    "w-full px-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium",
+                                    site.type === 'BLOGSPOT'
+                                        ? "bg-slate-100 dark:bg-[#1e293b] border-slate-200 dark:border-[#324467] text-slate-500 cursor-not-allowed"
+                                        : "bg-slate-50 dark:bg-[#101622] border-slate-200 dark:border-[#324467]"
+                                )}
                             />
                         </div>
                         <div className="space-y-2">
-                            <label className="text-sm font-bold text-slate-900 dark:text-white">API 키 / 앱 패스워드</label>
+                            <label className="text-sm font-bold text-slate-900 dark:text-white">
+                                {site.type === 'WORDPRESS' ? 'API 키 / 앱 패스워드' : 'Access Token (자동 관리)'}
+                            </label>
                             <div className="relative">
                                 <input
                                     type="password"
                                     name="apiToken"
                                     defaultValue={site.apiToken}
                                     required
-                                    className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-slate-50 dark:bg-[#101622] border border-slate-200 dark:border-[#324467] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium"
+                                    readOnly={site.type === 'BLOGSPOT'}
+                                    className={clsx(
+                                        "w-full pl-10 pr-4 py-2.5 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium",
+                                        site.type === 'BLOGSPOT'
+                                            ? "bg-slate-100 dark:bg-[#1e293b] border-slate-200 dark:border-[#324467] text-slate-500 cursor-not-allowed"
+                                            : "bg-slate-50 dark:bg-[#101622] border-slate-200 dark:border-[#324467]"
+                                    )}
                                 />
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             </div>
@@ -159,13 +175,13 @@ export default function SiteDetailPage() {
                                     type="password"
                                     name="refreshToken"
                                     defaultValue={site.refreshToken}
-                                    placeholder="토큰이 있으면 여기에 표시됩니다."
-                                    className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-slate-50 dark:bg-[#101622] border border-slate-200 dark:border-[#324467] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium"
+                                    readOnly
+                                    className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-slate-100 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] text-slate-500 text-sm focus:outline-none cursor-not-allowed font-medium"
                                 />
                                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                             </div>
                             <p className="text-[11px] text-slate-500 leading-relaxed italic">
-                                * 구글의 보안 정책상 Access Token은 1시간만 유효합니다. 자동 재인증을 위해 Refresh Token이 반드시 필요합니다.
+                                * 구글 계정과 안전하게 연동되었습니다. 토큰은 시스템에 의해 자동으로 관리되므로 수동으로 수정할 필요가 없습니다.
                             </p>
                         </div>
                     )}

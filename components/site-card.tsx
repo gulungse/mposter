@@ -13,11 +13,11 @@ interface SiteCardProps {
     url: string
     type: 'WORDPRESS' | 'BLOGSPOT'
     status: 'ACTIVE' | 'ERROR'
-    postCount: number
+    createdAt: string | Date
     onCreateTask?: () => void
 }
 
-export function SiteCard({ id, name, url, type, status, postCount, onCreateTask }: SiteCardProps) {
+export function SiteCard({ id, name, url, type, status, createdAt, onCreateTask }: SiteCardProps) {
     const router = useRouter()
     const [isDeleting, setIsDeleting] = useState(false)
 
@@ -76,8 +76,10 @@ export function SiteCard({ id, name, url, type, status, postCount, onCreateTask 
                     </span>
                 </div>
                 <div className="flex flex-col gap-0.5">
-                    <span className="text-[10px] font-medium text-muted-foreground">총 발행 글</span>
-                    <span className="text-xs font-bold text-foreground">{postCount.toLocaleString()}개</span>
+                    <span className="text-[10px] font-medium text-muted-foreground">등록일</span>
+                    <span className="text-xs font-bold text-foreground">
+                        {new Date(createdAt).toLocaleDateString()}
+                    </span>
                 </div>
             </div>
 

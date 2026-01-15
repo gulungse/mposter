@@ -32,7 +32,9 @@ export async function updateGlobalSettings(data: {
     isUpgradeEnabled?: boolean,
     costPerPost?: number,
     costPerScrap?: number,
-    costPerAIImage?: number
+    costPerAIImage?: number,
+    googleClientId?: string,
+    googleClientSecret?: string
 }) {
     try {
         await prisma.globalSetting.upsert({

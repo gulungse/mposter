@@ -14,7 +14,9 @@ import axios from 'axios'
 export async function updateUserSettings(data: {
     openaiApiKey?: string,
     geminiApiKey?: string,
-    piApiKey?: string
+    piApiKey?: string,
+    googleClientId?: string,
+    googleClientSecret?: string
 }) {
     try {
         const user = await getOrCreateUser() as any

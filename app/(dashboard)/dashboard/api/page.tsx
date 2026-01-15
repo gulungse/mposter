@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Key, Save, AlertCircle, Info, Loader2, CheckCircle2, XCircle, Sparkles, Brain, Image as ImageIcon } from 'lucide-react'
+import { Key, Save, AlertCircle, Info, Loader2, CheckCircle2, XCircle, Sparkles, Brain, Image as ImageIcon, Globe } from 'lucide-react'
 import { updateUserSettings, getUserSettings, validateOpenAI, validateGemini, validatePiApi } from '@/app/actions/user'
 import { clsx } from 'clsx'
 
@@ -14,7 +14,9 @@ export default function ApiManagementPage() {
     const [keys, setKeys] = useState({
         openaiApiKey: '',
         geminiApiKey: '',
-        piApiKey: ''
+        piApiKey: '',
+        googleClientId: '',
+        googleClientSecret: ''
     })
 
     // Validation State
@@ -28,7 +30,9 @@ export default function ApiManagementPage() {
                 setKeys({
                     openaiApiKey: res.data.openaiApiKey || '',
                     geminiApiKey: res.data.geminiApiKey || '',
-                    piApiKey: res.data.piApiKey || ''
+                    piApiKey: res.data.piApiKey || '',
+                    googleClientId: (res.data as any).googleClientId || '',
+                    googleClientSecret: (res.data as any).googleClientSecret || ''
                 })
             }
             setLoading(false)
@@ -73,7 +77,7 @@ export default function ApiManagementPage() {
         <div className="p-8 space-y-8 max-w-5xl">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+                <h1 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
                     <Key className="h-8 w-8 text-blue-600" />
                     API 관리
                 </h1>
@@ -107,54 +111,93 @@ export default function ApiManagementPage() {
                 </div>
 
                 {/* API Key Sections */}
-                <div className="space-y-6">
-                    <ApiInputRow
-                        label="ChatGPT (OpenAI)"
-                        description="GPT-4o, GPT-4o-mini 모델을 사용하여 텍스트 콘텐츠를 생성합니다."
-                        value={keys.openaiApiKey}
-                        onChange={(v) => setKeys({ ...keys, openaiApiKey: v })}
-                        onTest={() => testConnection('openai')}
-                        isValidating={validating['openai']}
-                        validationResult={validationResults['openai']}
-                        icon={<Brain className="h-5 w-5 text-emerald-500" />}
-                        placeholder="sk-..."
-                    />
+                <div className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <ApiInputRow
+                            label="ChatGPT (OpenAI)"
+                            description="GPT-4o, GPT-4o-mini 모델을 사용하여 텍스트 콘텐츠를 생성합니다."
+                            value={keys.openaiApiKey}
+                            onChange={(v) => setKeys({ ...keys, openaiApiKey: v })}
+                            onTest={() => testConnection('openai')}
+                            isValidating={validating['openai']}
+                            validationResult={validationResults['openai']}
+                            icon={<Brain className="h-5 w-5 text-emerald-500" />}
+                            placeholder="sk-..."
+                        />
 
-                    <ApiInputRow
-                        label="Gemini (Google)"
-                        description="Google의 최신 LLM을 사용하여 텍스트 및 멀티모달 콘텐츠를 생성합니다."
-                        value={keys.geminiApiKey}
-                        onChange={(v) => setKeys({ ...keys, geminiApiKey: v })}
-                        onTest={() => testConnection('gemini')}
-                        isValidating={validating['gemini']}
-                        validationResult={validationResults['gemini']}
-                        icon={<Sparkles className="h-5 w-5 text-blue-500" />}
-                        placeholder="AIza..."
-                    />
+                        <ApiInputRow
+                            label="Gemini (Google)"
+                            description="Google의 최신 LLM을 사용하여 텍스트 및 멀티모달 콘텐츠를 생성합니다."
+                            value={keys.geminiApiKey}
+                            onChange={(v) => setKeys({ ...keys, geminiApiKey: v })}
+                            onTest={() => testConnection('gemini')}
+                            isValidating={validating['gemini']}
+                            validationResult={validationResults['gemini']}
+                            icon={<Sparkles className="h-5 w-5 text-blue-500" />}
+                            placeholder="AIza..."
+                        />
 
-                    <ApiInputRow
-                        label="piAPI (FLUX)"
-                        description="FLUX 모델을 사용하여 고품질의 블로그 이미지를 생성합니다."
-                        value={keys.piApiKey}
-                        onChange={(v) => setKeys({ ...keys, piApiKey: v })}
-                        onTest={() => testConnection('piapi')}
-                        isValidating={validating['piapi']}
-                        validationResult={validationResults['piapi']}
-                        icon={<ImageIcon className="h-5 w-5 text-purple-500" />}
-                        placeholder="API Key from piapi.ai"
-                    />
-                </div>
+                        <ApiInputRow
+                            label="piAPI (FLUX)"
+                            description="FLUX 모델을 사용하여 고품질의 블로그 이미지를 생성합니다."
+                            value={keys.piApiKey}
+                            onChange={(v) => setKeys({ ...keys, piApiKey: v })}
+                            onTest={() => testConnection('piapi')}
+                            isValidating={validating['piapi']}
+                            validationResult={validationResults['piapi']}
+                            icon={<ImageIcon className="h-5 w-5 text-purple-500" />}
+                            placeholder="API Key from piapi.ai"
+                        />
+                    </div>
 
-                {/* Save Button */}
-                <div className="flex justify-end pt-4">
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="bg-blue-600 text-white px-8 py-3 rounded-xl text-base font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 active:scale-95"
-                    >
-                        {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                        모든 설정 저장하기
-                    </button>
+                    <div className="space-y-6">
+                        <div className="w-full h-px bg-slate-100 dark:bg-slate-800" />
+
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <Key className="h-5 w-5 text-amber-500" />
+                                Google OAuth 설정 (블로그스팟용)
+                            </h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <ApiInputRow
+                                label="Google Client ID"
+                                description="블로그스팟 연결을 위한 OAuth 2.0 클라이언트 ID입니다."
+                                value={keys.googleClientId || ''}
+                                onChange={(v) => setKeys({ ...keys, googleClientId: v })}
+                                onTest={() => { }}
+                                isValidating={false}
+                                validationResult={null}
+                                icon={<Globe className="h-5 w-5 text-amber-500" />}
+                                placeholder="example.apps.googleusercontent.com"
+                            />
+
+                            <ApiInputRow
+                                label="Google Client Secret"
+                                description="OAuth 2.0 클라이언트 보안 비밀번호입니다."
+                                value={keys.googleClientSecret || ''}
+                                onChange={(v) => setKeys({ ...keys, googleClientSecret: v })}
+                                onTest={() => { }}
+                                isValidating={false}
+                                validationResult={null}
+                                icon={<Globe className="h-5 w-5 text-amber-500" />}
+                                placeholder="****************"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Save Button */}
+                    <div className="flex justify-end pt-4">
+                        <button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="bg-blue-600 text-white px-8 py-3 rounded-xl text-base font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 active:scale-95"
+                        >
+                            {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                            모든 설정 저장하기
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -225,3 +268,5 @@ function ApiInputRow({ label, description, value, onChange, onTest, isValidating
         </div>
     )
 }
+
+

@@ -48,6 +48,7 @@ export function Sidebar({ className }: { className?: string }) {
                 { href: '/dashboard/keywords', icon: 'Key', label: '키워드 관리' },
                 { href: '/dashboard/prompts', icon: 'Terminal', label: '프롬프트 관리' },
                 { href: '/dashboard/tasks', icon: 'Cpu', label: '자동화 작업' },
+                { href: '/dashboard/api', icon: 'Code2', label: 'API 관리' },
             ]
 
             if (res.success && res.data && res.data.length > 0) {
