@@ -238,10 +238,6 @@ export default async function DashboardPage() {
                 </div>
                 <footer className="mt-auto py-4 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
                     <p>© 2026 MediPoster Service</p>
-                    <div className="flex gap-4">
-                        <Link href="#" className="hover:text-foreground">고객지원</Link>
-                        <Link href="#" className="hover:text-foreground">매뉴얼</Link>
-                    </div>
                 </footer>
             </div>
         </>
