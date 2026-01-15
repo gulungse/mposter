@@ -12,6 +12,7 @@ export default function AdminSettingsPage() {
         costPerPost: 1,
         costPerScrap: 1,
         costPerAIImage: 2,
+        signupBonus: 10,
         isUpgradeEnabled: false,
         googleClientId: '',
         googleClientSecret: ''
@@ -25,6 +26,7 @@ export default function AdminSettingsPage() {
                     costPerPost: res.data.costPerPost,
                     costPerScrap: res.data.costPerScrap,
                     costPerAIImage: res.data.costPerAIImage,
+                    signupBonus: (res.data as any).signupBonus || 10,
                     isUpgradeEnabled: res.data.isUpgradeEnabled,
                     googleClientId: (res.data as any).googleClientId || '',
                     googleClientSecret: (res.data as any).googleClientSecret || ''
@@ -70,12 +72,12 @@ export default function AdminSettingsPage() {
                 <div className="space-y-6">
                     <div className="flex items-center gap-2 mb-4">
                         <Coins className="h-5 w-5 text-yellow-500" />
-                        <h2 className="text-lg font-bold text-slate-900 dark:text-white">토큰 소모 정책</h2>
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white">토큰 정책 설정</h2>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Cost Per Post */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center p-4 rounded-xl bg-slate-50 dark:bg-[#1a2333] border border-slate-100 dark:border-[#2a364d]">
+                        <div className="p-5 rounded-xl bg-slate-50 dark:bg-[#1a2333] border border-slate-100 dark:border-[#2a364d] flex flex-col justify-between gap-3">
                             <div>
                                 <label className="text-sm font-bold text-slate-700 dark:text-slate-200">기본 글 발행 비용</label>
                                 <p className="text-xs text-slate-400 mt-1">글 1개 발행 시 차감되는 기본 토큰</p>
@@ -90,7 +92,7 @@ export default function AdminSettingsPage() {
                         </div>
 
                         {/* Cost Per Scrap Image */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center p-4 rounded-xl bg-slate-50 dark:bg-[#1a2333] border border-slate-100 dark:border-[#2a364d]">
+                        <div className="p-5 rounded-xl bg-slate-50 dark:bg-[#1a2333] border border-slate-100 dark:border-[#2a364d] flex flex-col justify-between gap-3">
                             <div>
                                 <label className="text-sm font-bold text-slate-700 dark:text-slate-200">이미지 스크랩 비용</label>
                                 <p className="text-xs text-slate-400 mt-1">스크랩 이미지 사용 추가 비용</p>
@@ -105,7 +107,7 @@ export default function AdminSettingsPage() {
                         </div>
 
                         {/* Cost Per AI Image */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center p-4 rounded-xl bg-slate-50 dark:bg-[#1a2333] border border-slate-100 dark:border-[#2a364d]">
+                        <div className="p-5 rounded-xl bg-slate-50 dark:bg-[#1a2333] border border-slate-100 dark:border-[#2a364d] flex flex-col justify-between gap-3">
                             <div>
                                 <label className="text-sm font-bold text-slate-700 dark:text-slate-200">AI 이미지 생성 비용</label>
                                 <p className="text-xs text-slate-400 mt-1">DALL-E 3 또는 FLUX 생성 추가 비용</p>
@@ -118,37 +120,20 @@ export default function AdminSettingsPage() {
                                 className="w-full px-4 py-3 rounded-lg bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-[#324467] font-bold text-right focus:ring-2 focus:ring-blue-500/50 outline-none"
                             />
                         </div>
-                    </div>
 
-                    <div className="flex items-center gap-2 mb-4 pt-6 border-t border-slate-100 dark:border-[#2a364d]">
-                        <SettingsIcon className="h-5 w-5 text-green-500" />
-                        <h2 className="text-lg font-bold text-slate-900 dark:text-white">Google OAuth 설정</h2>
-                    </div>
-
-                    <div className="space-y-4">
-                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#1a2333] border border-slate-100 dark:border-[#2a364d] space-y-4">
+                        {/* Signup Bonus */}
+                        <div className="p-5 rounded-xl bg-slate-50 dark:bg-[#1a2333] border border-slate-100 dark:border-[#2a364d] flex flex-col justify-between gap-3">
                             <div>
-                                <label className="text-sm font-bold text-slate-700 dark:text-slate-200">Google Client ID</label>
-                                <p className="text-xs text-slate-400 mt-1">GCP 콘솔에서 발급받은 OAuth 2.0 클라이언트 ID</p>
-                                <input
-                                    type="text"
-                                    value={settings.googleClientId}
-                                    onChange={e => setSettings({ ...settings, googleClientId: e.target.value })}
-                                    className="mt-2 w-full px-4 py-2 rounded-lg bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-[#324467] text-sm focus:ring-2 focus:ring-blue-500/50 outline-none"
-                                    placeholder="example.apps.googleusercontent.com"
-                                />
+                                <label className="text-sm font-bold text-slate-700 dark:text-slate-200">회원가입 무료 토큰</label>
+                                <p className="text-xs text-slate-400 mt-1">신규 가입자에게 지급될 웰컴 토큰</p>
                             </div>
-                            <div>
-                                <label className="text-sm font-bold text-slate-700 dark:text-slate-200">Google Client Secret</label>
-                                <p className="text-xs text-slate-400 mt-1">OAuth 2.0 클라이언트 보안 비밀번호</p>
-                                <input
-                                    type="password"
-                                    value={settings.googleClientSecret}
-                                    onChange={e => setSettings({ ...settings, googleClientSecret: e.target.value })}
-                                    className="mt-2 w-full px-4 py-2 rounded-lg bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-[#324467] text-sm focus:ring-2 focus:ring-blue-500/50 outline-none"
-                                    placeholder="****************"
-                                />
-                            </div>
+                            <input
+                                type="number"
+                                min="0"
+                                value={settings.signupBonus}
+                                onChange={e => setSettings({ ...settings, signupBonus: parseInt(e.target.value) || 0 })}
+                                className="w-full px-4 py-3 rounded-lg bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-[#324467] font-bold text-right focus:ring-2 focus:ring-blue-500/50 outline-none"
+                            />
                         </div>
                     </div>
 

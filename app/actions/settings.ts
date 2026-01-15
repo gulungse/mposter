@@ -16,6 +16,7 @@ export async function getGlobalSettings() {
                     costPerPost: 1,
                     costPerScrap: 1,
                     costPerAIImage: 2,
+                    signupBonus: 10,
                     isUpgradeEnabled: false
                 }
             })
@@ -33,6 +34,7 @@ export async function updateGlobalSettings(data: {
     costPerPost?: number,
     costPerScrap?: number,
     costPerAIImage?: number,
+    signupBonus?: number,
     googleClientId?: string,
     googleClientSecret?: string
 }) {

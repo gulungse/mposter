@@ -244,9 +244,10 @@ model GlobalSetting {
   costPerPost      Int @default(1)
   costPerScrap     Int @default(1)
   costPerAIImage   Int @default(2) // DALLE or FLUX
+  signupBonus      Int @default(10) // 회원가입 시 제공되는 무료 토큰
   isUpgradeEnabled Boolean @default(false) // 사이드바 업그레이드 버튼 표시 여부
   
-  // Google OAuth 설정
+  // Google OAuth 설정 (Deprecated: User Settings로 이동)
   googleClientId     String?
   googleClientSecret String?
   
