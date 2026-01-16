@@ -12,9 +12,7 @@ export function LoginButton() {
         const { error } = await supabase.auth.signInWithOAuth({
             provider,
             options: {
-                redirectTo: process.env.NEXT_PUBLIC_SITE_URL
-                    ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
-                    : 'https://mposter.kr/auth/callback',
+                redirectTo: `${window.location.origin}/auth/callback`,
                 // 1. 기본 스코프를 닉네임으로 제한
                 scopes: provider === 'kakao' ? 'profile_nickname' : undefined,
                 // 2. 쿼리 파라미터로 다시 한번 닉네임만 강제 (Supabase 대시보드에서 'Allow users without an email' 활성화 필수)
