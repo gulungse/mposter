@@ -17,11 +17,12 @@ import {
     ChevronsUpDown
 } from 'lucide-react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { getUserProfile } from '@/app/actions/user'
 import { getActiveSidebarMenus } from '@/app/actions/menu'
 import { getGlobalSettings } from '@/app/actions/settings'
+import { createClient } from '@/lib/supabase/client'
 
 const ICON_MAP: Record<string, any> = {
     LayoutDashboard, Globe, Key, Terminal, Cpu, Code2, MenuIcon
@@ -29,9 +30,17 @@ const ICON_MAP: Record<string, any> = {
 
 export function Sidebar({ className }: { className?: string }) {
     const pathname = usePathname()
+    const router = useRouter()
     const [user, setUser] = useState<{ name: string | null; email: string; role: string } | null>(null)
     const [menus, setMenus] = useState<any[]>([])
     const [showUpgrade, setShowUpgrade] = useState(false)
+
+    const handleLogout = async () => {
+        const supabase = createClient()
+        await supabase.auth.signOut()
+        router.refresh()
+        router.push('/')
+    }
 
     useEffect(() => {
         async function loadProfile() {
@@ -193,7 +202,14 @@ export function Sidebar({ className }: { className?: string }) {
                             {user?.email || 'Loading...'}
                         </p>
                     </div>
-                    <ChevronsUpDown className="h-4 w-4 text-slate-600 group-hover:text-slate-400 transition-colors" />
+                </div>
+                <div
+                    onClick={handleLogout}
+                    className="mt-4 flex items-center justify-center gap-2 p-2.5 rounded-xl bg-[#1F2937] hover:bg-[#374151] text-slate-300 hover:text-white cursor-pointer transition-all duration-200"
+                    title="로그아웃"
+                >
+                    <LogOut className="h-4 w-4" />
+                    <span className="text-xs font-bold">로그아웃</span>
                 </div>
             </div>
         </aside>
