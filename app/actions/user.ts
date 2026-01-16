@@ -46,13 +46,16 @@ export async function updateUserSettings(data: any) {
 /**
  * OpenAI API 키 검증
  */
+/**
+ * OpenAI API 키 검증
+ */
 export async function validateOpenAI(apiKey: string) {
     try {
         const openai = new OpenAI({ apiKey })
         await openai.models.list()
-        return { success: true }
+        return { success: true, message: 'OpenAI API 연결 성공' }
     } catch (error: any) {
-        return { success: false, error: error.message || '유효하지 않은 API 키입니다.' }
+        return { success: false, message: error.message || '유효하지 않은 API 키입니다.' }
     }
 }
 
@@ -63,9 +66,9 @@ export async function validateGemini(apiKey: string) {
     try {
         // v1beta 모델 목록 조회로 검증
         await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`)
-        return { success: true }
+        return { success: true, message: 'Gemini API 연결 성공' }
     } catch (error: any) {
-        return { success: false, error: '유효하지 않은 API 키입니다.' }
+        return { success: false, message: '유효하지 않은 API 키입니다.' }
     }
 }
 
@@ -77,9 +80,9 @@ export async function validatePiApi(apiKey: string) {
     // 간단히 키가 비어있는지만 체크하거나, 
     // 실제로는 태스크 생성 시도 등을 해야 하지만 여기선 형식만 체크
     if (!apiKey || apiKey.length < 10) {
-        return { success: false, error: '유효하지 않은 키 형식입니다.' }
+        return { success: false, message: '유효하지 않은 키 형식입니다.' }
     }
-    return { success: true }
+    return { success: true, message: '키 형식 검증 완료' }
 }
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
