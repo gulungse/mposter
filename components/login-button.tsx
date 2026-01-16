@@ -12,8 +12,8 @@ export function LoginButton() {
         const { error } = await supabase.auth.signInWithOAuth({
             provider,
             options: {
-                redirectTo: process.env.NEXT_PUBLIC_SITE_URL
-                    ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`
+                redirectTo: window.location.hostname === 'localhost'
+                    ? `${window.location.origin}/auth/callback`
                     : 'https://mposter.kr/auth/callback',
                 // 1. 기본 스코프를 닉네임으로 제한
                 scopes: provider === 'kakao' ? 'profile_nickname' : undefined,
