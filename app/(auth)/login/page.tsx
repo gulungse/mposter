@@ -1,9 +1,14 @@
-
 import { LoginButton } from '@/components/login-button'
-import { Sparkles as SparklesIcon, Zap as ZapIcon } from 'lucide-react'
+import { Sparkles as SparklesIcon, Zap as ZapIcon, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 
-export default function LoginPage() {
+export default async function LoginPage({
+    searchParams
+}: {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
+    const { error, date } = await searchParams
+
     return (
         <div className="relative flex min-h-screen w-full flex-col items-center justify-center overflow-hidden bg-background">
             {/* Subtle Top Navigation / Brand Only */}
@@ -24,6 +29,20 @@ export default function LoginPage() {
                 <div className="mb-6 flex justify-center">
                     <div className="h-1 bg-gradient-to-r from-transparent via-primary to-transparent w-24 rounded-full opacity-50" />
                 </div>
+
+                {/* WITHDRAWAL ALERT */}
+                {error === 'withdrawn' && (
+                    <div className="mb-6 p-4 rounded-2xl bg-red-500/5 border border-red-500/20 text-red-600 animate-in fade-in zoom-in-95 shadow-sm">
+                        <div className="flex items-center justify-center gap-2 mb-1">
+                            <AlertCircle className="h-4 w-4" />
+                            <p className="text-sm font-black">재가입 제한 안내</p>
+                        </div>
+                        <p className="text-xs font-medium leading-relaxed opacity-90">
+                            탈퇴하신 계정은 정책에 따라<br />
+                            <span className="font-bold underline decoration-red-500/30 underline-offset-2">{date}</span> 까지 재가입이 불가능합니다.
+                        </p>
+                    </div>
+                )}
 
                 {/* Headline Text */}
                 <div className="mb-2">

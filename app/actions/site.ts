@@ -32,6 +32,26 @@ export async function createSite(data: {
             return { success: false, message: limitRes.error }
         }
 
+        // 워드프레스 연결 테스트
+        if (data.type === 'WORDPRESS') {
+            try {
+                const baseUrl = data.url.replace(/\/$/, '')
+                await axios.get(`${baseUrl}/wp-json/wp/v2/users/me`, {
+                    auth: {
+                        username: data.username || '',
+                        password: data.apiToken
+                    },
+                    timeout: 10000
+                })
+            } catch (err: any) {
+                console.error('WP Connection Test Failed:', err.message)
+                return {
+                    success: false,
+                    message: `워드프레스 연결 실패: ${err.response?.status === 401 ? '인증 정보가 올바르지 않습니다.' : '사이트에 접속할 수 없거나 REST API가 비활성화되어 있습니다.'}`
+                }
+            }
+        }
+
         const id = crypto.randomUUID()
         const now = new Date().toISOString()
 

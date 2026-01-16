@@ -28,6 +28,28 @@ export async function getOrCreateUser() {
         const freePlans: any[] = await (prisma as any).$queryRawUnsafe(`SELECT id FROM "plans" WHERE "name" LIKE 'Free%' LIMIT 1`)
         const freePlanId = freePlans[0]?.id || null
 
+        // 탈퇴 이력 확인 (재가입 방지)
+        if (authUser.email) {
+            // Prisma Client 갱신 지연 시 방어 로직 (재시작 전까지 크래시 방지)
+            if ((prisma as any).withdrawnUser) {
+                const withdrawn = await prisma.withdrawnUser.findUnique({
+                    where: { email: authUser.email }
+                })
+
+                if (withdrawn) {
+                    const now = new Date()
+                    if (withdrawn.availableAt > now) {
+                        await supabase.auth.signOut()
+                        const dateStr = withdrawn.availableAt.toISOString().split('T')[0]
+                        redirect(`/login?error=withdrawn&date=${dateStr}`)
+                    }
+                }
+            } else {
+                // 개발 환경에서 스키마 변경 후 서버 재시작이 안 되었을 때 로그 남김
+                console.warn("⚠️ Warning: 'withdrawnUser' model not found in Prisma Client. Please restart the server to apply schema changes.")
+            }
+        }
+
         user = await prisma.user.create({
             data: {
                 id: authUser.id,

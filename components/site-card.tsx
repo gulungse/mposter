@@ -15,9 +15,10 @@ interface SiteCardProps {
     status: 'ACTIVE' | 'ERROR'
     createdAt: string | Date
     onCreateTask?: () => void
+    onDeleted?: () => void
 }
 
-export function SiteCard({ id, name, url, type, status, createdAt, onCreateTask }: SiteCardProps) {
+export function SiteCard({ id, name, url, type, status, createdAt, onCreateTask, onDeleted }: SiteCardProps) {
     const router = useRouter()
     const [isDeleting, setIsDeleting] = useState(false)
 
@@ -27,6 +28,7 @@ export function SiteCard({ id, name, url, type, status, createdAt, onCreateTask 
         const res = await deleteSite(id)
         if (res.success) {
             router.refresh()
+            if (onDeleted) onDeleted()
         } else {
             alert(res.error || '삭제 실패')
             setIsDeleting(false)

@@ -15,12 +15,35 @@ import {
     AlertCircle as AlertCircleIcon
 } from 'lucide-react'
 import { BuyTokensButton } from '@/components/dashboard/buy-tokens-button'
+import { LogoutButton } from '@/components/logout-button'
 
 export default async function DashboardPage() {
     const user = await getOrCreateUser()
 
-    // 통계 데이터 및 최근 로그 조회
-    const [successPosts, activeJobs, recentLogs] = await Promise.all([
+    // 사용자 플랜 및 리소스 사용량 조회
+    const userData = await prisma.user.findUnique({
+        where: { id: user.id },
+        include: { plan: true }
+    })
+
+    // 플랜 제한 (플랜이 없으면 기본 무료 제한 적용)
+    const limits = {
+        sites: userData?.plan?.siteLimit ?? 2,
+        keywords: userData?.plan?.keywordGroupLimit ?? 3,
+        prompts: userData?.plan?.promptLimit ?? 3,
+        tasks: userData?.plan?.taskLimit ?? 3
+    }
+
+    // 통계 데이터 동시 조회
+    const [
+        successPosts,
+        activeJobs,
+        recentLogs,
+        siteCount,
+        keywordGroupCount,
+        promptCount,
+        taskCount
+    ] = await Promise.all([
         prisma.postLog.count({ where: { userId: user.id, status: 'SUCCESS' } }),
         prisma.automationJob.count({ where: { userId: user.id, isActive: true } }),
         prisma.postLog.findMany({
@@ -34,76 +57,96 @@ export default async function DashboardPage() {
                     }
                 }
             }
-        })
+        }),
+        prisma.site.count({ where: { userId: user.id } }),
+        prisma.keywordGroup.count({ where: { userId: user.id } }),
+        prisma.prompt.count({ where: { userId: user.id, type: 'USER' } }),
+        prisma.automationJob.count({ where: { userId: user.id } })
     ])
-
-    // 키워드 그룹 수 조회 (별도 쿼리로 분리)
-    const totalKeywords = await prisma.keywordGroup.count({ where: { userId: user.id } })
 
     const stats = {
         activeSites: activeJobs,
         totalPosts: successPosts,
-        totalKeywords: totalKeywords
+        totalKeywords: keywordGroupCount // Note: Showing keyword group count in stats card as explicit request implied slots
     }
 
     return (
         <>
-            {/* Top Navbar */}
-
-
-            <div className="p-5 space-y-5 pb-10">
-                {/* Header */}
-                <div className="mb-5 flex items-end justify-between">
-                    <div>
-                        <h1 className="text-2xl font-black tracking-tight text-foreground">종합상황대기실 [DashBoard]</h1>
-                        <p className="text-muted-foreground text-sm font-medium mt-1">자동화 작업 및 블로그 발행 현황을 한눈에 확인하세요.</p>
-                    </div>
-                    <Link href="/dashboard/tasks/new" className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg shadow-blue-500/20 flex items-center gap-2 transition-all active:scale-95">
-                        <ZapIcon className="h-4 w-4" />
-                        새 작업 만들기
-                    </Link>
+            <div className="p-5 space-y-6 pb-10">
+                {/* Header Title (Simplified) */}
+                <div>
+                    <h1 className="text-2xl font-black tracking-tight text-foreground">대시보드</h1>
+                    <p className="text-muted-foreground text-sm font-medium mt-1">나의 작업 현황과 리소스를 한눈에 확인하세요.</p>
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-5">
-                    <StatCard
-                        title="활성화된 자동화 작업"
-                        value={stats.activeSites}
-                        icon={ActivityIcon}
-                        trend="Active Jobs"
-                        trendUp={true}
-                    />
-                    <StatCard
-                        title="총 발행포스트"
-                        value={stats.totalPosts}
-                        icon={FileTextIcon}
-                        trend="Total Posted"
-                        trendUp={true}
-                    />
-                    <StatCard
-                        title="등록한 키워드"
-                        value={stats.totalKeywords}
-                        icon={HashIcon}
-                        trend="Target Keywords"
-                        trendUp={true}
-                    />
+                {/* New User Profile & Overview Section */}
+                <div className="bg-card border border-border rounded-3xl p-6 shadow-sm relative overflow-hidden">
+                    {/* Background Glow */}
+                    <div className="absolute top-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
 
-                    {/* Premium Token Card */}
-                    <div className="bg-card border border-primary/20 rounded-2xl p-5 relative overflow-hidden group shadow-lg shadow-blue-500/5">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full blur-3xl -mr-16 -mt-16 transition-all group-hover:bg-primary/20"></div>
-                        <div className="flex justify-between items-start mb-3 relative z-10">
-                            <div>
-                                <p className="text-xs font-bold text-primary uppercase tracking-wider">토큰 보유량</p>
-                                <h3 className="text-2xl font-black text-foreground mt-1">{user?.tokenBalance?.toLocaleString() || 0}</h3>
+                    <div className="relative z-10 flex flex-col md:flex-row gap-8 justify-between">
+                        {/* Profile & Plan */}
+                        <div className="flex items-start gap-5">
+                            <div className="h-20 w-20 rounded-2xl bg-muted border-2 border-border overflow-hidden shadow-inner flex items-center justify-center shrink-0">
+                                {user.image ? (
+                                    <img src={user.image} alt={user.name || 'User'} className="h-full w-full object-cover" />
+                                ) : (
+                                    <ActivityIcon className="h-8 w-8 text-muted-foreground" />
+                                )}
                             </div>
-                            <div className="h-10 w-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-blue-600/30">
-                                <CoinsIcon className="h-5 w-5" />
+                            <div className="space-y-2">
+                                <div>
+                                    <h2 className="text-2xl font-black text-foreground">{user.name || '알 수 없는 사용자'}</h2>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase border border-primary/20">
+                                            <ZapIcon className="h-3 w-3" />
+                                            {userData?.plan?.name || 'Free Plan'}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <p className="text-xs text-muted-foreground mb-4 relative z-10 h-4">
-                            {/* Empty placeholder for spacing or remove completely if not needed */}
-                        </p>
-                        <BuyTokensButton />
+
+                        {/* Account Info Details (Middle) */}
+                        <div className="flex-1 border-l border-border pl-8 flex flex-col justify-center space-y-2.5 hidden md:flex">
+                            <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
+                                <span className="flex items-center gap-2 min-w-[80px]">
+                                    이메일
+                                </span>
+                                <span className="text-foreground">{user.email}</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
+                                <span className="flex items-center gap-2 min-w-[80px]">
+                                    로그인 방식
+                                </span>
+                                <span className="text-foreground">Google (Social)</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
+                                <span className="flex items-center gap-2 min-w-[80px]">
+                                    가입 날짜
+                                </span>
+                                <span className="text-foreground">
+                                    {new Date(user.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                </span>
+                            </div>
+                            <div className="mt-2 pt-2 border-t border-border/50 w-full flex justify-start">
+                                <LogoutButton />
+                            </div>
+                        </div>
+
+                        {/* Token Balance (Right) */}
+                        <div className="flex flex-col items-end justify-center min-w-[220px] bg-muted/30 p-5 rounded-2xl border border-border/50">
+                            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">토큰 보유량</h3>
+                            <div className="flex items-center gap-2 mb-3">
+                                <CoinsIcon className="h-5 w-5 text-primary" />
+                                <div className="text-3xl font-black text-primary">
+                                    {user?.tokenBalance?.toLocaleString() || 0}
+                                </div>
+                            </div>
+                            <div className="w-full">
+                                <BuyTokensButton />
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -116,10 +159,19 @@ export default async function DashboardPage() {
                             <h3 className="font-bold text-foreground flex items-center gap-2 text-sm">
                                 <LayoutListIcon className="h-4 w-4 text-primary" />
                                 자동화 작업 현황
+                                <span className="text-muted-foreground text-xs font-medium ml-2 bg-muted px-2 py-0.5 rounded-full">
+                                    총 {stats.totalPosts.toLocaleString()}개 발행됨
+                                </span>
                             </h3>
-                            <Link href="/dashboard/history" className="text-xs font-bold text-primary hover:underline">
-                                전체 내역 보기
-                            </Link>
+                            <div className="flex gap-2">
+                                <Link href="/dashboard/tasks/new" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+                                    <ZapIcon className="h-3 w-3" /> 작업 생성
+                                </Link>
+                                <span className="text-border">|</span>
+                                <Link href="/dashboard/history" className="text-xs font-bold text-muted-foreground hover:text-foreground">
+                                    전체 내역
+                                </Link>
+                            </div>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full">
@@ -139,8 +191,14 @@ export default async function DashboardPage() {
                                                 <td className="py-3 pl-2 font-bold text-foreground">
                                                     {log.job?.site?.name || 'Unknown Site'}
                                                 </td>
-                                                <td className="py-3 text-foreground/90 max-w-[200px] truncate" title={log.title || ''}>
-                                                    {log.title || '(No Title)'}
+                                                <td className="py-3 text-foreground/90 max-w-[200px] truncate" title={log.title || log.keyword}>
+                                                    {log.status === 'SUCCESS' && log.postUrl ? (
+                                                        <a href={log.postUrl} target="_blank" rel="noopener noreferrer" className="hover:text-primary hover:underline transition-colors block truncate">
+                                                            {log.title || log.keyword || '(No Title)'}
+                                                        </a>
+                                                    ) : (
+                                                        log.title || log.keyword || '제목 생성 중...'
+                                                    )}
                                                 </td>
                                                 <td className="py-3">
                                                     <StatusBadge status={log.status} />
@@ -165,42 +223,39 @@ export default async function DashboardPage() {
                         </div>
                     </div>
 
-                    {/* Right Column: System Health & Resources (Restored) */}
+                    {/* Right Column: User Usage Stats (Real Data) */}
                     <div className="space-y-5">
                         <div className="bg-card border border-border rounded-2xl p-5 shadow-sm h-full">
                             <h3 className="font-bold text-foreground flex items-center gap-2 mb-5 text-sm">
                                 <CpuIcon className="h-4 w-4 text-orange-500" />
-                                시스템 리소스 상태
+                                내 리소스 현황
                             </h3>
 
-                            <div className="space-y-5">
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-xs font-bold">
-                                        <span className="text-muted-foreground">API 사용량 (OpenAI)</span>
-                                        <span className="text-foreground">85%</span>
-                                    </div>
-                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                                        <div className="h-full bg-blue-500 w-[85%] rounded-full" />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-xs font-bold">
-                                        <span className="text-muted-foreground">서버 부하</span>
-                                        <span className="text-foreground">12%</span>
-                                    </div>
-                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                                        <div className="h-full bg-green-500 w-[12%] rounded-full" />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-xs font-bold">
-                                        <span className="text-muted-foreground">스토리지 공간</span>
-                                        <span className="text-foreground">45%</span>
-                                    </div>
-                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                                        <div className="h-full bg-purple-500 w-[45%] rounded-full" />
-                                    </div>
-                                </div>
+                            <div className="space-y-6">
+                                <UsageBar
+                                    label="사이트 등록 슬롯"
+                                    used={siteCount}
+                                    limit={limits.sites}
+                                    color="bg-blue-500"
+                                />
+                                <UsageBar
+                                    label="자동화 작업 슬롯"
+                                    used={taskCount}
+                                    limit={limits.tasks}
+                                    color="bg-green-500"
+                                />
+                                <UsageBar
+                                    label="키워드 그룹 슬롯"
+                                    used={keywordGroupCount}
+                                    limit={limits.keywords}
+                                    color="bg-purple-500"
+                                />
+                                <UsageBar
+                                    label="프롬프트 슬롯"
+                                    used={promptCount}
+                                    limit={limits.prompts}
+                                    color="bg-pink-500"
+                                />
                             </div>
 
                             <div className="mt-8 pt-6 border-t border-border">
@@ -209,8 +264,8 @@ export default async function DashboardPage() {
                                     <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 border border-border/50">
                                         <AlertCircleIcon className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                                         <div>
-                                            <p className="text-xs font-bold text-foreground">블로그 연결 만료 임박</p>
-                                            <p className="text-[10px] text-muted-foreground mt-0.5">'My Tech Blog' 연결이 2일 내 만료됩니다.</p>
+                                            <p className="text-xs font-bold text-foreground">서비스 안내</p>
+                                            <p className="text-[10px] text-muted-foreground mt-0.5">현재 베타 서비스 중입니다. 기능 개선을 위한 피드백은 환영합니다.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -224,6 +279,21 @@ export default async function DashboardPage() {
                 </footer>
             </div>
         </>
+    )
+}
+
+function UsageBar({ label, used, limit, color }: { label: string, used: number, limit: number, color: string }) {
+    const percent = Math.min(100, Math.max(0, (used / limit) * 100))
+    return (
+        <div className="space-y-2">
+            <div className="flex justify-between text-xs font-bold">
+                <span className="text-muted-foreground">{label}</span>
+                <span className="text-foreground">{used} / {limit} ({Math.round(percent)}%)</span>
+            </div>
+            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${percent}%` }} />
+            </div>
+        </div>
     )
 }
 

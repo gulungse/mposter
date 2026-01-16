@@ -47,6 +47,16 @@ enum UserRole {
   ADMIN
 }
 
+// 탈퇴한 사용자 기록 (재가입 제한용)
+model WithdrawnUser {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  withdrawnAt DateTime @default(now())
+  availableAt DateTime // 재가입 가능일 (탈퇴일 + 1년)
+
+  @@map("withdrawn_users")
+}
+
 // 요금제 플랜 모델
 model Plan {
   id                String   @id @default(uuid())

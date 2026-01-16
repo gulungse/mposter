@@ -1,14 +1,31 @@
 import { getKeywordGroups, fetchTrendingKeywords } from '@/app/actions/keyword'
 import { KeywordCard } from '@/components/keyword/keyword-card'
-import { Plus as PlusIcon, Search as SearchIcon, TrendingUp as TrendingUpIcon, Zap as ZapIcon, PlusCircle as PlusCircleIcon, ExternalLink as ExternalLinkIcon, Clock as ClockIcon, Trash2 as Trash2Icon, Edit as EditIcon } from 'lucide-react'
+import { Plus as PlusIcon, Search as SearchIcon, TrendingUp as TrendingUpIcon, Zap as ZapIcon, PlusCircle as PlusCircleIcon, ExternalLink as ExternalLinkIcon, Clock as ClockIcon, Trash2 as Trash2Icon, Edit as EditIcon, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
+import { getUserWithPlan } from '@/app/actions/plan'
 
 export default async function KeywordPage() {
-    const { data: groups = [] } = await getKeywordGroups()
-    const trending = await fetchTrendingKeywords()
+    const [{ data: groups = [] }, trending, planRes] = await Promise.all([
+        getKeywordGroups(),
+        fetchTrendingKeywords(),
+        getUserWithPlan()
+    ])
+
+    const limit = (planRes.success && (planRes.data as any).plan?.keywordGroupLimit) ?? 3
+    const isLimitReached = groups.length >= limit
 
     return (
         <div className="p-5 space-y-5">
+            {/* Warning Message */}
+            {isLimitReached && (
+                <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl p-4 flex items-center gap-3 text-amber-800 dark:text-amber-400">
+                    <AlertTriangle className="h-5 w-5 shrink-0" />
+                    <div className="text-sm font-bold">
+                        현재 키워드 그룹 등록 가능한 슬롯({limit}개)을 모두 사용 중입니다. 추가 등록을 원하시면 플랜을 업그레이드해주세요.
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -20,13 +37,15 @@ export default async function KeywordPage() {
                     </p>
                 </div>
                 <div className="flex gap-3">
-                    <Link
-                        href="/dashboard/keywords/new"
-                        className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-primary/90 shadow-lg shadow-blue-500/20 transition-all"
-                    >
-                        <PlusIcon className="h-4 w-4" />
-                        새 그룹 생성
-                    </Link>
+                    {!isLimitReached && (
+                        <Link
+                            href="/dashboard/keywords/new"
+                            className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-primary/90 shadow-lg shadow-blue-500/20 transition-all"
+                        >
+                            <PlusIcon className="h-4 w-4" />
+                            새 그룹 생성
+                        </Link>
+                    )}
                 </div>
             </div>
 
@@ -44,7 +63,7 @@ export default async function KeywordPage() {
                         <div className="divide-y divide-border">
                             {trending.length > 0 ? (
                                 trending.slice(0, 10).map((keyword, index) => (
-                                    <TrendingItem key={index} keyword={keyword} index={index} />
+                                    <TrendingItem key={index} keyword={keyword} index={index} isLimitReached={isLimitReached} />
                                 ))
                             ) : (
                                 <div className="p-16 text-center text-muted-foreground text-sm">
@@ -86,10 +105,12 @@ export default async function KeywordPage() {
                             />
                         ))}
 
-                        <Link href="/dashboard/keywords/new" className="flex items-center justify-center gap-2 p-4 rounded-2xl border-2 border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-muted/50 transition-all group">
-                            <PlusIcon className="h-4 w-4 group-hover:scale-125 transition-transform" />
-                            <span className="text-xs font-bold uppercase tracking-tight">새로운 키워드 그룹 추가</span>
-                        </Link>
+                        {!isLimitReached && (
+                            <Link href="/dashboard/keywords/new" className="flex items-center justify-center gap-2 p-4 rounded-2xl border-2 border-dashed border-border text-muted-foreground hover:text-primary hover:border-primary/50 hover:bg-muted/50 transition-all group">
+                                <PlusIcon className="h-4 w-4 group-hover:scale-125 transition-transform" />
+                                <span className="text-xs font-bold uppercase tracking-tight">새로운 키워드 그룹 추가</span>
+                            </Link>
+                        )}
                     </div>
                 </div>
             </div>
@@ -97,7 +118,7 @@ export default async function KeywordPage() {
     )
 }
 
-function TrendingItem({ keyword, index }: { keyword: string, index: number }) {
+function TrendingItem({ keyword, index, isLimitReached }: { keyword: string, index: number, isLimitReached: boolean }) {
     return (
         <div className="px-6 py-4 flex items-center justify-between group hover:bg-muted/50 transition-colors">
             <div className="flex items-center gap-4">
@@ -109,13 +130,15 @@ function TrendingItem({ keyword, index }: { keyword: string, index: number }) {
                 </span>
             </div>
             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-2 group-hover:translate-x-0">
-                <Link
-                    href={`/dashboard/keywords/new?keyword=${encodeURIComponent(keyword)}`}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card border border-border text-xs font-bold text-muted-foreground hover:text-primary hover:border-primary transition-all shadow-sm"
-                >
-                    <PlusCircleIcon className="h-3.5 w-3.5" />
-                    등록
-                </Link>
+                {!isLimitReached && (
+                    <Link
+                        href={`/dashboard/keywords/new?keyword=${encodeURIComponent(keyword)}`}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card border border-border text-xs font-bold text-muted-foreground hover:text-primary hover:border-primary transition-all shadow-sm"
+                    >
+                        <PlusCircleIcon className="h-3.5 w-3.5" />
+                        등록
+                    </Link>
+                )}
                 <Link
                     href={`/dashboard/tasks/new?keyword=${encodeURIComponent(keyword)}`}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all shadow-sm shadow-blue-500/20"

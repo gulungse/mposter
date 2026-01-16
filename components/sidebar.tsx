@@ -23,6 +23,7 @@ import { getUserProfile } from '@/app/actions/user'
 import { getActiveSidebarMenus } from '@/app/actions/menu'
 import { getGlobalSettings } from '@/app/actions/settings'
 import { createClient } from '@/lib/supabase/client'
+import { DeleteAccountButton } from '@/components/delete-account-button'
 
 const ICON_MAP: Record<string, any> = {
     LayoutDashboard, Globe, Key, Terminal, Cpu, Code2, MenuIcon
@@ -203,13 +204,8 @@ export function Sidebar({ className }: { className?: string }) {
                         </p>
                     </div>
                 </div>
-                <div
-                    onClick={handleLogout}
-                    className="mt-4 flex items-center justify-center gap-2 p-2.5 rounded-xl bg-[#1F2937] hover:bg-[#374151] text-slate-300 hover:text-white cursor-pointer transition-all duration-200"
-                    title="로그아웃"
-                >
-                    <LogOut className="h-4 w-4" />
-                    <span className="text-xs font-bold">로그아웃</span>
+                <div className="mt-4">
+                    <DeleteAccountButton variant="button" />
                 </div>
             </div>
         </aside>

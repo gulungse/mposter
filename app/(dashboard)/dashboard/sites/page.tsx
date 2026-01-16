@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus as PlusIcon, Search as SearchIcon, Smartphone, Zap as ZapIcon } from 'lucide-react'
+import { Plus as PlusIcon, Search as SearchIcon, Smartphone, Zap as ZapIcon, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { getSites } from '@/app/actions/site'
 import { getKeywordGroups } from '@/app/actions/keyword'
 import { getPrompts } from '@/app/actions/prompt'
+import { getUserWithPlan } from '@/app/actions/plan'
 import { SiteCard } from '@/components/site-card'
 import { NewTaskModal } from '@/components/task/new-task-modal'
 
@@ -14,6 +15,7 @@ export default function SitesPage() {
     const [keywords, setKeywords] = useState<any[]>([])
     const [prompts, setPrompts] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
+    const [limits, setLimits] = useState<any>(null)
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false)
@@ -25,14 +27,22 @@ export default function SitesPage() {
 
     async function loadData() {
         setLoading(true)
-        const [sitesRes, keywordsRes, promptsRes] = await Promise.all([
+        const [sitesRes, keywordsRes, promptsRes, planRes] = await Promise.all([
             getSites(),
             getKeywordGroups(),
-            getPrompts()
+            getPrompts(),
+            getUserWithPlan()
         ])
         if (sitesRes.success) setSites(sitesRes.data || [])
         if (keywordsRes.success) setKeywords(keywordsRes.data || [])
         if (promptsRes.success) setPrompts(promptsRes.data || [])
+
+        if (planRes.success && (planRes.data as any).plan) {
+            setLimits({ maxSites: (planRes.data as any).plan.siteLimit })
+        } else {
+            setLimits({ maxSites: 2 })
+        }
+
         setLoading(false)
     }
 
@@ -41,10 +51,26 @@ export default function SitesPage() {
         setIsModalOpen(true)
     }
 
+    const handleSiteDeleted = (deletedId: string) => {
+        setSites(prev => prev.filter(s => s.id !== deletedId))
+    }
+
+    const isLimitReached = sites.length >= (limits?.maxSites ?? 2)
+
     if (loading) return <div className="p-12 text-center text-slate-500 font-bold">로딩 중...</div>
 
     return (
         <div className="p-5 space-y-5">
+            {/* Warning Message */}
+            {isLimitReached && (
+                <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl p-4 flex items-center gap-3 text-amber-800 dark:text-amber-400">
+                    <AlertTriangle className="h-5 w-5 shrink-0" />
+                    <div className="text-sm font-bold">
+                        현재 사이트 등록 가능한 슬롯({limits?.maxSites}개)을 모두 사용 중입니다. 추가 등록을 원하시면 플랜을 업그레이드해주세요.
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -63,13 +89,15 @@ export default function SitesPage() {
                         <ZapIcon className="h-4 w-4" />
                         빠른 자동화 생성
                     </button>
-                    <Link
-                        href="/dashboard/sites/new"
-                        className="bg-secondary text-secondary-foreground px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-secondary/80 border border-border shadow-sm transition-all w-fit"
-                    >
-                        <PlusIcon className="h-4 w-4" />
-                        새 사이트 연결
-                    </Link>
+                    {!isLimitReached && (
+                        <Link
+                            href="/dashboard/sites/new"
+                            className="bg-secondary text-secondary-foreground px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-secondary/80 border border-border shadow-sm transition-all w-fit"
+                        >
+                            <PlusIcon className="h-4 w-4" />
+                            새 사이트 연결
+                        </Link>
+                    )}
                 </div>
             </div>
 
@@ -97,16 +125,19 @@ export default function SitesPage() {
                         status="ACTIVE"
                         createdAt={site.createdAt}
                         onCreateTask={() => openCreateTask(site.id)}
+                        onDeleted={() => handleSiteDeleted(site.id)}
                     />
                 ))}
 
-                {/* Empty State / Add New Card */}
-                <Link href="/dashboard/sites/new" className="group flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border p-5 hover:bg-muted/50 transition-all py-10 hover:border-primary/50">
-                    <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all duration-300">
-                        <PlusIcon className="h-6 w-6 text-muted-foreground group-hover:text-white" />
-                    </div>
-                    <p className="font-bold text-muted-foreground text-xs group-hover:text-primary transition-colors uppercase tracking-tight">새 사이트 추가</p>
-                </Link>
+                {/* Empty State / Add New Card - Hide if limit reached */}
+                {!isLimitReached && (
+                    <Link href="/dashboard/sites/new" className="group flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border p-5 hover:bg-muted/50 transition-all py-10 hover:border-primary/50">
+                        <div className="h-12 w-12 rounded-xl bg-muted flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all duration-300">
+                            <PlusIcon className="h-6 w-6 text-muted-foreground group-hover:text-white" />
+                        </div>
+                        <p className="font-bold text-muted-foreground text-xs group-hover:text-primary transition-colors uppercase tracking-tight">새 사이트 추가</p>
+                    </Link>
+                )}
             </div>
 
             {/* Mobile-Style Creation Modal */}
