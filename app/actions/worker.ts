@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { getOrCreateUser } from '@/lib/auth'
+import { GoogleGenerativeAI } from "@google/generative-ai"
 import OpenAI from 'openai'
 import axios from 'axios'
 import { revalidatePath } from 'next/cache'
@@ -47,74 +48,87 @@ async function refreshBloggerToken(site: any, clientId?: string, clientSecret?: 
 /**
  * 사용 가능한 제미나이 모델을 지능적으로 타겟팅하여 콘텐츠를 생성합니다.
  */
+async function getAvailableGeminiModels(apiKey: string) {
+    try {
+        const refererUrl = process.env.NEXT_PUBLIC_SITE_URL
+            ? (process.env.NEXT_PUBLIC_SITE_URL.endsWith('/') ? process.env.NEXT_PUBLIC_SITE_URL : `${process.env.NEXT_PUBLIC_SITE_URL}/`)
+            : 'http://localhost:3000/';
+
+        // v1beta 엔드포인트에서 모델 목록 조회
+        const response = await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
+            headers: { 'Referer': refererUrl },
+            timeout: 10000
+        });
+
+        return response.data?.models || [];
+    } catch (error: any) {
+        console.warn('Gemini Model List Failed:', error.message);
+        return [];
+    }
+}
+
 async function generateGeminiContent(apiKey: string, systemPrompt: string, targetKeyword: string) {
     const trimmedKey = apiKey.trim()
 
-    // 1. 실시간 모델 목록 조회 및 지원 기능 분석
-    let availableModels: string[] = []
-    try {
-        const listRes = await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${trimmedKey}`, { timeout: 10000 })
-        const models = listRes.data.models || []
-        // 실제 텍스트 생성이 가능한 모델만 추출 (명칭에서 models/ 접두사 제거)
-        availableModels = models
-            .filter((m: any) => m.supportedGenerationMethods?.includes('generateContent'))
-            .map((m: any) => m.name.replace('models/', ''))
-    } catch (err: any) {
-        console.error('Gemini Discovery Failed:', err.response?.data || err.message)
-    }
+    // 1. 사용 가능한 모델 목록 조회 (스마트 감지)
+    const availableModels = await getAvailableGeminiModels(trimmedKey);
+    const availableNames = availableModels.map((m: any) => m.name); // 예: ['models/gemini-1.5-flash', ...]
+    console.log('Available Gemini Models:', availableNames);
 
-    // 2. 전략적 후보군 선별 (발견된 모델 우선 + 표준 모델 백업)
-    // 최신 고효율 모델 순으로 가중치 부여
-    const priorityKeywords = ['2.5-flash', '2.5-pro', '2.0-flash', '1.5-flash', '1.5-pro', '-latest', 'gemini-pro']
+    // 2. 우선순위에 따라 최적의 모델 선택
+    // 사용자 추천: gemini-1.5-pro > gemini-1.5-flash
+    let selectedModelName = availableNames.find((name: string) => name.includes('gemini-1.5-pro'))
+        || availableNames.find((name: string) => name.includes('gemini-1.5-flash'))
+        || availableNames.find((name: string) => name.includes('gemini-pro') && !name.includes('vision'));
 
-    const matchedModels = availableModels.filter(m =>
-        priorityKeywords.some(key => m.toLowerCase().includes(key))
-    )
+    // 목록 조회가 실패했거나 매칭되는 게 없으면 강제로 최신 지정
+    let modelId = selectedModelName ? selectedModelName.replace('models/', '') : 'gemini-1.5-pro';
 
-    // 중복 제거 및 후보 리스트 확정
-    const candidates = Array.from(new Set([
-        ...matchedModels,
-        ...availableModels,
-        'gemini-1.5-flash',
-        'gemini-1.5-pro',
-        'gemini-pro'
-    ])).filter(Boolean)
+    // 1.5 계열은 v1beta, 그 외는 상황 봐서 처리하지만 여기선 감지된 모델 위주
+    const version = 'v1beta';
 
-    const versions = ['v1', 'v1beta']
-    let detailedErrors: string[] = []
+    console.log(`Selected Target Model: ${modelId} (${version})`);
+
     let text = ''
+    let lastError = ''
 
-    // 3. 최적의 조합 탐색 (모델별로 v1/v1beta 모두 시도)
-    search: for (const modelName of candidates) {
-        // 이미 시도한 결과가 있다면 스킵 (v1/v1beta 교차 시도)
-        for (const version of versions) {
-            try {
-                const response = await axios.post(`https://generativelanguage.googleapis.com/${version}/models/${modelName}:generateContent?key=${trimmedKey}`, {
-                    contents: [{
-                        parts: [{
-                            text: `${systemPrompt}\n\n위 지침을 따라 '${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘. 
+    // 단일 모델 시도 (이미 검증된 모델이므로 루프 불필요)
+    try {
+        const refererUrl = process.env.NEXT_PUBLIC_SITE_URL
+            ? (process.env.NEXT_PUBLIC_SITE_URL.endsWith('/') ? process.env.NEXT_PUBLIC_SITE_URL : `${process.env.NEXT_PUBLIC_SITE_URL}/`)
+            : 'http://localhost:3000/';
+
+        const url = `https://generativelanguage.googleapis.com/${version}/models/${modelId}:generateContent?key=${trimmedKey}`;
+
+        const response = await axios.post(url, {
+            contents: [{
+                parts: [{
+                    text: `${systemPrompt}\n\n위 지침을 따라 '${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘. 
 본문은 반드시 5개 이상의 문단으로 구성하고, 독자에게 유용하고 상세한 정보를 제공하는 SEO 최적화된 글이어야 해. 분량은 가급적 1000자 이상으로 풍부하게 작성해줘.
 반드시 JSON 형식 {"title": "...", "content": "..."}으로만 답변하고, JSON 외의 텍스트는 절대 포함하지 마.`
-                        }]
-                    }]
-                }, {
-                    headers: { 'Content-Type': 'application/json' },
-                    timeout: 25000 // 생성 시간이 걸릴 수 있으므로 넉넉히 설정
-                })
+                }]
+            }]
+        }, {
+            headers: {
+                'Content-Type': 'application/json',
+                'Referer': refererUrl
+            },
+            timeout: 60000 // 생성 시간 고려하여 타임아웃 증대
+        })
 
-                text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
-                if (text) break search
-            } catch (err: any) {
-                const errMsg = err.response?.data?.error?.message || err.message
-                detailedErrors.push(`[${version}/${modelName}] ${errMsg}`)
-                // 403(권한)이나 429(할당량)인 경우 해당 모델은 더 이상 시도하지 않음
-                if (err.response?.status === 403 || err.response?.status === 429) break
-            }
+        text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    } catch (err: any) {
+        const errMsg = err.response?.data?.error?.message || err.message
+        console.warn(`Gemini Generation [${modelId}] failed:`, errMsg)
+        lastError = errMsg
+
+        if (errMsg.includes('referrer') || (err.response?.status === 403)) {
+            lastError = `API 키 리퍼러 차단됨. (사용된 Referer: ${process.env.NEXT_PUBLIC_SITE_URL || 'localhost'}) 구글 콘솔 확인 필요.`
         }
     }
 
     if (!text) {
-        throw new Error(`Gemini 콘텐츠 생성에 실패했습니다. (시도된 조합: ${candidates.slice(0, 3).join(', ')} 등)\n\n최종 진단: ${detailedErrors[detailedErrors.length - 1]}`)
+        throw new Error(`Gemini 콘텐츠 생성 실패 (${modelId}): ${lastError}`)
     }
 
     // JSON 응답 정제

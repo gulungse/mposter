@@ -21,9 +21,11 @@ export async function GET(request: Request) {
             } else {
                 return NextResponse.redirect(`${origin}${next}`)
             }
+        } else {
+            console.error('Supabase Auth Exchange Error:', error)
         }
     }
 
     // return the user to an error page with instructions
-    return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+    return NextResponse.redirect(`${origin}/auth/auth-code-error?error=verification_failed`)
 }
