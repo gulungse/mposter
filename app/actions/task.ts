@@ -18,6 +18,7 @@ export async function createAutomationTask(data: {
     scheduleCron: string;
     aiModel: any;
     imageSource: any;
+    imageCount?: number;
     wpCategoryId?: number;
     runImmediately?: boolean;
 }) {
@@ -41,6 +42,7 @@ export async function createAutomationTask(data: {
                 scheduleCron: data.scheduleCron,
                 aiModel: data.aiModel,
                 imageSource: data.imageSource,
+                imageCount: data.imageCount || 1,
                 wpCategoryId: data.wpCategoryId,
                 isActive: true,
                 nextRunAt: new Date(Date.now() + 6 * 10 * 1000) // 기본 1시간 후 (Cron에 의해 덮어씌워짐)
@@ -80,6 +82,7 @@ export async function updateAutomationTask(id: string, data: {
     scheduleCron?: string;
     aiModel?: any;
     imageSource?: any;
+    imageCount?: number;
     wpCategoryId?: number;
 }) {
     try {
@@ -95,6 +98,7 @@ export async function updateAutomationTask(id: string, data: {
                 scheduleCron: data.scheduleCron,
                 aiModel: data.aiModel,
                 imageSource: data.imageSource,
+                imageCount: data.imageCount,
                 wpCategoryId: data.wpCategoryId,
             }
         })

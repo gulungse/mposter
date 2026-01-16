@@ -6,6 +6,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 import OpenAI from 'openai'
 import axios from 'axios'
 import { revalidatePath } from 'next/cache'
+import * as cheerio from 'cheerio'
+import sharp from 'sharp'
 
 /**
  * 블로거(Blogger)의 만료된 Access Token을 Refresh Token으로 갱신합니다.
@@ -183,6 +185,75 @@ async function generateFluxImage(apiKey: string, prompt: string) {
     }
 
     throw new Error(`FLUX 이미지 생성 시간 초과 (60초, Task ID: ${taskId})`);
+    throw new Error(`FLUX 이미지 생성 시간 초과 (60초, Task ID: ${taskId})`);
+}
+
+/**
+ * 텍스트 기반 썸네일(500x500)을 생성합니다. (단색 배경 + 한글 제목 + 테두리)
+ */
+async function generateThumbnail(text: string): Promise<Buffer> {
+    const width = 500;
+    const height = 500;
+
+    // 랜덤 파스텔 배경 & 대비되는 진한 테두리 색상
+    const hue = Math.floor(Math.random() * 360);
+    const bgColor = `hsl(${hue}, 70%, 85%)`;
+    const borderColor = `hsl(${hue}, 80%, 30%)`;
+
+    // 텍스트 줄바꿈 처리 (간단한 로직)
+    // 10자 넘어가면 줄바꿈 시도
+    const words = text.split(' ');
+    let lines = [];
+    let currentLine = words[0] || '';
+
+    for (let i = 1; i < words.length; i++) {
+        const word = words[i];
+        if ((currentLine + word).length < 8) {
+            currentLine += ' ' + word;
+        } else {
+            lines.push(currentLine);
+            currentLine = word;
+        }
+    }
+    lines.push(currentLine);
+    if (lines.length > 3) lines = lines.slice(0, 3); // 최대 3줄로 제한
+
+    const svgTextLines = lines.map((line, i) => {
+        const yPos = 50 - ((lines.length - 1) * 6) + (i * 12); // 중앙 정렬 보정
+        return `<text x="50%" y="${yPos}%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="45" font-weight="900" fill="${borderColor}">${line}</text>`
+    }).join('');
+
+    const svg = `
+    <svg width="${width}" height="${height}" version="1.1" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="0" width="${width}" height="${height}" fill="${bgColor}" />
+        <rect x="15" y="15" width="${width - 30}" height="${height - 30}" fill="none" stroke="${borderColor}" stroke-width="15" rx="20" />
+        ${svgTextLines}
+    </svg>
+    `;
+
+    return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+/**
+ * 워드프레스 미디어 라이브러리에 이미지를 업로드합니다.
+ */
+async function uploadToWordPress(site: any, imageBuffer: Buffer, filename: string): Promise<{ id: number, url: string }> {
+    try {
+        const response = await axios.post(`${site.url}/wp-json/wp/v2/media`, imageBuffer, {
+            headers: {
+                'Content-Type': 'image/png',
+                'Content-Disposition': `attachment; filename=${encodeURIComponent(filename)}.png`
+            },
+            auth: {
+                username: site.username,
+                password: site.apiToken
+            }
+        });
+        return { id: response.data.id, url: response.data.source_url };
+    } catch (error: any) {
+        console.error('WP Upload Failed:', error.response?.data || error.message);
+        throw new Error(`워드프레스 이미지 업로드 실패: ${error.response?.data?.message || error.message}`);
+    }
 }
 
 /**
@@ -195,6 +266,7 @@ export async function testPublishAction(data: {
     promptId: string;
     aiModel: 'GPT4O' | 'GEMINI';
     imageSource: 'SCRAP' | 'DALLE' | 'FLUX' | 'NONE';
+    imageCount?: number;
     wpCategoryId?: number;
 }) {
     try {
@@ -265,40 +337,100 @@ export async function testPublishAction(data: {
             throw new Error(`[AI 생성 실패] ${err.response?.status === 401 ? 'API 키가 유효하지 않습니다.' : err.message}`)
         }
 
-        let imageUrl = ''
-        try {
-            if (data.imageSource === 'DALLE') {
-                const apiKey = settings.openaiApiKey
-                if (apiKey) {
-                    const openai = new OpenAI({ apiKey })
-                    const image = await openai.images.generate({ model: "dall-e-3", prompt: `${targetKeyword} 일러스트`, n: 1, size: "1024x1024" })
-                    imageUrl = image.data?.[0]?.url || ''
+        // --- 이미지 생성 및 삽입 로직 ---
+        const imageSource = data.imageSource || 'NONE'
+        const imageCount = data.imageCount || 1
+        let featuredMediaId = 0
+
+        const $ = cheerio.load(content);
+        const headings = $('h2, h3');
+
+        if (headings.length > 0 && imageSource !== 'NONE') {
+            for (let i = 1; i <= imageCount; i++) {
+                let targetHeading: cheerio.Cheerio<any> | null = null;
+                let position: 'before' | 'after' = 'after';
+
+                if (i === 1) {
+                    targetHeading = $(headings[0]);
+                    position = 'before';
+                } else {
+                    const idx = i;
+                    if (headings.length > idx) {
+                        targetHeading = $(headings[idx]);
+                    }
                 }
-            } else if (data.imageSource === 'SCRAP') {
-                imageUrl = `https://loremflickr.com/1200/800/${encodeURIComponent(targetKeyword)}?lock=${Math.floor(Math.random() * 1000)}`
-            } else if (data.imageSource === 'FLUX') {
-                const apiKey = settings.piApiKey
-                if (apiKey) {
-                    imageUrl = await generateFluxImage(apiKey, `${targetKeyword} high quality blog hero image, professional photography`)
+
+                if (!targetHeading) continue;
+
+                let imageUrl = '';
+                let success = false;
+
+                if (i === 1 && site.type === 'WORDPRESS') {
+                    try {
+                        const thumbBuffer = await generateThumbnail(title || targetKeyword);
+                        const uploaded = await uploadToWordPress(site, thumbBuffer, `${targetKeyword}-thumb-${Date.now()}`);
+                        imageUrl = uploaded.url;
+                        featuredMediaId = uploaded.id;
+                        success = true;
+                    } catch (e) {
+                        console.warn('WP/Thumbnail Error:', e);
+                    }
+                }
+
+                if (!imageUrl) {
+                    try {
+                        if (imageSource === 'DALLE') {
+                            const apiKey = settings.openaiApiKey
+                            if (apiKey) {
+                                const openai = new OpenAI({ apiKey })
+                                const imgPrompt = i === 1 ? `${targetKeyword} minimal vector art` : `${targetKeyword} detailed photo ${i}`;
+                                const image = await openai.images.generate({ model: "dall-e-3", prompt: imgPrompt, size: "1024x1024" })
+                                imageUrl = image.data?.[0]?.url || ''
+                                if (imageUrl) success = true;
+                            }
+                        } else if (imageSource === 'SCRAP') {
+                            const w = i === 1 ? 500 : 700;
+                            const h = i === 1 ? 500 : 350;
+                            imageUrl = `https://loremflickr.com/${w}/${h}/${encodeURIComponent(targetKeyword)}?lock=${Math.floor(Math.random() * 1000) + i}`
+                            success = true;
+                        } else if (imageSource === 'FLUX') {
+                            const apiKey = settings.piApiKey
+                            if (apiKey) {
+                                imageUrl = await generateFluxImage(apiKey, `${targetKeyword} blog image ${i}`)
+                                if (imageUrl) success = true;
+                            }
+                        }
+                    } catch (e) {
+                        console.warn(`Image ${i} Generation Failed`, e);
+                    }
+                }
+
+                if (imageUrl) {
+                    const alt = `${targetKeyword} ${i > 1 ? i : ''}`;
+                    const style = i === 1
+                        ? "width:100%; max-width:500px; height:auto; aspect-ratio:1/1; object-fit:cover; display:block; margin: 20px auto; border-radius:8px;"
+                        : "width:100%; max-width:700px; height:auto; aspect-ratio:700/350; object-fit:cover; display:block; margin: 20px auto; border-radius:8px;";
+                    const imgTag = `<img src="${imageUrl}" alt="${alt}" style="${style}" />`;
+                    if (position === 'before') targetHeading.before(imgTag);
+                    else targetHeading.after(imgTag);
                 }
             }
-        } catch (err: any) {
-            console.warn('Image Generation Failed (Proceeding without image):', err.message)
         }
+        content = $.html();
 
-        if (imageUrl) {
-            content = `<img src="${imageUrl}" style="width:100%; border-radius:8px; margin-bottom:20px;"/>\n${content}`
-        }
 
         // 실제 사이트 발행
         try {
             if (site.type === 'WORDPRESS') {
-                await axios.post(`${site.url}/wp-json/wp/v2/posts`, {
+                const payload: any = {
                     title: `[테스트] ${title}`,
                     content: content,
                     status: 'publish',
                     categories: data.wpCategoryId ? [data.wpCategoryId] : []
-                }, {
+                };
+                if (featuredMediaId > 0) payload.featured_media = featuredMediaId;
+
+                await axios.post(`${site.url}/wp-json/wp/v2/posts`, payload, {
                     auth: { username: site.username || '', password: site.apiToken || '' },
                     timeout: 30000
                 })
@@ -351,7 +483,7 @@ export async function testPublishAction(data: {
             throw new Error(`[발행 실패] ${err.message}`)
         }
 
-        // 성공 시 토큰 차감
+        // 성공 시 토큰 차감 (-1)
         await (prisma as any).$executeRawUnsafe(
             'UPDATE "users" SET "tokenBalance" = "tokenBalance" - 1 WHERE "id" = $1',
             user.id
@@ -420,37 +552,121 @@ export async function runAutomationTask(jobId: string) {
             }
         } else {
             const apiKey = settings.geminiApiKey
+            if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
             const aiResult = await generateGeminiContent(apiKey, systemPrompt, targetKeyword)
             title = aiResult.title || targetKeyword
             content = aiResult.content || targetKeyword
         }
 
+        // --- 이미지 생성 및 삽입 로직 ---
         const imageSource = (job as any).imageSource || 'NONE'
-        let imageUrl = ''
-        if (imageSource === 'DALLE') {
-            const openai = new OpenAI({ apiKey: settings.openaiApiKey })
-            const image = await openai.images.generate({ model: "dall-e-3", prompt: `${targetKeyword} 이미지`, size: "1024x1024" })
-            imageUrl = image.data?.[0]?.url || ''
-        } else if (imageSource === 'SCRAP') {
-            // 키워드 기반 랜덤 이미지 검색
-            imageUrl = `https://loremflickr.com/1200/800/${encodeURIComponent(targetKeyword)}?lock=${Math.floor(Math.random() * 1000)}`
-        } else if (imageSource === 'FLUX') {
-            const apiKey = settings.piApiKey
-            if (apiKey) {
-                imageUrl = await generateFluxImage(apiKey, `${targetKeyword} high quality blog hero image, professional photography`)
+        const imageCount = (job as any).imageCount || 1
+        let featuredMediaId = 0
+        let imagesGenerated = 0 // 과금용 카운터
+
+        const $ = cheerio.load(content);
+        const headings = $('h2, h3');
+
+        // 헤딩태그가 없으면 이미지 생성 안 함 (요구사항)
+        if (headings.length > 0 && imageSource !== 'NONE') {
+
+            for (let i = 1; i <= imageCount; i++) {
+                // 위치 결정
+                // i=1: 1번 썸네일 -> 첫번째 헤딩(idx 0) 앞
+                // i=2: 2번 이미지 -> 3번째 헤딩(idx 2) 뒤
+                // i=3: 3번 이미지 -> 4번째 헤딩(idx 3) 뒤
+                // ...
+                let targetHeading: cheerio.Cheerio<any> | null = null;
+                let position: 'before' | 'after' = 'after';
+
+                if (i === 1) {
+                    targetHeading = $(headings[0]);
+                    position = 'before';
+                } else {
+                    const idx = i; // i=2 -> idx=2 (3rd heading)
+                    if (headings.length > idx) {
+                        targetHeading = $(headings[idx]);
+                    }
+                }
+
+                if (!targetHeading) continue;
+
+                // 이미지 생성 진행
+                let imageUrl = '';
+                let success = false;
+
+                // 1번 이미지 (썸네일) 특별 처리
+                if (i === 1 && job.site.type === 'WORDPRESS') {
+                    try {
+                        // 제목 텍스트로 썸네일 생성
+                        const thumbBuffer = await generateThumbnail(title || targetKeyword);
+                        const uploaded = await uploadToWordPress(job.site, thumbBuffer, `${targetKeyword}-thumb-${Date.now()}`);
+                        imageUrl = uploaded.url;
+                        featuredMediaId = uploaded.id;
+                        success = true;
+                    } catch (e) {
+                        console.warn('WP/Thumbnail Error:', e);
+                    }
+                }
+
+                // 1번인데 WP가 아니거나 실패, 또는 2번 이상인 경우
+                if (!imageUrl) {
+                    try {
+                        if (imageSource === 'DALLE') {
+                            const openai = new OpenAI({ apiKey: settings.openaiApiKey })
+                            const imgPrompt = i === 1 ? `${targetKeyword} minimal vector art` : `${targetKeyword} detailed photo ${i}`;
+                            const image = await openai.images.generate({ model: "dall-e-3", prompt: imgPrompt, size: "1024x1024" })
+                            imageUrl = image.data?.[0]?.url || ''
+                            if (imageUrl) success = true;
+                        } else if (imageSource === 'SCRAP') {
+                            const w = i === 1 ? 500 : 700;
+                            const h = i === 1 ? 500 : 350;
+                            imageUrl = `https://loremflickr.com/${w}/${h}/${encodeURIComponent(targetKeyword)}?lock=${Math.floor(Math.random() * 1000) + i}`
+                            success = true;
+                        } else if (imageSource === 'FLUX') {
+                            const apiKey = settings.piApiKey
+                            if (apiKey) {
+                                imageUrl = await generateFluxImage(apiKey, `${targetKeyword} blog image ${i}`)
+                                if (imageUrl) success = true;
+                            }
+                        }
+                    } catch (e) {
+                        console.warn(`Image ${i} Generation Failed`, e);
+                    }
+                }
+
+                if (imageUrl) {
+                    if (success) imagesGenerated++; // 실제 성공한 횟수 카운트
+
+                    const alt = `${targetKeyword} ${i > 1 ? i : ''}`;
+                    // CSS로 사이즈 강제 (원본 해상도 유지하되 표시는 요구사항대로)
+                    const style = i === 1
+                        ? "width:100%; max-width:500px; height:auto; aspect-ratio:1/1; object-fit:cover; display:block; margin: 20px auto; border-radius:8px;"
+                        : "width:100%; max-width:700px; height:auto; aspect-ratio:700/350; object-fit:cover; display:block; margin: 20px auto; border-radius:8px;";
+
+                    const imgTag = `<img src="${imageUrl}" alt="${alt}" style="${style}" />`;
+
+                    if (position === 'before') targetHeading.before(imgTag);
+                    else targetHeading.after(imgTag);
+                }
             }
         }
-
-        if (imageUrl) {
-            content = `<img src="${imageUrl}" style="width:100%; margin-bottom:20px;"/>\n${content}`
-        }
+        content = $.html();
 
         let postUrl = ''
         if (job.site.type === 'WORDPRESS') {
-            const res = await axios.post(`${job.site.url}/wp-json/wp/v2/posts`, {
-                title, content, status: 'publish', categories: (job as any).wpCategoryId ? [(job as any).wpCategoryId] : []
-            }, {
-                auth: { username: job.site.username || '', password: job.site.apiToken || '' }
+            const payload: any = {
+                title, content, status: 'publish',
+                categories: (job as any).wpCategoryId ? [(job as any).wpCategoryId] : []
+            };
+            // 1번 이미지 생성 성공 시 Featured Image 지정
+            if (featuredMediaId > 0) {
+                payload.featured_media = featuredMediaId;
+            }
+
+            const res = await axios.post(`${job.site.url}/wp-json/wp/v2/posts`, payload, {
+                auth: { username: job.site.username || '', password: job.site.apiToken || '' },
+                timeout: 30000 // 포스팅 타임아웃
             })
             postUrl = res.data.link
         } else if (job.site.type === 'BLOGSPOT') {
@@ -479,23 +695,25 @@ export async function runAutomationTask(jobId: string) {
         }
 
 
-        // 토큰 비용 계산 (시스템 설정 적용)
+        // 토큰 비용 계산
         let globalSettings = await prisma.globalSetting.findUnique({ where: { id: 'SYSTEM' } })
-        // 설정이 없으면 기본값 사용
         const costs = globalSettings || { costPerPost: 1, costPerScrap: 1, costPerAIImage: 2 }
 
         let tokensToDeduct = costs.costPerPost
-        // imageSource is already defined earlier in the function
-        if (imageSource === 'DALLE' || imageSource === 'FLUX') {
-            tokensToDeduct += costs.costPerAIImage
-        } else if (imageSource === 'SCRAP') {
-            tokensToDeduct += costs.costPerScrap
+        if (imagesGenerated > 0) {
+            if (imageSource === 'SCRAP') {
+                tokensToDeduct += (costs.costPerScrap * imagesGenerated);
+            } else {
+                tokensToDeduct += (costs.costPerAIImage * imagesGenerated);
+            }
         }
 
         // 실행 전 토큰 잔액 체크 (안전장치)
         const currentUser = await prisma.user.findUnique({ where: { id: user.id } })
         if (!currentUser || currentUser.tokenBalance < tokensToDeduct) {
-            throw new Error(`토큰 잔액이 부족합니다. (필요: ${tokensToDeduct}, 보유: ${currentUser?.tokenBalance || 0})`)
+            // 이미 포스팅은 성공했으므로 잔액 0 처리하거나 마이너스 허용? 
+            // 여기선 그냥 차감 시도 (음수 될 수 있음)
+            console.warn(`User ${user.id} has insufficient tokens for deduction. Required: ${tokensToDeduct}, Available: ${currentUser?.tokenBalance || 0}`);
         }
 
         await prisma.postLog.update({
@@ -518,7 +736,7 @@ export async function runAutomationTask(jobId: string) {
             data: {
                 userId: user.id,
                 amount: -tokensToDeduct,
-                description: `자동화 작업 실행 (${job.name}) - 이미지: ${imageSource}`,
+                description: `자동화 작업 실행 (${job.name}) - 이미지 ${imagesGenerated}장`,
                 type: 'USAGE'
             }
         })

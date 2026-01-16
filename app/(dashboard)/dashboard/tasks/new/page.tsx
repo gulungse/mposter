@@ -43,6 +43,7 @@ function TaskForm() {
         scheduleCron: '0 * * * *',
         aiModel: 'GPT4O',
         imageSource: 'DALLE',
+        imageCount: 1,
         wpCategoryId: undefined as number | undefined
     })
 
@@ -81,6 +82,7 @@ function TaskForm() {
                         scheduleCron: t.scheduleCron || 'MANUAL',
                         aiModel: (t as any).aiModel || 'GPT4O',
                         imageSource: (t as any).imageSource || 'DALLE', // Default to DALLE or whatever
+                        imageCount: (t as any).imageCount || 1,
                         wpCategoryId: (t as any).wpCategoryId
                     })
                 } else {
@@ -139,6 +141,7 @@ function TaskForm() {
             promptId: formData.promptId,
             aiModel: formData.aiModel as any,
             imageSource: formData.imageSource as any,
+            imageCount: formData.imageCount,
             wpCategoryId: formData.wpCategoryId
         })
         if (result.success) {
@@ -394,6 +397,18 @@ function TaskForm() {
                                 <option value="SCRAP">웹 스크래핑</option>
                                 <option value="NONE">이미지 없음</option>
                             </select>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground">이미지 개수 (1~5)</label>
+                            <input
+                                type="number"
+                                min="1"
+                                max="5"
+                                value={formData.imageCount}
+                                onChange={e => setFormData({ ...formData, imageCount: Math.min(5, Math.max(1, Number(e.target.value))) })}
+                                disabled={formData.imageSource === 'NONE'}
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all disabled:opacity-50"
+                            />
                         </div>
                     </div>
 

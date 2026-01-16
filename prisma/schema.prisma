@@ -141,6 +141,7 @@ model AutomationJob {
   scheduleCron    String?  // Cron expression e.g., "0 9 * * *"
   aiModel         AIModel      @default(GPT4O)
   imageSource     ImageSource  @default(DALLE)
+  imageCount      Int          @default(1)
   isActive        Boolean  @default(true)
   
   // 워드프레스 전용

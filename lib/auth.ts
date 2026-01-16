@@ -1,4 +1,5 @@
 
+import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 
@@ -11,7 +12,7 @@ export async function getOrCreateUser() {
     const { data: { user: authUser }, error } = await supabase.auth.getUser()
 
     if (error || !authUser) {
-        throw new Error('Authentication required')
+        redirect('/login')
     }
 
     let user = await prisma.user.findUnique({
