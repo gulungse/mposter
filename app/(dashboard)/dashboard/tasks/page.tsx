@@ -110,7 +110,7 @@ export default async function TasksPage() {
                         promptTitle={task.prompt?.title || '프롬프트 없음'}
                         schedule={formatSchedule(task.scheduleCron)}
                         status={task.isActive}
-                        nextRun={task.nextRunAt ? new Date(task.nextRunAt).toLocaleString('ko-KR') : '-'}
+                        nextRun={task.nextRunAt ? new Date(task.nextRunAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '-'}
                     />
                 ))}
 
