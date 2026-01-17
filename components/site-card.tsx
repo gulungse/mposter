@@ -3,6 +3,7 @@
 import { Globe as GlobeIcon, MoreHorizontal as MoreHorizontalIcon, Settings as SettingsIcon, Trash2 as Trash2Icon, ExternalLink as ExternalLinkIcon, Loader2 as Loader2Icon, Zap as ZapIcon } from 'lucide-react'
 import { clsx } from 'clsx'
 import Link from 'next/link'
+import Image from 'next/image'
 import { deleteSite } from '@/app/actions/site'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -42,9 +43,11 @@ export function SiteCard({ id, name, url, type, status, createdAt, onCreateTask,
                     <div className={clsx(
                         "flex h-9 w-9 items-center justify-center rounded-lg overflow-hidden border border-border bg-white p-1",
                     )}>
-                        <img
+                        <Image
                             src={type === 'WORDPRESS' ? "/icons/wordpress.png" : "/icons/blogspot.png"}
                             alt={type}
+                            width={32}
+                            height={32}
                             className="h-full w-full object-contain"
                         />
                     </div>

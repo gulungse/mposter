@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { getOrCreateUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
@@ -89,7 +90,13 @@ export default async function DashboardPage() {
                         <div className="flex items-start gap-5">
                             <div className="h-20 w-20 rounded-2xl bg-muted border-2 border-border overflow-hidden shadow-inner flex items-center justify-center shrink-0">
                                 {user.image ? (
-                                    <img src={user.image} alt={user.name || 'User'} className="h-full w-full object-cover" />
+                                    <Image
+                                        src={user.image}
+                                        alt={user.name || 'User'}
+                                        width={80}
+                                        height={80}
+                                        className="h-full w-full object-cover"
+                                    />
                                 ) : (
                                     <ActivityIcon className="h-8 w-8 text-muted-foreground" />
                                 )}
