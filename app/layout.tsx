@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Noto_Sans_KR, Inter } from "next/font/google"; // Inter font added
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 
 const notoSansKr = Noto_Sans_KR({
@@ -30,6 +31,7 @@ export default function RootLayout({
         className={`${notoSansKr.variable} ${inter.variable} antialiased font-sans`}
       >
         {children}
+        <SpeedInsights />
       </body>
     </html>
   );
