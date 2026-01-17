@@ -27,6 +27,9 @@ model User {
   plan          Plan?     @relation(fields: [planId], references: [id])
   subscriptionEnd DateTime? // 구독 종료일
   
+  emailVerifiedAt        DateTime? // 이메일 인증 완료 일시
+  verificationBonusClaimed Boolean   @default(false) // 이메일 인증 보너스 지급 여부
+
   // 설정 및 API 키 정보 (JSON으로 안전하게 관리)
   limits        Json?     // { siteLimit: 3, keywordGroupLimit: 5, ... } -> DEPRECATED (Use Plan)
   settings      Json?     // { openaiApiKey: '...', ... }
@@ -257,6 +260,7 @@ model GlobalSetting {
   costPerScrap     Int @default(1)
   costPerAIImage   Int @default(2) // DALLE or FLUX
   signupBonus      Int @default(10) // 회원가입 시 제공되는 무료 토큰
+  verificationBonus Int @default(20) // 이메일 인증 시 제공되는 보너스 토큰
   isUpgradeEnabled Boolean @default(false) // 사이드바 업그레이드 버튼 표시 여부
   
   // Google OAuth 설정 (Deprecated: User Settings로 이동)

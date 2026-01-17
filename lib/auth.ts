@@ -15,6 +15,19 @@ export async function getOrCreateUser() {
         redirect('/login')
     }
 
+    // Global Settings 조회 (Raw Query to avoid stale client issues)
+    let signupBonus = 10
+    let verificationBonus = 20
+    try {
+        const settingsRaw = await prisma.$queryRawUnsafe<any[]>(`SELECT "signupBonus", "verificationBonus" FROM "global_settings" WHERE "id" = 'SYSTEM' LIMIT 1`)
+        if (Array.isArray(settingsRaw) && settingsRaw.length > 0) {
+            signupBonus = settingsRaw[0]?.signupBonus ?? 10
+            verificationBonus = settingsRaw[0]?.verificationBonus ?? 20
+        }
+    } catch (e) {
+        console.warn("Failed to fetch global settings, using defaults:", e)
+    }
+
     let user = await prisma.user.findUnique({
         where: { id: authUser.id }
     })
@@ -50,17 +63,72 @@ export async function getOrCreateUser() {
             }
         }
 
-        user = await prisma.user.create({
-            data: {
-                id: authUser.id,
-                email: authUser.email!,
-                name: authUser.user_metadata.full_name || authUser.email?.split('@')[0] || 'User',
-                image: authUser.user_metadata.avatar_url,
-                role: isFirstUser ? 'ADMIN' : 'USER',
-                planId: freePlanId,
-                tokenBalance: 10 // 가입 축하 기본 토큰
-            }
+        // 유저 생성 및 가입 보너스 지급 (트랜잭션)
+        // Use transaction to ensure safe creation
+        user = await prisma.$transaction(async (tx) => {
+            const newUser = await tx.user.create({
+                data: {
+                    id: authUser.id,
+                    email: authUser.email!,
+                    name: authUser.user_metadata.full_name || authUser.email?.split('@')[0] || 'User',
+                    image: authUser.user_metadata.avatar_url,
+                    role: isFirstUser ? 'ADMIN' : 'USER',
+                    planId: freePlanId,
+                    tokenBalance: signupBonus
+                    // Note: We intentionally omit emailVerifiedAt here to avoid errors if Prisma Client is stale.
+                    // We will update it in the bonus block below using raw SQL.
+                }
+            })
+
+            // 가입 축하금 기록
+            await tx.transaction.create({
+                data: {
+                    userId: newUser.id,
+                    amount: signupBonus,
+                    type: 'BONUS',
+                    description: '회원가입 축하금'
+                }
+            })
+
+            return newUser
         })
+    }
+
+    // 이메일 인증 보너스 로직 (가입 직후 또는 추후 인증 시)
+    // Check if user exists (TS check) and verify email status
+    if (user && authUser.email_confirmed_at) {
+        try {
+            const confirmedAt = new Date(authUser.email_confirmed_at).toISOString()
+
+            // Raw SQL update to support new fields even if Prisma Client is stale
+            // Updates only if verificationBonusClaimed is false (meaning not yet claimed)
+            const result = await prisma.$executeRawUnsafe(
+                `UPDATE "users" 
+                 SET "tokenBalance" = "tokenBalance" + $1, 
+                     "verificationBonusClaimed" = true, 
+                     "emailVerifiedAt" = $2::timestamp 
+                 WHERE "id" = $3 AND "verificationBonusClaimed" = false`,
+                verificationBonus,
+                confirmedAt,
+                user.id
+            )
+
+            // If rows affected > 0, it means we applied the bonus
+            if (result > 0) {
+                await prisma.transaction.create({
+                    data: {
+                        userId: user.id,
+                        amount: verificationBonus,
+                        type: 'BONUS',
+                        description: '이메일 인증 보너스'
+                    }
+                })
+                // Update local user object token balance so UI reflects it immediately
+                user.tokenBalance += verificationBonus
+            }
+        } catch (e) {
+            console.error("Failed to apply verification bonus:", e)
+        }
     }
 
     return user
