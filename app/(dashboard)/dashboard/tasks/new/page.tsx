@@ -44,7 +44,8 @@ function TaskForm() {
         aiModel: 'GPT4O',
         imageSource: 'DALLE',
         imageCount: 1,
-        wpCategoryId: undefined as number | undefined
+        wpCategoryId: undefined as number | undefined,
+        postStatus: 'publish'
     })
 
     const [keywordMode, setKeywordMode] = useState<'GROUP' | 'MANUAL'>('GROUP')
@@ -83,7 +84,8 @@ function TaskForm() {
                         aiModel: (t as any).aiModel || 'GPT4O',
                         imageSource: (t as any).imageSource || 'DALLE', // Default to DALLE or whatever
                         imageCount: (t as any).imageCount || 1,
-                        wpCategoryId: (t as any).wpCategoryId
+                        wpCategoryId: (t as any).wpCategoryId,
+                        postStatus: (t as any).postStatus || 'publish'
                     })
                 } else {
                     alert('작업 정보를 불러올 수 없습니다.')
@@ -142,7 +144,8 @@ function TaskForm() {
             aiModel: formData.aiModel as any,
             imageSource: formData.imageSource as any,
             imageCount: formData.imageCount,
-            wpCategoryId: formData.wpCategoryId
+            wpCategoryId: formData.wpCategoryId,
+            postStatus: formData.postStatus
         })
         if (result.success) {
             alert('테스트 발행 성공! 실제 사이트에서 확인해 보세요.')
@@ -251,6 +254,23 @@ function TaskForm() {
                             </select>
                         </div>
                     </div>
+
+                    {/* WordPress Post Status Option */}
+                    {sites.find(s => s.id === formData.siteId)?.type === 'WORDPRESS' && (
+                        <div className="pl-9 mt-4 w-1/2 pr-2">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-medium text-muted-foreground">발행 상태 (워드프레스)</label>
+                                <select
+                                    value={formData.postStatus}
+                                    onChange={e => setFormData({ ...formData, postStatus: e.target.value })}
+                                    className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                                >
+                                    <option value="publish">🚀 즉시 발행 (공개)</option>
+                                    <option value="draft">💾 임시 저장 (비공개)</option>
+                                </select>
+                            </div>
+                        </div>
+                    )}
                 </section>
 
                 <div className="w-full h-px bg-border pl-9" />
@@ -443,7 +463,7 @@ function TaskForm() {
                 </div>
             </div>
             <div className="h-24" /> {/* Spacer for fixed bottom bar */}
-        </div>
+        </div >
     )
 }
 

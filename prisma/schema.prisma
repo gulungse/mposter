@@ -160,6 +160,7 @@ model AutomationJob {
   // 워드프레스 전용
   wpCategoryId    Int?
   wpCategoryName  String?
+  postStatus      String       @default("publish") // "publish" or "draft"
   
   lastRunAt       DateTime?
   nextRunAt       DateTime?

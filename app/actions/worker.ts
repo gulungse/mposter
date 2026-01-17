@@ -268,6 +268,7 @@ export async function testPublishAction(data: {
     imageSource: 'SCRAP' | 'DALLE' | 'FLUX' | 'NONE';
     imageCount?: number;
     wpCategoryId?: number;
+    postStatus?: string;
 }) {
     try {
         const user = await getOrCreateUser()
@@ -422,18 +423,27 @@ export async function testPublishAction(data: {
         // 실제 사이트 발행
         try {
             if (site.type === 'WORDPRESS') {
+                const targetStatus = data.postStatus || 'publish';
                 const payload: any = {
                     title: `[테스트] ${title}`,
                     content: content,
-                    status: 'publish',
+                    status: 'draft', // 1단계: 일단 임시저장으로 생성 (안정성 확보)
                     categories: data.wpCategoryId ? [data.wpCategoryId] : []
                 };
                 if (featuredMediaId > 0) payload.featured_media = featuredMediaId;
 
-                await axios.post(`${site.url}/wp-json/wp/v2/posts`, payload, {
+                const wpRes = await axios.post(`${site.url}/wp-json/wp/v2/posts`, payload, {
                     auth: { username: site.username || '', password: site.apiToken || '' },
-                    timeout: 30000
+                    timeout: 60000
                 })
+
+                // 2단계: 즉시 발행인 경우 상태 업데이트
+                if (targetStatus === 'publish') {
+                    await axios.post(`${site.url}/wp-json/wp/v2/posts/${wpRes.data.id}`, { status: 'publish' }, {
+                        auth: { username: site.username || '', password: site.apiToken || '' },
+                        timeout: 60000
+                    })
+                }
             } else if (site.type === 'BLOGSPOT') {
                 const blogId = site.username || site.url.split('blogId=')[1] || site.url.replace(/[^0-9]/g, '');
                 const postToBlogger = async (token: string) => {
@@ -655,20 +665,29 @@ export async function runAutomationTask(jobId: string) {
 
         let postUrl = ''
         if (job.site.type === 'WORDPRESS') {
+            const targetStatus = (job as any).postStatus || 'publish';
             const payload: any = {
-                title, content, status: 'publish',
+                title, content, status: 'draft', // 1단계: 일단 임시저장
                 categories: (job as any).wpCategoryId ? [(job as any).wpCategoryId] : []
             };
-            // 1번 이미지 생성 성공 시 Featured Image 지정
             if (featuredMediaId > 0) {
                 payload.featured_media = featuredMediaId;
             }
 
             const res = await axios.post(`${job.site.url}/wp-json/wp/v2/posts`, payload, {
                 auth: { username: job.site.username || '', password: job.site.apiToken || '' },
-                timeout: 30000 // 포스팅 타임아웃
+                timeout: 60000
             })
             postUrl = res.data.link
+
+            // 2단계: 즉시 발행인 경우 상태 업데이트
+            if (targetStatus === 'publish') {
+                const pubRes = await axios.post(`${job.site.url}/wp-json/wp/v2/posts/${res.data.id}`, { status: 'publish' }, {
+                    auth: { username: job.site.username || '', password: job.site.apiToken || '' },
+                    timeout: 60000
+                })
+                postUrl = pubRes.data.link
+            }
         } else if (job.site.type === 'BLOGSPOT') {
             const blogId = job.site.username || job.site.url.split('blogId=')[1] || job.site.url.replace(/[^0-9]/g, '');
             const postToBlogger = async (token: string) => {

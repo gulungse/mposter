@@ -20,6 +20,7 @@ export async function createAutomationTask(data: {
     imageSource: any;
     imageCount?: number;
     wpCategoryId?: number;
+    postStatus?: string;
     runImmediately?: boolean;
 }) {
     try {
@@ -44,6 +45,7 @@ export async function createAutomationTask(data: {
                 imageSource: data.imageSource,
                 imageCount: data.imageCount || 1,
                 wpCategoryId: data.wpCategoryId,
+                postStatus: data.postStatus || 'publish', // Default default
                 isActive: true,
                 nextRunAt: new Date(Date.now() + 6 * 10 * 1000) // 기본 1시간 후 (Cron에 의해 덮어씌워짐)
             }
@@ -84,6 +86,7 @@ export async function updateAutomationTask(id: string, data: {
     imageSource?: any;
     imageCount?: number;
     wpCategoryId?: number;
+    postStatus?: string;
 }) {
     try {
         const user = await getOrCreateUser()
@@ -100,6 +103,7 @@ export async function updateAutomationTask(id: string, data: {
                 imageSource: data.imageSource,
                 imageCount: data.imageCount,
                 wpCategoryId: data.wpCategoryId,
+                postStatus: data.postStatus,
             }
         })
 
