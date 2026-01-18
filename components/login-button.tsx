@@ -13,6 +13,12 @@ export function LoginButton() {
             provider,
             options: {
                 redirectTo: `${window.location.origin}/auth/callback`,
+                // Kakao: 이메일 권한이 없으므로 닉네임과 프로필 사진만 요청하도록 명시
+                scopes: provider === 'kakao' ? 'profile_nickname' : undefined,
+                queryParams: provider === 'kakao' ? {
+                    scope: 'profile_nickname,profile_image',
+                    prompt: 'login'
+                } : undefined
             },
         })
         if (error) {
