@@ -12,7 +12,9 @@ export function LoginButton() {
         const { error } = await supabase.auth.signInWithOAuth({
             provider,
             options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
+                redirectTo: window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.')
+                    ? `${window.location.origin}/auth/callback`
+                    : 'https://mposter.kr/auth/callback',
                 // Kakao: 이메일 권한이 없으므로 닉네임과 프로필 사진만 요청하도록 명시
                 scopes: provider === 'kakao' ? 'profile_nickname' : undefined,
                 queryParams: provider === 'kakao' ? {
