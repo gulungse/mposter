@@ -1,10 +1,14 @@
 'use client'
 
-import { Megaphone } from 'lucide-react'
+import { Megaphone, Menu } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getUserProfile } from '@/app/actions/user'
 
-export function DashboardHeader() {
+interface DashboardHeaderProps {
+    onMenuClick?: () => void
+}
+
+export function DashboardHeader({ onMenuClick }: DashboardHeaderProps) {
     const [user, setUser] = useState<{ name: string | null; email: string; image: string | null } | null>(null)
     const [loading, setLoading] = useState(true)
 
@@ -27,9 +31,17 @@ export function DashboardHeader() {
     return (
         <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/80 backdrop-blur px-6 py-3 h-[60px]">
             <div className="flex items-center gap-4 flex-1">
+                <button
+                    onClick={onMenuClick}
+                    className="md:hidden p-1 -ml-1 hover:bg-muted/50 rounded-lg transition-colors"
+                >
+                    <Menu className="h-5 w-5 text-muted-foreground" />
+                </button>
+
                 <div className="bg-yellow-500/10 text-yellow-500 rounded-lg px-4 py-1.5 text-xs font-bold flex items-center gap-2 animate-pulse cursor-pointer hover:bg-yellow-500/20 transition-colors">
                     <Megaphone className="h-4 w-4" />
-                    <span>공지사항은 카톡 오픈방에 올라옵니다. 좌측 공지사항 오픈톡방을 반드시 입장해주세요</span>
+                    <span className="hidden sm:inline">공지사항은 카톡 오픈방에 올라옵니다. 좌측 공지사항 오픈톡방을 반드시 입장해주세요</span>
+                    <span className="sm:hidden">공지사항 확인하기</span>
                 </div>
             </div>
 

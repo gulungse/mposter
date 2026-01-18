@@ -41,6 +41,7 @@ model User {
   automationJobs AutomationJob[]
   postLogs      PostLog[]
   transactions  Transaction[]
+  purchases     UserPurchase[]
 
   @@map("users")
 }
@@ -236,6 +237,7 @@ enum TransactionType {
   USAGE
   BONUS
   REFUND
+  PURCHASE
 }
 
 // 사이드바 메뉴 모델 (관리자 전용 설정)
@@ -271,4 +273,51 @@ model GlobalSetting {
   updatedAt        DateTime @updatedAt
 
   @@map("global_settings")
+}
+
+// 상점 아이템 모델 (토큰 상점)
+model ShopItem {
+  id          String   @id @default(uuid())
+  name        String   // 상품명 (예: 사이트 슬롯 1개 추가)
+  description String?
+  type        ItemType // SITE_SLOT, KEYWORD_SLOT, PROMPT_SLOT, TASK_SLOT
+  amount      Int      // 추가되는 슬롯 수량
+  price       Int      // 가격 (토큰)
+  durationDays Int     @default(30) // 유효 기간 (일)
+  isActive    Boolean  @default(true) // 상품 판매 중 여부
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  purchases   UserPurchase[]
+
+  @@map("shop_items")
+}
+
+// 사용자 구매/구독 내역
+model UserPurchase {
+  id          String   @id @default(uuid())
+  userId      String
+  itemId      String
+  type        ItemType // 쿼리 편의성을 위해 중복 저장
+  slotAmount  Int      // 구매 시점의 추가 수량
+  price       Int      // 구매 시점의 가격
+  
+  startDate   DateTime @default(now())
+  endDate     DateTime // 만료일
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  item        ShopItem @relation(fields: [itemId], references: [id])
+
+  createdAt   DateTime @default(now())
+  
+  @@index([userId, endDate])
+  @@map("user_purchases")
+}
+
+enum ItemType {
+  SITE_SLOT
+  KEYWORD_SLOT
+  PROMPT_SLOT
+  TASK_SLOT
 }
