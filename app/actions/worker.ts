@@ -311,12 +311,25 @@ export async function testPublishAction(data: {
                 const completion = await openai.chat.completions.create({
                     model: "gpt-4o",
                     messages: [
-                        { role: "system", content: `${systemPrompt}\n당신은 SEO에 최적화된 전문 블로거입니다. 독자가 궁금해하는 정보를 상세하고 친절하게 설명해야 합니다.` },
+                        { role: "system", content: `당신은 SEO에 특화된 10년 경력의 전문 블로그 작가입니다. 독자가 궁금해하는 정보를 깊이 있게 분석하고, 매우 상세하고 친절한 어조로 글을 작성해야 합니다. 단순한 요약이 아닌, 독자에게 실질적인 도움이 되는 가치 있는 콘텐츠를 생산하세요. ${systemPrompt}` },
                         {
-                            role: "user", content: `'${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘. 
-    본문은 반드시 5개 이상의 긴 문단으로 구성하고, 각 문단에는 구체적인 정보와 유용한 팁을 포함해줘. 전체 분량은 최소 1200자 이상으로 매우 풍부하게 작성해야 해.
-    반드시 JSON 형식 {"title": "...", "content": "..."}으로 답변해줘.` }
+                            role: "user", content: `'${targetKeyword}' 주제로 완벽한 블로그 포스팅을 작성해줘. 다음 지침을 엄격히 준수하라:
+
+1. [필수 분량]: 공백 제외 최소 2500자 이상 작성할 것. 내용이 짧거나 피상적이면 절대 안 됨.
+2. [구성 요소]:
+   - 매력적인 제목 (클릭을 유도하는 후킹 제목)
+   - 서론: 독자의 문제 제기 및 공감, 글을 읽어야 하는 이유 (300자 이상)
+   - 본론: 최소 5개 이상의 상세 소주제(h2/h3). 각 소주제는 깊이 있는 분석과 예시, 통계, 전문가 의견 등을 포함하여 500자 이상 서술할 것.
+   - 결론: 핵심 요약 및 독자의 행동 유도 (Call to Action).
+   - FAQ: 자주 묻는 질문 3~4개와 그에 대한 명확한 답변.
+3. [형식 및 스타일]:
+   - 반드시 HTML 태그(<p>, <h3>, <ul>, <li>, <strong>, <blockquote> 등)를 사용하여 가독성을 극대화할 것.
+   - 문체: 친근하고 전문적인 '해요체' 사용.
+   - 내용 중 '${targetKeyword}' 키워드를 자연스럽게 8회 이상 포함할 것.
+4. [출력 포맷]:
+   - 오직 JSON 형식으로만 답변할 것: {"title": "제목", "content": "HTML 본문"}` }
                     ],
+                    max_tokens: 4096,
                     response_format: { type: "json_object" }
                 })
                 const aiResult = JSON.parse(completion.choices[0].message.content || '{}')
@@ -545,12 +558,25 @@ export async function runAutomationTask(jobId: string) {
             const completion = await openai.chat.completions.create({
                 model: "gpt-4o",
                 messages: [
-                    { role: "system", content: `${systemPrompt}\n당신은 SEO에 최적화된 전문 블로거입니다. 독자가 궁금해하는 정보를 상세하고 친절하게 설명해야 합니다.` },
+                    { role: "system", content: `당신은 SEO에 특화된 10년 경력의 전문 블로그 작가입니다. 독자가 궁금해하는 정보를 깊이 있게 분석하고, 매우 상세하고 친절한 어조로 글을 작성해야 합니다. 단순한 요약이 아닌, 독자에게 실질적인 도움이 되는 가치 있는 콘텐츠를 생산하세요. ${systemPrompt}` },
                     {
-                        role: "user", content: `'${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘. 
-본문은 반드시 5개 이상의 긴 문단으로 구성하고, 각 문단에는 구체적인 정보와 유용한 팁을 포함해줘. 전체 분량은 최소 1200자 이상으로 매우 풍부하게 작성해야 해.
-반드시 JSON 형식 {"title": "...", "content": "..."}으로 답변해줘.` }
+                        role: "user", content: `'${targetKeyword}' 주제로 완벽한 블로그 포스팅을 작성해줘. 다음 지침을 엄격히 준수하라:
+
+1. [필수 분량]: 공백 제외 최소 2500자 이상 작성할 것. 내용이 짧거나 피상적이면 절대 안 됨.
+2. [구성 요소]:
+   - 매력적인 제목 (클릭을 유도하는 후킹 제목)
+   - 서론: 독자의 문제 제기 및 공감, 글을 읽어야 하는 이유 (300자 이상)
+   - 본론: 최소 5개 이상의 상세 소주제(h2/h3). 각 소주제는 깊이 있는 분석과 예시, 통계, 전문가 의견 등을 포함하여 500자 이상 서술할 것.
+   - 결론: 핵심 요약 및 독자의 행동 유도 (Call to Action).
+   - FAQ: 자주 묻는 질문 3~4개와 그에 대한 명확한 답변.
+3. [형식 및 스타일]:
+   - 반드시 HTML 태그(<p>, <h3>, <ul>, <li>, <strong>, <blockquote> 등)를 사용하여 가독성을 극대화할 것.
+   - 문체: 친근하고 전문적인 '해요체' 사용.
+   - 내용 중 '${targetKeyword}' 키워드를 자연스럽게 8회 이상 포함할 것.
+4. [출력 포맷]:
+   - 오직 JSON 형식으로만 답변할 것: {"title": "제목", "content": "HTML 본문"}` }
                 ],
+                max_tokens: 4096,
                 response_format: { type: "json_object" }
             })
             const aiResult = JSON.parse(completion.choices[0].message.content || '{}')
