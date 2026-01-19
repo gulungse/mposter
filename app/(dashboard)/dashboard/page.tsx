@@ -321,9 +321,7 @@ export default async function DashboardPage() {
                     </div>
 
                 </div>
-                <footer className="mt-auto py-4 border-t border-border flex justify-between items-center text-xs text-muted-foreground">
-                    <p>© 2026 MediPoster Service</p>
-                </footer>
+
             </div>
         </>
     )
