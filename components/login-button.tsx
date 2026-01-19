@@ -12,9 +12,7 @@ export function LoginButton() {
         const { error } = await supabase.auth.signInWithOAuth({
             provider,
             options: {
-                redirectTo: window.location.hostname === 'localhost' || window.location.hostname.startsWith('192.168.')
-                    ? `${window.location.origin}/auth/callback`
-                    : 'https://mposter.kr/auth/callback',
+                redirectTo: `${window.location.origin}/auth/callback`,
                 // Kakao: 이메일 권한 오류(account_email) 방지를 위해 명시적으로 스코프 제한
                 scopes: provider === 'kakao' ? undefined : undefined,
                 queryParams: provider === 'kakao' ? {
