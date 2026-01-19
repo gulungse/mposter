@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Save, AlertCircle, Coins, Settings as SettingsIcon } from 'lucide-react'
+import { Save, AlertCircle, Coins, Settings as SettingsIcon, ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
 import { getGlobalSettings, updateGlobalSettings } from '@/app/actions/settings'
 import { Loader2 } from 'lucide-react'
 
@@ -54,16 +55,21 @@ export default function AdminSettingsPage() {
     return (
         <div className="p-8 max-w-2xl mx-auto space-y-8">
             <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center shadow-xl">
-                    <SettingsIcon className="h-6 w-6" />
-                </div>
-                <div>
-                    <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-                        시스템 환경설정
-                    </h1>
-                    <p className="text-slate-500 dark:text-[#92a4c9] text-sm mt-1">
-                        토큰 소모량 및 전역 규칙을 정의합니다.
-                    </p>
+                <Link href="/dashboard/admin" className="p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-[#232f48] text-slate-500 transition-colors">
+                    <ArrowLeft className="h-5 w-5" />
+                </Link>
+                <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center shadow-xl">
+                        <SettingsIcon className="h-6 w-6" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+                            시스템 환경설정
+                        </h1>
+                        <p className="text-slate-500 dark:text-[#92a4c9] text-sm mt-1">
+                            토큰 소모량 및 전역 규칙을 정의합니다.
+                        </p>
+                    </div>
                 </div>
             </div>
 

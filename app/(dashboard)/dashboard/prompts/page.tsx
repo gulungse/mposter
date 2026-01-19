@@ -15,7 +15,7 @@ export default async function PromptsPage() {
     const systemPrompts = prompts.filter(p => p.type === 'SYSTEM')
     const userPrompts = prompts.filter(p => p.type === 'USER')
 
-    const limit = (planRes.success && (planRes.data as any).plan?.promptLimit) ?? 3
+    const limit = (planRes.success && (planRes.data as any).limits?.prompts) ?? 3
     const isLimitReached = userPrompts.length >= limit
 
     return (

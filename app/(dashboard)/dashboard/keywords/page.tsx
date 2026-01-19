@@ -11,7 +11,7 @@ export default async function KeywordPage() {
         getUserWithPlan()
     ])
 
-    const limit = (planRes.success && (planRes.data as any).plan?.keywordGroupLimit) ?? 3
+    const limit = (planRes.success && (planRes.data as any).limits?.keywords) ?? 3
     const isLimitReached = groups.length >= limit
 
     return (

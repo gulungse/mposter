@@ -177,48 +177,8 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                             <NavItem
                                 href="/dashboard/admin"
                                 icon={<ShieldCheck className="h-[18px] w-[18px]" />}
-                                label="사용자 관리"
-                                isActive={pathname === '/dashboard/admin'}
-                                variant="admin"
-                                onClick={onClose}
-                            />
-                            <NavItem
-                                href="/dashboard/admin/plans"
-                                icon={<CreditCard className="h-[18px] w-[18px]" />}
-                                label="요금제 관리"
-                                isActive={pathname === '/dashboard/admin/plans'}
-                                variant="admin"
-                                onClick={onClose}
-                            />
-                            <NavItem
-                                href="/dashboard/admin/prompts"
-                                icon={<Terminal className="h-[18px] w-[18px]" />}
-                                label="시스템 프롬프트"
-                                isActive={pathname === '/dashboard/admin/prompts'}
-                                variant="admin"
-                                onClick={onClose}
-                            />
-                            <NavItem
-                                href="/dashboard/admin/shop"
-                                icon={<ShoppingBag className="h-[18px] w-[18px]" />}
-                                label="상점 상품 관리"
-                                isActive={pathname === '/dashboard/admin/shop'}
-                                variant="admin"
-                                onClick={onClose}
-                            />
-                            <NavItem
-                                href="/dashboard/admin/menus"
-                                icon={<MenuIcon className="h-[18px] w-[18px]" />}
-                                label="메뉴 관리"
-                                isActive={pathname === '/dashboard/admin/menus'}
-                                variant="admin"
-                                onClick={onClose}
-                            />
-                            <NavItem
-                                href="/dashboard/admin/settings"
-                                icon={<SettingsIcon className="h-[18px] w-[18px]" />}
-                                label="시스템 설정"
-                                isActive={pathname === '/dashboard/admin/settings'}
+                                label="관리자 메뉴"
+                                isActive={pathname?.startsWith('/dashboard/admin')}
                                 variant="admin"
                                 onClick={onClose}
                             />

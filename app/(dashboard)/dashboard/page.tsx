@@ -39,7 +39,8 @@ export default async function DashboardPage() {
         siteCount,
         keywordGroupCount,
         promptCount,
-        taskCount
+        taskCount,
+        purchases
     ] = await Promise.all([
         prisma.postLog.count({ where: { userId: user.id, status: 'SUCCESS' } }),
         prisma.automationJob.count({ where: { userId: user.id, isActive: true } }),
@@ -58,7 +59,15 @@ export default async function DashboardPage() {
         prisma.site.count({ where: { userId: user.id } }),
         prisma.keywordGroup.count({ where: { userId: user.id } }),
         prisma.prompt.count({ where: { userId: user.id, type: 'USER' } }),
-        prisma.automationJob.count({ where: { userId: user.id } })
+        prisma.automationJob.count({ where: { userId: user.id } }),
+        prisma.userPurchase.findMany({
+            where: {
+                userId: user.id,
+                endDate: { gt: new Date() }
+            },
+            include: { item: true },
+            orderBy: { endDate: 'asc' }
+        })
     ])
 
     const stats = {
@@ -262,15 +271,50 @@ export default async function DashboardPage() {
                             </div>
 
                             <div className="mt-8 pt-6 border-t border-border">
-                                <h4 className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-3">시스템 알림</h4>
+                                <h4 className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-3">활성 구독 및 확장권</h4>
                                 <div className="space-y-3">
-                                    <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 border border-border/50">
-                                        <AlertCircleIcon className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                                        <div>
-                                            <p className="text-xs font-bold text-foreground">서비스 안내</p>
-                                            <p className="text-[10px] text-muted-foreground mt-0.5">현재 베타 서비스 중입니다. 기능 개선을 위한 피드백은 환영합니다.</p>
+                                    {(userData as any).plan && (
+                                        <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50 border border-border/50">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                                                    <ZapIcon className="h-4 w-4" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-foreground">{(userData as any).plan.name}</p>
+                                                    <p className="text-[10px] text-muted-foreground">기본 요금제</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-[10px] font-bold text-green-500 bg-green-500/10 px-2 py-1 rounded-full">구독중</span>
                                         </div>
-                                    </div>
+                                    )}
+
+                                    {/* Active Purchases List */}
+                                    {purchases.length > 0 ? (
+                                        purchases.map((purchase: any) => (
+                                            <div key={purchase.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-500">
+                                                        <CoinsIcon className="h-4 w-4" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs font-bold text-slate-900 dark:text-slate-200">{purchase.item.name}</p>
+                                                        <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
+                                                            ~ {new Date(purchase.endDate).toLocaleDateString()} 만료
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded-full">
+                                                    +{purchase.slotAmount}
+                                                </span>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        !(userData as any).plan && (
+                                            <div className="text-center py-4 text-xs text-muted-foreground bg-muted/30 rounded-xl border border-dashed border-border/50">
+                                                활성화된 추가 구독이 없습니다.
+                                            </div>
+                                        )
+                                    )}
                                 </div>
                             </div>
                         </div>

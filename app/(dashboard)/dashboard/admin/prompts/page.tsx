@@ -3,7 +3,8 @@
 export const dynamic = 'force-dynamic'
 
 import { useState, useEffect } from 'react'
-import { Plus, Save, Trash2, Edit2, ShieldAlert, Sparkles, MessageSquare, RotateCcw, Zap } from 'lucide-react'
+import { Plus, Save, Trash2, Edit2, ShieldAlert, Sparkles, MessageSquare, RotateCcw, Zap, ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
 import { getSystemPromptsAdmin, createSystemPrompt, updatePrompt, deletePrompt, seedDefaultSystemPrompts } from '@/app/actions/prompt'
 
 import { clsx } from "clsx"
@@ -85,14 +86,19 @@ export default function AdminPromptsPage() {
     return (
         <div className="p-8 max-w-7xl mx-auto space-y-8">
             <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
-                        <MessageSquare className="h-8 w-8 text-purple-600" />
-                        시스템 프롬프트 관리
-                    </h1>
-                    <p className="text-slate-500 dark:text-[#92a4c9] text-base mt-2">
-                        모든 회원에게 공통으로 제공되는 시스템 프롬프트를 관리합니다.
-                    </p>
+                <div className="flex items-center gap-4">
+                    <Link href="/dashboard/admin" className="p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-[#232f48] text-slate-500 transition-colors">
+                        <ArrowLeft className="h-5 w-5" />
+                    </Link>
+                    <div>
+                        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+                            <MessageSquare className="h-8 w-8 text-purple-600" />
+                            시스템 프롬프트 관리
+                        </h1>
+                        <p className="text-slate-500 dark:text-[#92a4c9] text-base mt-2">
+                            모든 회원에게 공통으로 제공되는 시스템 프롬프트를 관리합니다.
+                        </p>
+                    </div>
                 </div>
                 <div className="flex gap-3">
                     {prompts.length === 0 && (

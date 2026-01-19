@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import {
     LayoutDashboard, Globe, Key, Terminal, Cpu, Code2,
     Plus, Save, Trash2, MoveUp, MoveDown, Loader2,
-    CheckCircle2, AlertCircle, Menu as MenuIcon, Eye, EyeOff, Edit
+    CheckCircle2, AlertCircle, Menu as MenuIcon, Eye, EyeOff, Edit, ArrowLeft
 } from 'lucide-react'
+import Link from 'next/link'
 import { getSidebarMenus, createSidebarMenu, updateSidebarMenu, deleteSidebarMenu, seedDefaultMenus } from '@/app/actions/menu'
 import { clsx } from 'clsx'
 
@@ -110,14 +111,19 @@ export default function MenuManagementPage() {
     return (
         <div className="p-8 space-y-8 max-w-5xl">
             <div className="flex justify-between items-end">
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
-                        <MenuIcon className="h-8 w-8 text-blue-600" />
-                        사이드바 메뉴 관리
-                    </h1>
-                    <p className="text-slate-500 dark:text-[#92a4c9] text-base mt-2">
-                        사용자 통합 사이드바의 메뉴 구성과 순서를 실시간으로 조정합니다.
-                    </p>
+                <div className="flex items-center gap-4">
+                    <Link href="/dashboard/admin" className="p-2 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-[#232f48] text-slate-500 transition-colors">
+                        <ArrowLeft className="h-5 w-5" />
+                    </Link>
+                    <div>
+                        <h1 className="text-3xl font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-3">
+                            <MenuIcon className="h-8 w-8 text-blue-600" />
+                            사이드바 메뉴 관리
+                        </h1>
+                        <p className="text-slate-500 dark:text-[#92a4c9] text-base mt-2">
+                            사용자 통합 사이드바의 메뉴 구성과 순서를 실시간으로 조정합니다.
+                        </p>
+                    </div>
                 </div>
                 <div className="flex gap-3">
                     <button onClick={handleSeed} className="px-4 py-2 rounded-xl border-2 border-slate-200 dark:border-[#324467] text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#192233] transition-all">

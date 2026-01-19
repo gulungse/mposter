@@ -27,10 +27,34 @@ export async function getUserLimits(userId: string): Promise<UserLimits> {
     }
 
     let currentLimits: UserLimits = {
-        sites: user.plan?.siteLimit ?? BASE_LIMITS.sites,
-        keywords: user.plan?.keywordGroupLimit ?? BASE_LIMITS.keywords,
-        prompts: user.plan?.promptLimit ?? BASE_LIMITS.prompts,
-        tasks: user.plan?.taskLimit ?? BASE_LIMITS.tasks,
+        sites: BASE_LIMITS.sites,
+        keywords: BASE_LIMITS.keywords,
+        prompts: BASE_LIMITS.prompts,
+        tasks: BASE_LIMITS.tasks,
+    }
+
+    if (user.plan) {
+        currentLimits = {
+            sites: user.plan.siteLimit,
+            keywords: user.plan.keywordGroupLimit,
+            prompts: user.plan.promptLimit,
+            tasks: user.plan.taskLimit,
+        }
+    } else {
+        // 플랜이 없는 경우(무료 회원), DB에서 'Free Plan'을 찾아 그 설정을 따름
+        // (관리자가 수정한 무료 플랜 한도를 적용하기 위함)
+        const freePlan = await prisma.plan.findFirst({
+            where: { name: 'Free Plan' }
+        })
+        
+        if (freePlan) {
+            currentLimits = {
+                sites: freePlan.siteLimit,
+                keywords: freePlan.keywordGroupLimit,
+                prompts: freePlan.promptLimit,
+                tasks: freePlan.taskLimit,
+            }
+        }
     }
 
     // 2. 유효한(만료되지 않은) 구매 슬롯 조회

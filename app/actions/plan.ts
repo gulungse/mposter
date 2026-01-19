@@ -152,12 +152,23 @@ export async function getUserWithPlan() {
 
         const limits = await getUserLimits(user.id)
 
+        // 유효한 구매 내역 조회 (슬롯 확장 등)
+        const purchases = await prisma.userPurchase.findMany({
+            where: {
+                userId: user.id,
+                endDate: { gt: new Date() }
+            },
+            include: { item: true },
+            orderBy: { endDate: 'asc' }
+        })
+
         return {
             success: true,
             data: {
                 ...user,
                 plan,
-                limits
+                limits,
+                purchases
             }
         }
     } catch (error) {
@@ -201,12 +212,14 @@ export async function checkLimit(type: 'site' | 'keywordGroup' | 'prompt' | 'aut
         }
 
         if (currentCount >= limit) {
+                         console.log(`[Limit Check] Failed: ${type} (Count: ${currentCount} / Limit: ${limit})`)
             return {
                 success: false,
                 error: `"${type === 'site' ? '사이트' : type === 'keywordGroup' ? '키워드 그룹' : type === 'prompt' ? '프롬프트' : '자동화 작업'}" 생성 한도(${limit}개)를 초과했습니다. 상점에서 슬롯을 확장해 보세요!`
             }
         }
-
+        
+        console.log(`[Limit Check] Passed: ${type} (Count: ${currentCount} / Limit: ${limit})`)
         return { success: true }
     } catch (error: any) {
         return { success: false, error: error.message }

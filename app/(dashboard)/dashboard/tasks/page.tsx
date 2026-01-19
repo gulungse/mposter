@@ -1,8 +1,9 @@
 
 import { TaskCard } from '@/components/task/task-card'
-import { MonitorPlay as MonitorPlayIcon, Plus as PlusIcon, Search as SearchIcon } from 'lucide-react'
+import { MonitorPlay as MonitorPlayIcon, Plus as PlusIcon, Search as SearchIcon, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { getAutomationTasks } from '@/app/actions/task'
+import { getUserWithPlan } from '@/app/actions/plan'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,12 +23,29 @@ function formatSchedule(cron: string | null) {
 }
 
 export default async function TasksPage() {
-    const { data: tasks = [] } = await getAutomationTasks()
+    const [{ data: tasks = [] }, planRes] = await Promise.all([
+        getAutomationTasks(),
+        getUserWithPlan()
+    ])
 
     const activeTasksCount = tasks.filter(t => t.isActive === true).length
+    
+    // Limits check
+    const limit = (planRes.success && (planRes.data as any).limits?.tasks) ?? 3
+    const isLimitReached = activeTasksCount >= limit
 
     return (
         <div className="p-5 space-y-5">
+            {/* Warning Message */}
+            {isLimitReached && (
+                <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30 rounded-xl p-4 flex items-center gap-3 text-amber-800 dark:text-amber-400">
+                    <AlertTriangle className="h-5 w-5 shrink-0" />
+                    <div className="text-sm font-bold">
+                        현재 활성 자동화 작업 슬롯({limit}개)을 모두 사용 중입니다. 추가 생성을 원하시면 플랜을 업그레이드해주세요.
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -38,13 +56,15 @@ export default async function TasksPage() {
                         콘텐츠 생성 작업을 모니터링하고 관리하세요.
                     </p>
                 </div>
-                <Link
-                    href="/dashboard/tasks/new"
-                    className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-primary/90 shadow-lg shadow-blue-500/20 transition-all w-fit"
-                >
-                    <PlusIcon className="h-4 w-4" />
-                    새 작업 만들기
-                </Link>
+                {!isLimitReached && (
+                    <Link
+                        href="/dashboard/tasks/new"
+                        className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-primary/90 shadow-lg shadow-blue-500/20 transition-all w-fit"
+                    >
+                        <PlusIcon className="h-4 w-4" />
+                        새 작업 만들기
+                    </Link>
+                )}
             </div>
 
             {/* Stats Summary */}
@@ -55,7 +75,7 @@ export default async function TasksPage() {
                     </div>
                     <div>
                         <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">활성 작업</p>
-                        <p className="text-xl font-black text-foreground">{activeTasksCount}</p>
+                        <p className="text-xl font-black text-foreground">{activeTasksCount} / {limit}</p>
                     </div>
                 </div>
                 <div className="bg-card p-4 rounded-xl border border-border flex items-center gap-4 shadow-sm">
@@ -115,15 +135,17 @@ export default async function TasksPage() {
                 ))}
 
                 {/* New Task Button */}
-                <Link href="/dashboard/tasks/new" className="group flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border p-6 hover:bg-muted/50 transition-colors min-h-[300px]">
-                    <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors shadow-sm">
-                        <PlusIcon className="h-6 w-6 text-muted-foreground group-hover:text-white" />
-                    </div>
-                    <div className="text-center">
-                        <p className="font-bold text-base text-foreground group-hover:text-primary">새 작업 추가</p>
-                        <p className="text-xs text-muted-foreground mt-1">자동화된 콘텐츠 생성을 설정하세요</p>
-                    </div>
-                </Link>
+                {!isLimitReached && (
+                    <Link href="/dashboard/tasks/new" className="group flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border p-6 hover:bg-muted/50 transition-colors min-h-[300px]">
+                        <div className="h-14 w-14 rounded-full bg-muted flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors shadow-sm">
+                            <PlusIcon className="h-6 w-6 text-muted-foreground group-hover:text-white" />
+                        </div>
+                        <div className="text-center">
+                            <p className="font-bold text-base text-foreground group-hover:text-primary">새 작업 추가</p>
+                            <p className="text-xs text-muted-foreground mt-1">자동화된 콘텐츠 생성을 설정하세요</p>
+                        </div>
+                    </Link>
+                )}
             </div>
         </div>
     )
