@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { getOrCreateUser } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
+import { getUserLimits } from '@/lib/limits'
 
 /**
  * 모든 요금제 플랜을 가져옵니다.
@@ -164,16 +165,15 @@ export async function getUserWithPlan() {
 /**
  * 리소스 생성 전 한도를 체크합니다.
  */
+/**
+ * 리소스 생성 전 한도를 체크합니다.
+ */
 export async function checkLimit(type: 'site' | 'keywordGroup' | 'prompt' | 'automationJob') {
     try {
         const user = await getOrCreateUser()
         if (user.role === 'ADMIN') return { success: true } // 어드민은 무제한
 
-        const res = await getUserWithPlan()
-        if (!res.success || !res.data) return { success: false, error: '사용자 정보를 확인할 수 없습니다.' }
-
-        const plan = (res.data as any).plan
-        if (!plan) return { success: false, error: '연결된 요금제가 없습니다. 업그레이드가 필요합니다.' }
+        const limits = await getUserLimits(user.id)
 
         let currentCount = 0
         let limit = 0
@@ -181,26 +181,26 @@ export async function checkLimit(type: 'site' | 'keywordGroup' | 'prompt' | 'aut
         switch (type) {
             case 'site':
                 currentCount = await prisma.site.count({ where: { userId: user.id } })
-                limit = plan.siteLimit
+                limit = limits.sites
                 break
             case 'keywordGroup':
                 currentCount = await prisma.keywordGroup.count({ where: { userId: user.id } })
-                limit = plan.keywordGroupLimit
+                limit = limits.keywords
                 break
             case 'prompt':
                 currentCount = await prisma.prompt.count({ where: { userId: user.id } })
-                limit = plan.promptLimit
+                limit = limits.prompts
                 break
             case 'automationJob':
                 currentCount = await prisma.automationJob.count({ where: { userId: user.id } })
-                limit = plan.taskLimit
+                limit = limits.tasks
                 break
         }
 
         if (currentCount >= limit) {
             return {
                 success: false,
-                error: `현재 요금제(${plan.name})의 "${type === 'site' ? '사이트' : type === 'keywordGroup' ? '키워드 그룹' : type === 'prompt' ? '프롬프트' : '자동화 작업'}" 생성 한도(${limit}개)를 초과했습니다. 더 높은 요금제로 업그레이드해 보세요!`
+                error: `"${type === 'site' ? '사이트' : type === 'keywordGroup' ? '키워드 그룹' : type === 'prompt' ? '프롬프트' : '자동화 작업'}" 생성 한도(${limit}개)를 초과했습니다. 상점에서 슬롯을 확장해 보세요!`
             }
         }
 

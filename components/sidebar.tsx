@@ -12,9 +12,11 @@ import {
     ShieldCheck,
     Menu as MenuIcon,
     CreditCard,
+    Coins,
     Settings as SettingsIcon,
     LogOut,
     ChevronsUpDown,
+    ShoppingBag,
     X
 } from 'lucide-react'
 import Link from 'next/link'
@@ -27,7 +29,7 @@ import { createClient } from '@/lib/supabase/client'
 import { DeleteAccountButton } from '@/components/delete-account-button'
 
 const ICON_MAP: Record<string, any> = {
-    LayoutDashboard, Globe, Key, Terminal, Cpu, Code2, MenuIcon
+    LayoutDashboard, Globe, Key, Terminal, Cpu, Code2, MenuIcon, Coins, ShoppingBag
 }
 
 interface SidebarProps {
@@ -66,6 +68,7 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                 { href: '/dashboard/prompts', icon: 'Terminal', label: '프롬프트 관리' },
                 { href: '/dashboard/tasks', icon: 'Cpu', label: '자동화 작업' },
                 { href: '/dashboard/api', icon: 'Code2', label: 'API 관리' },
+                { href: '/dashboard/shop', icon: 'Coins', label: '충전소/상점' },
             ]
 
             if (res.success && res.data && res.data.length > 0) {
@@ -192,6 +195,22 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                                 icon={<Terminal className="h-[18px] w-[18px]" />}
                                 label="시스템 프롬프트"
                                 isActive={pathname === '/dashboard/admin/prompts'}
+                                variant="admin"
+                                onClick={onClose}
+                            />
+                            <NavItem
+                                href="/dashboard/admin/shop"
+                                icon={<ShoppingBag className="h-[18px] w-[18px]" />}
+                                label="상점 상품 관리"
+                                isActive={pathname === '/dashboard/admin/shop'}
+                                variant="admin"
+                                onClick={onClose}
+                            />
+                            <NavItem
+                                href="/dashboard/admin/menus"
+                                icon={<MenuIcon className="h-[18px] w-[18px]" />}
+                                label="메뉴 관리"
+                                isActive={pathname === '/dashboard/admin/menus'}
                                 variant="admin"
                                 onClick={onClose}
                             />

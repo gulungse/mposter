@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { getOrCreateUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getUserLimits } from '@/lib/limits'
 import {
     Search,
     Bell,
@@ -27,13 +28,8 @@ export default async function DashboardPage() {
         include: { plan: true }
     })
 
-    // 플랜 제한 (플랜이 없으면 기본 무료 제한 적용)
-    const limits = {
-        sites: userData?.plan?.siteLimit ?? 2,
-        keywords: userData?.plan?.keywordGroupLimit ?? 3,
-        prompts: userData?.plan?.promptLimit ?? 3,
-        tasks: userData?.plan?.taskLimit ?? 3
-    }
+    // 동적 리소스 제한 조회 (기본 + 슬롯 구매)
+    const limits = await getUserLimits(user.id)
 
     // 통계 데이터 동시 조회
     const [
