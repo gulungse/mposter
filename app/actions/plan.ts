@@ -150,11 +150,14 @@ export async function getUserWithPlan() {
             plan = plans[0] || null
         }
 
+        const limits = await getUserLimits(user.id)
+
         return {
             success: true,
             data: {
                 ...user,
-                plan
+                plan,
+                limits
             }
         }
     } catch (error) {

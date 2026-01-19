@@ -37,7 +37,9 @@ export default function SitesPage() {
         if (keywordsRes.success) setKeywords(keywordsRes.data || [])
         if (promptsRes.success) setPrompts(promptsRes.data || [])
 
-        if (planRes.success && (planRes.data as any).plan) {
+        if (planRes.success && (planRes.data as any).limits) {
+            setLimits({ maxSites: (planRes.data as any).limits.sites })
+        } else if (planRes.success && (planRes.data as any).plan) {
             setLimits({ maxSites: (planRes.data as any).plan.siteLimit })
         } else {
             setLimits({ maxSites: 2 })
