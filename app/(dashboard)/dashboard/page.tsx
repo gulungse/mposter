@@ -280,7 +280,7 @@ export default async function DashboardPage() {
                                                     <ZapIcon className="h-4 w-4" />
                                                 </div>
                                                 <div>
-                                                    <p className="text-xs font-bold text-foreground">{(userData as any).plan.name}</p>
+                                                    <p className="text-xs font-bold text-foreground">{(userData as any).plan?.name || 'Basic Plan'}</p>
                                                     <p className="text-[10px] text-muted-foreground">기본 요금제</p>
                                                 </div>
                                             </div>
@@ -297,7 +297,7 @@ export default async function DashboardPage() {
                                                         <CoinsIcon className="h-4 w-4" />
                                                     </div>
                                                     <div>
-                                                        <p className="text-xs font-bold text-slate-900 dark:text-slate-200">{purchase.item.name}</p>
+                                                        <p className="text-xs font-bold text-slate-900 dark:text-slate-200">{purchase.item?.name || 'Unknown Item'}</p>
                                                         <p className="text-[10px] text-blue-600 dark:text-blue-400 font-medium">
                                                             ~ {new Date(purchase.endDate).toLocaleDateString()} 만료
                                                         </p>
