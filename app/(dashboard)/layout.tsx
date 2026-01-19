@@ -3,6 +3,7 @@
 import { Sidebar } from '@/components/sidebar'
 import { DashboardHeader } from '@/components/dashboard-header'
 import { CronTicker } from '@/components/cron-ticker'
+import { Footer } from '@/components/footer'
 import { useState } from 'react'
 
 export default function DashboardLayout({
@@ -21,7 +22,10 @@ export default function DashboardLayout({
             />
             <main className="flex-1 flex flex-col overflow-y-auto bg-background relative">
                 <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
-                {children}
+                <div className="flex-1">
+                    {children}
+                </div>
+                <Footer />
             </main>
         </div>
     )
