@@ -4,49 +4,74 @@ import { prisma } from '@/lib/prisma'
 import { getOrCreateUser } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
 import { calculateNextRun } from '@/lib/cron'
+import { runAutomationTask } from './worker'
+import { checkLimit } from './plan'
 
-// ... imports ...
+/**
+ * 자동화 작업 생성
+ */
+export async function createAutomationTask(data: {
+    name: string;
+    siteId: string;
+    keywordGroupId?: string;
+    keywords?: string[];
+    promptId: string;
+    scheduleCron: string;
+    aiModel: any;
+    imageSource: any;
+    imageCount?: number;
+    wpCategoryId?: number;
+    postStatus?: string;
+    runImmediately?: boolean;
+}) {
+    try {
+        const user = await getOrCreateUser()
 
-// Inside createAutomationTask function
-const task = await (prisma.automationJob as any).create({
-    data: {
-        userId: user.id,
-        name: data.name,
-        siteId: data.siteId,
-        keywordGroupId: data.keywordGroupId,
-        keywords: data.keywords, // Manual keywords
-        promptId: data.promptId,
-        scheduleCron: data.scheduleCron,
-        aiModel: data.aiModel,
-        imageSource: data.imageSource,
-        imageCount: data.imageCount || 1,
-        wpCategoryId: data.wpCategoryId,
-        postStatus: data.postStatus || 'publish', // Default default
-        isActive: true,
-        // 스케줄에 따른 첫 실행 시간 설정 (등록 직후 실행 방지, 지정된 간격 후 실행)
-        nextRunAt: calculateNextRun(data.scheduleCron)
-    }
-})
+        // 요금제 한도 체크
+        const limitRes = await checkLimit('automationJob')
+        if (!limitRes.success) {
+            return { success: false, error: limitRes.error }
+        }
 
-// 테스트 발행인 경우 즉시 실행
-if (data.runImmediately) {
-    // 비동기로 실행하거나 결과를 기다릴 수 있습니다.
-    // 여기서는 흐름상 즉시 실행 결과를 반환하는 것이 좋으므로 기다립니다.
-    const runResult = await runAutomationTask(task.id)
-    if (!runResult.success) {
-        return { success: true, data: task, warning: runResult.error }
-    }
-}
+        const task = await (prisma.automationJob as any).create({
+            data: {
+                userId: user.id,
+                name: data.name,
+                siteId: data.siteId,
+                keywordGroupId: data.keywordGroupId,
+                keywords: data.keywords, // Manual keywords
+                promptId: data.promptId,
+                scheduleCron: data.scheduleCron,
+                aiModel: data.aiModel,
+                imageSource: data.imageSource,
+                imageCount: data.imageCount || 1,
+                wpCategoryId: data.wpCategoryId,
+                postStatus: data.postStatus || 'publish', // Default default
+                isActive: true,
+                // 스케줄에 따른 첫 실행 시간 설정 (등록 직후 실행 방지, 지정된 간격 후 실행)
+                nextRunAt: calculateNextRun(data.scheduleCron)
+            }
+        })
 
-revalidatePath('/dashboard/tasks')
-return { success: true, data: task }
+        // 테스트 발행인 경우 즉시 실행
+        if (data.runImmediately) {
+            // 비동기로 실행하거나 결과를 기다릴 수 있습니다.
+            // 여기서는 흐름상 즉시 실행 결과를 반환하는 것이 좋으므로 기다립니다.
+            const runResult = await runAutomationTask(task.id)
+            if (!runResult.success) {
+                return { success: true, data: task, warning: runResult.error }
+            }
+        }
+
+        revalidatePath('/dashboard/tasks')
+        return { success: true, data: task }
     } catch (error: any) {
-    console.error('자동화 작업 생성 실패:', error)
-    return {
-        success: false,
-        error: `자동화 작업을 저장하는 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`
+        console.error('자동화 작업 생성 실패:', error)
+        return {
+            success: false,
+            error: `자동화 작업을 저장하는 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`
+        }
     }
-}
 }
 
 /**
