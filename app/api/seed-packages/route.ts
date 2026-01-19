@@ -11,21 +11,27 @@ export async function GET() {
         await prisma.tokenPackage.createMany({
             data: [
                 {
-                    name: '100 토큰',
-                    tokenAmount: 100,
-                    price: 1100,
+                    name: '5,000 토큰',
+                    tokenAmount: 5000,
+                    price: 5000,
                     isActive: true
                 },
                 {
-                    name: '550 토큰 (10% Bonus)',
-                    tokenAmount: 550,
-                    price: 5500,
+                    name: '10,000 토큰',
+                    tokenAmount: 10000,
+                    price: 10000,
                     isActive: true
                 },
                 {
-                    name: '1200 토큰 (20% Bonus)',
-                    tokenAmount: 1200,
-                    price: 11000,
+                    name: '30,000 토큰 (Bonus +10%)',
+                    tokenAmount: 33000,
+                    price: 30000,
+                    isActive: true
+                },
+                {
+                    name: '50,000 토큰 (Bonus +20%)',
+                    tokenAmount: 60000,
+                    price: 50000,
                     isActive: true
                 }
             ]
