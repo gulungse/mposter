@@ -22,8 +22,9 @@ export function TokenChargeCard({ id, name, amount, price, isPopular, buyerEmail
 
     const handleCharge = async () => {
         if (!window.IMP) {
-            // 결제 모듈이 로드되지 않았을 경우, 사용자에게 알림 대신 로깅 또는 다른 처리
-            console.error('결제 모듈이 로드되지 않았습니다. 새로고침 해주세요.')
+            // 결제 모듈이 로드되지 않았을 경우
+            alert('결제 모듈(PortOne)이 로드되지 않았습니다.\n새로고침 하거나 관리자에게 문의해주세요.')
+            console.error('Window.IMP is missing')
             return
         }
 
@@ -33,8 +34,8 @@ export function TokenChargeCard({ id, name, amount, price, isPopular, buyerEmail
         // PortOne Init
         const STORE_ID = process.env.NEXT_PUBLIC_PORTONE_STORE_ID
         if (!STORE_ID) {
-            // 상점 아이디가 설정되지 않았을 경우, 사용자에게 알림 대신 로깅 또는 다른 처리
-            console.error('상점 아이디(Store ID)가 설정되지 않았습니다.')
+            alert('상점 아이디(Store ID)가 설정되지 않았습니다.\n환경변수 NEXT_PUBLIC_PORTONE_STORE_ID를 확인해주세요.')
+            console.error('Store ID is missing')
             setIsLoading(false)
             return
         }

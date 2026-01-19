@@ -51,6 +51,14 @@ export async function POST(req: Request) {
             )
         }
 
+        // 결제 상태 검증 (중요: 취소된 결제 등 방지)
+        if (paymentData.status !== 'paid') {
+            return NextResponse.json(
+                { success: false, message: `Payment status is ${paymentData.status}, not paid` },
+                { status: 400 }
+            )
+        }
+
         // 5. 이미 처리된 결제인지 확인 (멱등성)
         const existingPayment = await prisma.payment.findUnique({
             where: { impUid: imp_uid }
