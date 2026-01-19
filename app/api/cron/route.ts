@@ -4,39 +4,10 @@ import { runAutomationTask } from '@/app/actions/worker'
 
 export const dynamic = 'force-dynamic'
 
-function getNextRun(cron: string, fromDate: Date = new Date()): Date {
-    const next = new Date(fromDate)
+import { calculateNextRun } from '@/lib/cron'
 
-    if (cron.startsWith('*/5')) {
-        next.setMinutes(next.getMinutes() + 5)
-    } else if (cron.startsWith('*/10')) {
-        next.setMinutes(next.getMinutes() + 10)
-    } else if (cron.startsWith('*/30')) {
-        next.setMinutes(next.getMinutes() + 30)
-    } else if (cron === '0 * * * *') {
-        next.setHours(next.getHours() + 1)
-        next.setMinutes(0, 0, 0)
-    } else if (cron === '0 */3 * * *') {
-        next.setHours(next.getHours() + 3)
-        next.setMinutes(0, 0, 0)
-    } else if (cron === '0 */6 * * *') {
-        next.setHours(next.getHours() + 6)
-        next.setMinutes(0, 0, 0)
-    } else if (cron === '0 */12 * * *') {
-        next.setHours(next.getHours() + 12)
-        next.setMinutes(0, 0, 0)
-    } else if (cron === '0 0 * * *') {
-        next.setDate(next.getDate() + 1)
-        next.setHours(0, 0, 0, 0)
-    } else if (cron === '0 0 */2 * *') {
-        next.setDate(next.getDate() + 2)
-        next.setHours(0, 0, 0, 0)
-    } else {
-        // Fallback for custom or unknown: Default 1 hour safety
-        next.setHours(next.getHours() + 1)
-    }
-    return next
-}
+// Removed local getNextRun function as we use the imported one
+// function getNextRun(cron: string, fromDate: Date = new Date()): Date { ... }
 
 export async function GET() {
     try {
@@ -63,7 +34,7 @@ export async function GET() {
 
             // 2. Schedule Next
             if (job.scheduleCron && job.scheduleCron !== 'MANUAL') {
-                const nextDate = getNextRun(job.scheduleCron)
+                const nextDate = calculateNextRun(job.scheduleCron) // Use imported function
                 await prisma.automationJob.update({
                     where: { id: job.id },
                     data: {
