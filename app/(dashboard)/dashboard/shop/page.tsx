@@ -18,6 +18,12 @@ export default async function ShopPage() {
         orderBy: { price: 'asc' }
     })
 
+    // 판매 중인 토큰 패키지 조회 (포트원 연동)
+    const tokenPackages = await prisma.tokenPackage.findMany({
+        where: { isActive: true },
+        orderBy: { price: 'asc' }
+    })
+
     return (
         <div className="p-5 space-y-10 pb-20">
             {/* Header */}
@@ -42,12 +48,22 @@ export default async function ShopPage() {
                         보유 토큰: <span className="font-bold text-foreground">{userData?.tokenBalance?.toLocaleString() ?? 0}</span>
                     </div>
                 </div>
-                
+
+                {/* Dynamically rendered packages */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <TokenChargeCard amount={5000} price={5000} />
-                    <TokenChargeCard amount={10000} price={10000} isPopular />
-                    <TokenChargeCard amount={30000} price={30000} />
-                    <TokenChargeCard amount={50000} price={50000} />
+                    {/* Fetch packages logic needs to be added above return */}
+                    {tokenPackages.map((pkg) => (
+                        <TokenChargeCard
+                            key={pkg.id}
+                            id={pkg.id}
+                            name={pkg.name}
+                            amount={pkg.tokenAmount}
+                            price={pkg.price}
+                            isPopular={pkg.tokenAmount === 10000} // Example logic: 10k is popular
+                            buyerEmail={user.email}
+                            buyerName={user.name ?? undefined}
+                        />
+                    ))}
                 </div>
             </section>
 
@@ -66,7 +82,7 @@ export default async function ShopPage() {
                     <div>
                         <p className="text-sm font-bold text-foreground">1개월(30일) 기간제 상품</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                            아래 상품은 구매 시점으로부터 30일간 해당 슬롯을 추가로 제공하는 유료 상품입니다.<br/>
+                            아래 상품은 구매 시점으로부터 30일간 해당 슬롯을 추가로 제공하는 유료 상품입니다.<br />
                             기간이 만료되면 가장 최근에 등록한 자원부터 비활성화됩니다.
                         </p>
                     </div>

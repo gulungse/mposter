@@ -42,6 +42,7 @@ model User {
   postLogs      PostLog[]
   transactions  Transaction[]
   purchases     UserPurchase[]
+  payments      Payment[]
 
   @@map("users")
 }
@@ -320,4 +321,48 @@ enum ItemType {
   KEYWORD_SLOT
   PROMPT_SLOT
   TASK_SLOT
+}
+
+// 토큰 충전 상품 모델 (포트원 결제용)
+model TokenPackage {
+  id          String   @id @default(uuid())
+  name        String   // 상품명 (예: 100 토큰)
+  tokenAmount Int      // 지급되는 토큰 수량
+  price       Int      // 가격 (KRW)
+  isActive    Boolean  @default(true) // 판매 중 여부
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  payments    Payment[]
+
+  @@map("token_packages")
+}
+
+// 결제 내역 모델 (포트원 연동)
+model Payment {
+  id          String   @id @default(uuid())
+  userId      String
+  packageId   String?
+  
+  impUid      String   @unique // 포트원 결제 고유 번호
+  merchantUid String   @unique // 가맹점 주문 번호
+  amount      Int      // 결제 금액
+  status      PaymentStatus @default(READY)
+  
+  paidAt      DateTime? // 결제 완료 일시
+  failedAt    DateTime? // 결제 실패 일시
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package     TokenPackage? @relation(fields: [packageId], references: [id])
+
+  @@map("payments")
+}
+
+enum PaymentStatus {
+  READY
+  PAID
+  FAILED
+  CANCELLED
 }

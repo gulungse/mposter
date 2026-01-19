@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Noto_Sans_KR, Inter } from "next/font/google"; // Inter font added
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import Script from "next/script";
 import "./globals.css";
 
 const notoSansKr = Noto_Sans_KR({
@@ -32,6 +33,7 @@ export default function RootLayout({
       >
         {children}
         <SpeedInsights />
+        <Script src="https://cdn.iamport.kr/v1/iamport.js" strategy="lazyOnload" />
       </body>
     </html>
   );

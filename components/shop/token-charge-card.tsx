@@ -1,38 +1,89 @@
 'use client'
 
 import { Coins, Loader2 } from 'lucide-react'
-import { buyToken } from '@/app/actions/shop'
 import { useState } from 'react'
+import axios from 'axios'
+import { useRouter } from 'next/navigation'
 
 interface Props {
+    id: string
+    name: string
     amount: number
     price: number
     isPopular?: boolean
+    buyerEmail?: string
+    buyerName?: string
+    buyerTel?: string
 }
 
-export function TokenChargeCard({ amount, price, isPopular }: Props) {
+export function TokenChargeCard({ id, name, amount, price, isPopular, buyerEmail, buyerName, buyerTel }: Props) {
+    const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
 
     const handleCharge = async () => {
-        if (!confirm(`${amount.toLocaleString()} 토큰을 충전하시겠습니까? (시뮬레이션)`)) return
-
-        setIsLoading(true)
-        try {
-            const res = await buyToken(amount)
-            if (res.success) {
-                alert(res.message)
-            } else {
-                alert(res.message)
-            }
-        } catch (e) {
-            alert('오류가 발생했습니다.')
-        } finally {
-            setIsLoading(false)
+        if (!window.IMP) {
+            // 결제 모듈이 로드되지 않았을 경우, 사용자에게 알림 대신 로깅 또는 다른 처리
+            console.error('결제 모듈이 로드되지 않았습니다. 새로고침 해주세요.')
+            return
         }
+
+        if (isLoading) return
+        setIsLoading(true)
+
+        // PortOne Init
+        const STORE_ID = process.env.NEXT_PUBLIC_PORTONE_STORE_ID
+        if (!STORE_ID) {
+            // 상점 아이디가 설정되지 않았을 경우, 사용자에게 알림 대신 로깅 또는 다른 처리
+            console.error('상점 아이디(Store ID)가 설정되지 않았습니다.')
+            setIsLoading(false)
+            return
+        }
+        window.IMP.init(STORE_ID)
+
+        const merchant_uid = `mid_${new Date().getTime()}`
+
+        const data = {
+            pg: process.env.NEXT_PUBLIC_PORTONE_PG || 'tosspayments', // PG사 설정 (기본값: 토스페이먼츠)
+            pay_method: 'card',
+            merchant_uid: merchant_uid,
+            name: `토큰 충전: ${name}`,
+            amount: price,
+            buyer_email: buyerEmail || 'test@mposter.ai',
+            buyer_name: buyerName || '테스트유저',
+            buyer_tel: buyerTel || '010-1234-5678',
+        }
+
+        window.IMP.request_pay(data, async (rsp: any) => {
+            // 성공 여부가 없더라도 imp_uid가 있으면 서버에서 검증 시도 (일부 PG사 호환성)
+            if (rsp.success || rsp.imp_uid) {
+                // ... verify logic ...
+                try {
+                    const verifyRes = await axios.post('/api/payments/verify', {
+                        imp_uid: rsp.imp_uid,
+                        merchant_uid: rsp.merchant_uid,
+                        packageId: id
+                    })
+
+                    if (verifyRes.data.success) {
+                        alert('결제가 성공적으로 완료되었습니다! 토큰이 지급되었습니다.')
+                        router.refresh()
+                    } else {
+                        alert(`결제 검증 실패: ${verifyRes.data.message}`)
+                    }
+                } catch (error: any) {
+                    console.error('Verify Error:', error)
+                    alert(`결제 검증 중 오류 발생: ${error.response?.data?.message || 'Unknown Error'}`)
+                }
+            } else {
+                const errorMsg = rsp.error_msg || rsp.msg || '결제가 취소되었습니다.'
+                alert(`결제 실패: ${errorMsg}`)
+            }
+            setIsLoading(false)
+        })
     }
 
     return (
-        <div 
+        <div
             onClick={!isLoading ? handleCharge : undefined}
             className={`
                 relative bg-card border rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg group flex flex-col items-center text-center gap-2
