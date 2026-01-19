@@ -1,4 +1,5 @@
 import { LoginButton } from '@/components/login-button'
+import { EmailLoginForm } from '@/components/email-login-form'
 import { Sparkles as SparklesIcon, Zap as ZapIcon, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 
@@ -63,8 +64,10 @@ export default async function LoginPage({
                 {/* Single Button Component (Google Login) */}
                 <div className="flex flex-col gap-4 items-center">
                     <LoginButton />
+                    
+                    <EmailLoginForm />
 
-                    <p className="mt-2 text-[10px] text-muted-foreground uppercase tracking-widest font-medium">
+                    <p className="mt-6 text-[10px] text-muted-foreground uppercase tracking-widest font-medium">
                         10,000명 이상의 마케터가 선택했습니다
                     </p>
                 </div>
