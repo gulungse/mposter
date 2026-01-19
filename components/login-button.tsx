@@ -18,7 +18,7 @@ export function LoginButton() {
                 // Kakao: 이메일 권한 오류(account_email) 방지를 위해 명시적으로 스코프 제한
                 scopes: provider === 'kakao' ? undefined : undefined,
                 queryParams: provider === 'kakao' ? {
-                    scope: 'profile_nickname,profile_image',
+                    scope: 'profile_nickname,profile_image,account_email',
                     prompt: 'login'
                 } : undefined
             },
@@ -62,26 +62,7 @@ export function LoginButton() {
                 <span>Google로 계속하기</span>
             </button>
 
-            {/* Kakao Login Button */}
-            <button
-                onClick={() => handleLogin('kakao')}
-                disabled={isLoading !== null}
-                className="group relative flex w-full items-center justify-center gap-3 rounded-xl bg-[#FEE500] px-6 py-4 text-base font-semibold text-[#191919] transition-all hover:bg-[#FDD835] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-                {isLoading === 'kakao' ? (
-                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#191919] border-t-transparent" />
-                ) : (
-                    <svg
-                        className="h-5 w-5"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        xmlns="http://www.w3.org/2000/svg"
-                    >
-                        <path d="M12 3C7.58 3 4 5.79 4 9.24c0 2.22 1.51 4.21 3.76 5.3-.17.61-.59 2.2-.67 2.53-.1.44.18.49.37.35.21-.15 3.47-2.36 4.07-2.77.34.05.67.07 1.01.07 4.42 0 8-2.79 8-6.24S16.42 3 12 3z" />
-                    </svg>
-                )}
-                <span>Kakao로 계속하기</span>
-            </button>
+
         </div>
     )
 }
