@@ -149,11 +149,14 @@ export default async function DashboardPage() {
                         {/* Token Balance (Right) */}
                         <div className="flex flex-col items-end justify-center min-w-[220px] bg-muted/30 p-5 rounded-2xl border border-border/50">
                             <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">토큰 보유량</h3>
-                            <div className="flex items-center gap-2 mb-3">
+                            <div className="flex items-center gap-2 mb-2">
                                 <CoinsIcon className="h-5 w-5 text-primary" />
                                 <div className="text-3xl font-black text-primary">
                                     {user?.tokenBalance?.toLocaleString() || 0}
                                 </div>
+                            </div>
+                            <div className="text-[11px] font-bold text-red-500 mb-3 bg-red-100 dark:bg-red-900/20 px-2 py-1 rounded-md border border-red-200 dark:border-red-900/30">
+                                7일내 소멸예정 토큰 : 0
                             </div>
                             <div className="w-full">
                                 <BuyTokensButton />

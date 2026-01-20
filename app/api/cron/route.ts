@@ -9,8 +9,16 @@ import { calculateNextRun } from '@/lib/cron'
 // Removed local getNextRun function as we use the imported one
 // function getNextRun(cron: string, fromDate: Date = new Date()): Date { ... }
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
+        // 보안 체크: 로컬호스트(127.0.0.1/::1)에서의 요청은 허용, 그 외에는 CRON_SECRET 확인
+        const authHeader = request.headers.get('authorization');
+        const host = request.headers.get('host') || '';
+        const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+
+        if (!isLocalhost && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+            return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+        }
         const jobs = await prisma.automationJob.findMany({
             where: { isActive: true, nextRunAt: { lte: new Date() } }
         })
