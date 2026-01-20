@@ -92,6 +92,29 @@ export async function updateAutomationTask(id: string, data: {
 }) {
     try {
         const user = await getOrCreateUser()
+
+        // 기존 작업 조회 (스케줄 변경 여부 확인용)
+        const existingJob = await prisma.automationJob.findUnique({
+            where: { id, userId: user.id }
+        })
+
+        if (!existingJob) {
+            return { success: false, error: '작업을 찾을 수 없습니다.' }
+        }
+
+        let nextRunAt = undefined
+        // 스케줄(Cron)이 변경된 경우 다음 실행 시간 재계산
+        if (data.scheduleCron && data.scheduleCron !== existingJob.scheduleCron) {
+            // 마지막 실행 시간이 있으면 그 기준으로, 없으면 현재 시간 기준으로 다음 실행 시간 계산
+            const baseTime = existingJob.lastRunAt || new Date()
+            nextRunAt = calculateNextRun(data.scheduleCron, baseTime)
+
+            // 만약 계산된 시간이 과거라면(예: 1시간 간격인데 마지막 실행이 2시간 전), 현재 기준으로 다시 잡음
+            if (nextRunAt <= new Date()) {
+                nextRunAt = calculateNextRun(data.scheduleCron)
+            }
+        }
+
         await (prisma.automationJob as any).update({
             where: { id, userId: user.id },
             data: {
@@ -106,6 +129,7 @@ export async function updateAutomationTask(id: string, data: {
                 imageCount: data.imageCount,
                 wpCategoryId: data.wpCategoryId,
                 postStatus: data.postStatus,
+                ...(nextRunAt ? { nextRunAt } : {})
             }
         })
 
