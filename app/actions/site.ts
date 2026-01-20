@@ -15,6 +15,29 @@ export type CreateSiteState = {
     message?: string
 }
 
+/**
+ * 워드프레스 연결 유효성을 검사합니다.
+ */
+async function validateWordPressConnection(url: string, username: string | undefined, apiToken: string) {
+    const baseUrl = url.replace(/\/$/, '')
+    try {
+        await axios.get(`${baseUrl}/wp-json/wp/v2/users/me`, {
+            auth: {
+                username: username || '',
+                password: apiToken
+            },
+            timeout: 10000
+        })
+        return { success: true }
+    } catch (err: any) {
+        console.error('WP Connection Test Failed:', err.message)
+        return {
+            success: false,
+            message: `워드프레스 연결 실패: ${err.response?.status === 401 ? '인증 정보가 올바르지 않습니다.' : '사이트에 접속할 수 없거나 REST API가 비활성화되어 있습니다.'}`
+        }
+    }
+}
+
 export async function createSite(data: {
     name: string
     url: string
@@ -34,21 +57,9 @@ export async function createSite(data: {
 
         // 워드프레스 연결 테스트
         if (data.type === 'WORDPRESS') {
-            try {
-                const baseUrl = data.url.replace(/\/$/, '')
-                await axios.get(`${baseUrl}/wp-json/wp/v2/users/me`, {
-                    auth: {
-                        username: data.username || '',
-                        password: data.apiToken
-                    },
-                    timeout: 10000
-                })
-            } catch (err: any) {
-                console.error('WP Connection Test Failed:', err.message)
-                return {
-                    success: false,
-                    message: `워드프레스 연결 실패: ${err.response?.status === 401 ? '인증 정보가 올바르지 않습니다.' : '사이트에 접속할 수 없거나 REST API가 비활성화되어 있습니다.'}`
-                }
+            const validation = await validateWordPressConnection(data.url, data.username, data.apiToken)
+            if (!validation.success) {
+                return { success: false, message: validation.message }
             }
         }
 
@@ -129,6 +140,23 @@ export async function updateSite(id: string, data: {
     try {
         const user = await getOrCreateUser()
         const now = new Date().toISOString()
+
+        // 사이트 타입 조회 (워드프레스인지 확인하기 위해)
+        const existingSite = await prisma.site.findUnique({
+            where: { id, userId: user.id }
+        })
+
+        if (!existingSite) {
+            return { success: false, error: '수정할 사이트를 찾을 수 없습니다.' }
+        }
+
+        // 워드프레스인 경우 연결 테스트 수행
+        if (existingSite.type === 'WORDPRESS') {
+            const validation = await validateWordPressConnection(data.url, data.username, data.apiToken)
+            if (!validation.success) {
+                return { success: false, error: validation.message }
+            }
+        }
 
         // Prisma Client sync 이슈 방지를 위해 Raw SQL로 업데이트
         await (prisma as any).$executeRawUnsafe(`
