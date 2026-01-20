@@ -8,15 +8,22 @@ export async function POST(req: Request) {
         const data = Object.fromEntries(formData.entries())
 
         // 1. 기본 검증 (linkval)
-        // 판매자 사이트 설정의 연동 VALUE와 일치해야 함
         const PAYAPP_LINK_VALUE = process.env.PAYAPP_LINK_VALUE
+        console.log('[PayApp Feedback] Received:', {
+            pay_state: data.pay_state,
+            pay_no: data.pay_no,
+            price: data.price,
+            linkval_received: data.linkval,
+            linkval_expected: PAYAPP_LINK_VALUE ? 'SET' : 'NOT_SET'
+        })
+
         if (!PAYAPP_LINK_VALUE) {
-            console.error('PAYAPP_LINK_VALUE is not set')
+            console.error('[PayApp Feedback] Error: PAYAPP_LINK_VALUE is not set in env')
             return new Response('System Error', { status: 500 })
         }
 
         if (data.linkval !== PAYAPP_LINK_VALUE) {
-            console.error('Invalid linkval:', data.linkval)
+            console.error(`[PayApp Feedback] Linkval mismatch. Received: ${data.linkval}, Expected: ${PAYAPP_LINK_VALUE}`)
             return new Response('Invalid linkval', { status: 400 })
         }
 

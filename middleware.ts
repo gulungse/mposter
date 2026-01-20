@@ -2,6 +2,11 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+    // 결제 관련 API는 미들웨어 처리 생략 (PayApp 등의 외부 호출 허용)
+    if (request.nextUrl.pathname.startsWith('/api/payments')) {
+        return NextResponse.next()
+    }
+
     let response = NextResponse.next({
         request: {
             headers: request.headers,
