@@ -2,7 +2,6 @@
 
 import { Coins, Loader2 } from 'lucide-react'
 import { useState } from 'react'
-import axios from 'axios'
 import { useRouter } from 'next/navigation'
 
 interface Props {
@@ -14,70 +13,66 @@ interface Props {
     buyerEmail?: string
     buyerName?: string
     buyerTel?: string
+    userId: string
 }
 
-export function TokenChargeCard({ id, name, amount, price, isPopular, buyerEmail, buyerName, buyerTel }: Props) {
+declare global {
+    interface Window {
+        PayApp?: any
+    }
+}
+
+export function TokenChargeCard({ id, name, amount, price, isPopular, buyerEmail, buyerName, buyerTel, userId }: Props) {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
 
     const handleCharge = async () => {
-        if (!window.IMP) {
-            // 결제 모듈이 로드되지 않았을 경우
-            alert('결제 모듈(PortOne)이 로드되지 않았습니다.\n새로고침 하거나 관리자에게 문의해주세요.')
-            console.error('Window.IMP is missing')
+        if (!window.PayApp) {
+            alert('결제 모듈이 로드되지 않았습니다. 새로고침 후 다시 시도해주세요.')
             return
         }
 
         if (isLoading) return
         setIsLoading(true)
 
-        // PortOne Init
-        const STORE_ID = process.env.NEXT_PUBLIC_PORTONE_STORE_ID
-        if (!STORE_ID) {
-            alert('상점 아이디(Store ID)가 설정되지 않았습니다.\n환경변수 NEXT_PUBLIC_PORTONE_STORE_ID를 확인해주세요.')
-            console.error('Store ID is missing')
+        const PAYAPP_ID = process.env.NEXT_PUBLIC_PAYAPP_USER_ID
+        if (!PAYAPP_ID) {
+            alert('상점 아이디(M-Poster)가 설정되지 않았습니다.\n관리자에게 문의해주세요.')
             setIsLoading(false)
             return
         }
-        window.IMP.init(STORE_ID)
 
         const merchant_uid = `mid_${new Date().getTime()}`
+        const origin = window.location.origin
 
-        const data = {
-            pg: process.env.NEXT_PUBLIC_PORTONE_PG || 'tosspayments', // PG사 설정 (기본값: 토스페이먼츠)
-            pay_method: 'card',
-            merchant_uid: merchant_uid,
-            name: `토큰 충전: ${name}`,
-            amount: price,
-            buyer_email: buyerEmail || 'test@mposter.ai',
-            buyer_name: buyerName || '테스트유저',
-            buyer_tel: buyerTel || '010-1234-5678',
-        }
-
-        window.IMP.request_pay(data, async (rsp: any) => {
-            // 성공 여부가 없더라도 imp_uid가 있으면 서버에서 검증 시도 (일부 PG사 호환성)
-            if (rsp.success || rsp.imp_uid) {
-                // ... verify logic ...
-                try {
-                    const verifyRes = await axios.post('/api/payments/verify', {
-                        imp_uid: rsp.imp_uid,
-                        merchant_uid: rsp.merchant_uid,
-                        packageId: id
-                    })
-
-                    if (verifyRes.data.success) {
-                        alert('결제가 성공적으로 완료되었습니다! 토큰이 지급되었습니다.')
-                        router.refresh()
-                    } else {
-                        alert(`결제 검증 실패: ${verifyRes.data.message}`)
-                    }
-                } catch (error: any) {
-                    console.error('Verify Error:', error)
-                    alert(`결제 검증 중 오류 발생: ${error.response?.data?.message || 'Unknown Error'}`)
-                }
+        window.PayApp.payrequest({
+            userid: PAYAPP_ID,
+            shopname: 'M-Poster',
+            goodname: name,
+            price: price,
+            mul_no: merchant_uid,
+            buyerid: buyerEmail, // 구매자 식별자(이메일 사용)
+            buyername: buyerName,
+            buyertel: buyerTel,
+            // 웹훅 및 리다이렉트 설정
+            returnurl: `${origin}/dashboard/shop`,
+            feedbackurl: `${origin}/api/payments/feedback`,
+            var1: userId,    // 사용자 ID
+            var2: id,        // 패키지 ID
+            smsuse: 'n',     // 결제요청 SMS 발송 안함
+            reqaddr: '0',    // 주소 요청 안함
+            checkretry: 'y', // Feedback 재시도 설정
+        }, function (ret: any) {
+            // 콜백 함수 (결제창 닫힘 등)
+            // PayApp Lite는 보통 리턴 URL로 이동하거나, 여기서 성공/실패 확인 가능
+            if (ret.state === 'SA' || ret.state === 'OK') {
+                // 결제 성공 (또는 승인 대기)
+                // 실제 토큰 지급은 Feedback URL(webhook)을 통해 처리됩니다.
+                alert('결제가 완료되었습니다. 토큰이 지급될 때까지 잠시만 기다려주세요.')
+                router.refresh()
             } else {
-                const errorMsg = rsp.error_msg || rsp.msg || '결제가 취소되었습니다.'
-                alert(`결제 실패: ${errorMsg}`)
+                // 사용자가 취소했거나 오류 발생
+                if (ret.message) alert(ret.message)
             }
             setIsLoading(false)
         })

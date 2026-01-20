@@ -62,6 +62,7 @@ export default async function ShopPage() {
                             isPopular={pkg.tokenAmount === 10000} // Example logic: 10k is popular
                             buyerEmail={user.email}
                             buyerName={user.name ?? undefined}
+                            userId={user.id}
                         />
                     ))}
                 </div>

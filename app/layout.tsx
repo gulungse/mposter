@@ -33,7 +33,7 @@ export default function RootLayout({
       >
         {children}
         <SpeedInsights />
-        <Script src="https://cdn.iamport.kr/v1/iamport.js" strategy="lazyOnload" />
+        <Script src="https://lite.payapp.kr/public/api/v2/payapp-lite.js" strategy="lazyOnload" />
       </body>
     </html>
   );
