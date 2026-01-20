@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { runAutomationTask } from '@/app/actions/worker'
-
-export const dynamic = 'force-dynamic'
-
+import { processAutomationJob } from '@/lib/automation'
 import { calculateNextRun } from '@/lib/cron'
 
-// Removed local getNextRun function as we use the imported one
-// function getNextRun(cron: string, fromDate: Date = new Date()): Date { ... }
+export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
     try {
@@ -31,11 +27,11 @@ export async function GET(request: Request) {
         for (const job of jobs) {
             console.log(`[CRON] Executing Job: ${job.name} (${job.id})`)
 
-            // 1. Run Task
+            // 1. Run Task (Auth Free)
             let start = Date.now()
             let res: any = { success: false, error: 'Unknown' }
             try {
-                res = await runAutomationTask(job.id)
+                res = await processAutomationJob(job.id)
             } catch (e: any) {
                 res = { success: false, error: e.message }
             }
