@@ -13,8 +13,32 @@ import {
     uploadToWordPress,
     refreshBloggerToken
 } from '@/lib/automation'
+import { fetchRandomImage } from '@/lib/image_providers'
 import axios from 'axios'
 
+
+
+/**
+ * 마크다운 문법을 HTML로 강제 변환 (Failsafe)
+ */
+function convertMarkdownToHtml(text: string): string {
+    if (!text) return '';
+    
+    let html = text;
+    // 1. 헤더 변환 (### -> <h3>)
+    html = html.replace(/^###\s+(.*$)/gim, '<h3>$1</h3>');
+    html = html.replace(/^##\s+(.*$)/gim, '<h2>$1</h2>');
+    html = html.replace(/^#\s+(.*$)/gim, '<h1>$1</h1>');
+    
+    // 2. 볼드체 (**text** -> <strong>text</strong>)
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__((?:(?!__).)+)__/g, '<strong>$1</strong>');
+
+    // 3. 리스트 (- item -> <li>item</li>)
+    html = html.replace(/^\-\s+(.*$)/gim, '<li>$1</li>');
+    
+    return html;
+}
 
 /**
  * 특정 데이터를 가지고 실제 사이트에 테스트 발행을 수행합니다.
@@ -61,6 +85,7 @@ export async function testPublishAction(data: {
 
         let title = ''
         let content = ''
+        let aiResult: any = {};
         const systemPrompt = prompt.content
 
         try {
@@ -86,15 +111,22 @@ export async function testPublishAction(data: {
    - 반드시 HTML 태그(<p>, <h3>, <ul>, <li>, <strong>, <blockquote> 등)를 사용하여 가독성을 극대화할 것.
    - 문체: 친근하고 전문적인 '해요체' 사용.
    - 내용 중 '${targetKeyword}' 키워드를 자연스럽게 8회 이상 포함할 것.
-4. [출력 포맷]:
-   - 오직 JSON 형식으로만 답변할 것: {"title": "제목", "content": "HTML 본문"}` }
+   - [반드시 준수할 포맷 규칙]:
+   - **반드시** 순수한 JSON만 반환할 것.
+   - **마크다운(Markdown) 문법을 절대 본문에 포함하지 마시오.** (예: ###, **, - 등 금지)
+   - 모든 제목과 강조는 오직 HTML 태그(h2, h3, strong)로만 작성해야 함. 만약 마크다운이 발견되면 시스템 오류로 처리됨.
+   - 키워드와 연관된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 포함할 것.
+   - 예시: {"title": "...", "content": "...", "imageKeywords": ["tax", "office", "money", "paper", "calculator"]}` }
                     ],
                     max_tokens: 4096,
                     response_format: { type: "json_object" }
                 })
-                const aiResult = JSON.parse(completion.choices[0].message.content || '{}')
+                let rawContent = completion.choices[0].message.content || '{}';
+                rawContent = rawContent.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
+                
+                aiResult = JSON.parse(rawContent)
                 title = aiResult.title || aiResult.subject || aiResult.header || '테스트 제목'
-                content = aiResult.content || aiResult.body || aiResult.text || aiResult.article || '테스트 본문'
+                content = convertMarkdownToHtml(aiResult.content || aiResult.body || aiResult.text || aiResult.article || '테스트 본문')
 
                 if (content === '테스트 본문' && completion.choices[0].message.content) {
                     content = completion.choices[0].message.content;
@@ -102,9 +134,9 @@ export async function testPublishAction(data: {
             } else {
                 const apiKey = settings.geminiApiKey
                 if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
-                const aiResult = await generateGeminiContent(apiKey, systemPrompt, targetKeyword)
+                aiResult = await generateGeminiContent(apiKey, systemPrompt, targetKeyword)
                 title = aiResult.title || '테스트 제목'
-                content = aiResult.content || '테스트 본문'
+                content = convertMarkdownToHtml(aiResult.content || '테스트 본문')
             }
         } catch (err: any) {
             console.error('AI Generation Failed:', err)
@@ -120,22 +152,24 @@ export async function testPublishAction(data: {
         const headings = $('h2, h3');
 
         if (headings.length > 0 && imageSource !== 'NONE') {
-            for (let i = 1; i <= imageCount; i++) {
-                let targetHeading: cheerio.Cheerio<any> | null = null;
-                let position: 'before' | 'after' = 'after';
 
-                if (i === 1) {
-                    targetHeading = $(headings[0]);
-                    position = 'before';
-                } else {
-                    const idx = i;
-                    if (headings.length > idx) {
-                        targetHeading = $(headings[idx]);
-                    }
+            const insertionRules = [
+                { imgIdx: 1, headIdx: 0, pos: 'before' },
+                { imgIdx: 2, headIdx: 2, pos: 'after' },
+                { imgIdx: 3, headIdx: 3, pos: 'after' },
+                { imgIdx: 4, headIdx: 4, pos: 'after' },
+                { imgIdx: 5, headIdx: 5, pos: 'after' },
+            ];
+
+            for (let i = 1; i <= imageCount; i++) {
+                const rule = insertionRules.find(r => r.imgIdx === i);
+                if (!rule) continue;
+
+                if (headings.length <= rule.headIdx) {
+                    continue;
                 }
 
-                if (!targetHeading) continue;
-
+                const targetHeading = $(headings[rule.headIdx]);
                 let imageUrl = '';
                 let success = false;
 
@@ -163,9 +197,20 @@ export async function testPublishAction(data: {
                                 if (imageUrl) success = true;
                             }
                         } else if (imageSource === 'SCRAP') {
-                            const w = i === 1 ? 500 : 700;
-                            const h = i === 1 ? 500 : 350;
-                            imageUrl = `https://loremflickr.com/${w}/${h}/${encodeURIComponent(targetKeyword)}?lock=${Math.floor(Math.random() * 1000) + i}`
+                            // AI가 생성한 영문 키워드 사용 (없으면 기본 키워드의 첫 단어 사용)
+                            const searchKeyword = (aiResult.imageKeywords && aiResult.imageKeywords[i-1]) 
+                                ? aiResult.imageKeywords[i-1] 
+                                : (targetKeyword.split(' ')[0] || 'korea');
+
+                            // Multi-Source Image Fetch
+                            imageUrl = await fetchRandomImage(settings, searchKeyword, i);
+
+                            // Fallback to LoremFlickr
+                            if (!imageUrl) {
+                                const w = i === 1 ? 768 : 768;
+                                const h = i === 1 ? 512 : 512;
+                                imageUrl = `https://loremflickr.com/${w}/${h}/${encodeURIComponent(searchKeyword)}?lock=${Math.floor(Math.random() * 100000) + i}&random=${Date.now()}${i}`
+                            }
                             success = true;
                         } else if (imageSource === 'FLUX') {
                             const apiKey = settings.piApiKey
@@ -185,7 +230,7 @@ export async function testPublishAction(data: {
                         ? "width:100%; max-width:500px; height:auto; aspect-ratio:1/1; object-fit:cover; display:block; margin: 20px auto; border-radius:8px;"
                         : "width:100%; max-width:700px; height:auto; aspect-ratio:700/350; object-fit:cover; display:block; margin: 20px auto; border-radius:8px;";
                     const imgTag = `<img src="${imageUrl}" alt="${alt}" style="${style}" />`;
-                    if (position === 'before') targetHeading.before(imgTag);
+                    if (rule.pos === 'before') targetHeading.before(imgTag);
                     else targetHeading.after(imgTag);
                 }
             }

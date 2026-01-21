@@ -84,6 +84,68 @@ export async function validatePiApi(apiKey: string) {
     }
     return { success: true, message: '키 형식 검증 완료' }
 }
+
+/**
+ * Pixabay API 키 검증
+ */
+export async function validatePixabay(apiKey: string) {
+    try {
+        await axios.get(`https://pixabay.com/api/?key=${apiKey}&q=test&per_page=3`)
+        return { success: true, message: 'Pixabay API 연결 성공' }
+    } catch (error: any) {
+        return { success: false, message: '유효하지 않은 API 키입니다.' }
+    }
+}
+
+/**
+ * Pexels API 키 검증
+ */
+export async function validatePexels(apiKey: string) {
+    try {
+        await axios.get('https://api.pexels.com/v1/curated?per_page=1', {
+            headers: { Authorization: apiKey }
+        })
+        return { success: true, message: 'Pexels API 연결 성공' }
+    } catch (error: any) {
+        return { success: false, message: '유효하지 않은 API 키입니다.' }
+    }
+}
+
+/**
+ * Unsplash API 키 검증 (Access Key 사용)
+ */
+export async function validateUnsplash(accessKey: string) {
+    try {
+        // Unsplash는 'Authorization: Client-ID <Access Key>' 헤더 사용
+        await axios.get('https://api.unsplash.com/photos?per_page=1', {
+            headers: { Authorization: `Client-ID ${accessKey}` }
+        })
+        return { success: true, message: 'Unsplash API 연결 성공' }
+    } catch (error: any) {
+         if (error.response?.status === 403 || error.response?.status === 401) {
+            return { success: false, message: 'Access Key가 유효하지 않거나 한도 초과입니다.' }
+        }
+        return { success: false, message: error.message || '연결 실패' }
+    }
+}
+
+/**
+ * Freepik API 키 검증
+ */
+export async function validateFreepik(apiKey: string) {
+    try {
+        // Freepik Key 검증 (헤더: X-Freepik-API-Key)
+        await axios.get('https://api.freepik.com/v1/resources?locale=en-US&limit=1', {
+            headers: { 'X-Freepik-API-Key': apiKey }
+        })
+        return { success: true, message: 'Freepik API 연결 성공' }
+    } catch (error: any) {
+        if (error.response?.status === 401 || error.response?.status === 403) {
+            return { success: false, message: 'API 키가 유효하지 않습니다.' }
+        }
+        return { success: false, message: error.message || '연결 실패' }
+    }
+}
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'

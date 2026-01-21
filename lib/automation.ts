@@ -5,6 +5,7 @@ import OpenAI from 'openai'
 import axios from 'axios'
 import { revalidatePath } from 'next/cache'
 import * as cheerio from 'cheerio'
+import { fetchRandomImage } from '@/lib/image_providers'
 import sharp from 'sharp'
 
 /**
@@ -105,7 +106,8 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
                 parts: [{
                     text: `${systemPrompt}\n\n위 지침을 따라 '${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘. 
 본문은 반드시 5개 이상의 문단으로 구성하고, 독자에게 유용하고 상세한 정보를 제공하는 SEO 최적화된 글이어야 해. 분량은 가급적 1000자 이상으로 풍부하게 작성해줘.
-반드시 JSON 형식 {"title": "...", "content": "..."}으로만 답변하고, JSON 외의 텍스트는 절대 포함하지 마.`
+또한, 이 글과 관련된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 배열로 제공해줘. (LoremFlickr 검색용)
+반드시 JSON 형식 {"title": "...", "content": "...", "imageKeywords": ["keyword1", "keyword2", ...]}으로만 답변하고, JSON 외의 텍스트는 절대 포함하지 마.`
                 }]
             }]
         }, {
@@ -113,7 +115,7 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
                 'Content-Type': 'application/json',
                 'Referer': refererUrl
             },
-            timeout: 60000 // 생성 시간 고려하여 타임아웃 증대
+            timeout: 180000 // 생성 시간 고려하여 타임아웃 대폭 증대 (3분)
         })
 
         text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
@@ -131,14 +133,41 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
         throw new Error(`Gemini 콘텐츠 생성 실패 (${modelId}): ${lastError}`)
     }
 
-    // JSON 응답 정제
-    const cleanedText = text.replace(/```json|```/g, '').trim()
+    // JSON 응답 정제 (2중 안전장치)
+    const cleanedText = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
     try {
         return JSON.parse(cleanedText || '{}')
     } catch (e) {
         // 완전한 JSON이 아닐 경우 최소한의 구조 생성
         return { title: targetKeyword, content: text }
+        // 완전한 JSON이 아닐 경우 최소한의 구조 생성
+        return { title: targetKeyword, content: text }
     }
+}
+
+/**
+ * 마크다운 문법을 HTML로 강제 변환 (Failsafe)
+ */
+function convertMarkdownToHtml(text: string): string {
+    if (!text) return '';
+    
+    let html = text;
+    
+    // 1. 헤더 변환 (### -> <h3>)
+    html = html.replace(/^###\s+(.*$)/gim, '<h3>$1</h3>');
+    html = html.replace(/^##\s+(.*$)/gim, '<h2>$1</h2>');
+    html = html.replace(/^#\s+(.*$)/gim, '<h1>$1</h1>');
+    
+    // 2. 볼드체 (**text** -> <strong>text</strong>)
+    html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__((?:(?!__).)+)__/g, '<strong>$1</strong>');
+
+    // 3. 리스트 (- item -> <li>item</li>)
+    // <ul> 감싸는 건 복잡하므로 일단 <li>로만 변환하거나, 
+    // 간단히 줄바꿈을 <br>로 처리하는 등 최소한의 조치
+    html = html.replace(/^\-\s+(.*$)/gim, '<li>$1</li>');
+    
+    return html;
 }
 
 /**
@@ -287,6 +316,7 @@ export async function processAutomationJob(jobId: string) {
 
         let title = ''
         let content = ''
+        let aiResult: any = {}; // AI 결과 저장 (키워드 참조용)
         const aiModel = (job as any).aiModel || 'GPT4O'
         const systemPrompt = job.prompt?.content || 'SEO 블로거로서 글을 작성해줘.'
 
@@ -311,15 +341,24 @@ export async function processAutomationJob(jobId: string) {
    - 반드시 HTML 태그(<p>, <h3>, <ul>, <li>, <strong>, <blockquote> 등)를 사용하여 가독성을 극대화할 것.
    - 문체: 친근하고 전문적인 '해요체' 사용.
    - 내용 중 '${targetKeyword}' 키워드를 자연스럽게 8회 이상 포함할 것.
-4. [출력 포맷]:
-   - 오직 JSON 형식으로만 답변할 것: {"title": "제목", "content": "HTML 본문"}` }
+   - [반드시 준수할 포맷 규칙]:
+   - **반드시** 순수한 JSON만 반환할 것.
+   - **마크다운(Markdown) 문법을 절대 본문에 포함하지 마시오.** (예: ###, **, - 등 금지)
+   - 모든 제목과 강조는 오직 HTML 태그(h2, h3, strong)로만 작성해야 함. 만약 마크다운이 발견되면 시스템 오류로 처리됨.
+   - 키워드와 연관된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 포함할 것.
+   - 키워드와 연관된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 포함할 것.
+   - 예시: {"title": "...", "content": "...", "imageKeywords": ["tax", "office", "money", "paper", "calculator"]}` }
                 ],
                 max_tokens: 4096,
                 response_format: { type: "json_object" }
             })
-            const aiResult = JSON.parse(completion.choices[0].message.content || '{}')
+            let rawContent = completion.choices[0].message.content || '{}';
+            // 마크다운 코드 블록 제거
+            rawContent = rawContent.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
+
+            aiResult = JSON.parse(rawContent)
             title = aiResult.title || aiResult.subject || targetKeyword
-            content = aiResult.content || aiResult.body || aiResult.text || targetKeyword
+            content = convertMarkdownToHtml(aiResult.content || aiResult.body || aiResult.text || targetKeyword)
 
             if (content === targetKeyword && completion.choices[0].message.content) {
                 content = completion.choices[0].message.content;
@@ -327,9 +366,9 @@ export async function processAutomationJob(jobId: string) {
         } else {
             const apiKey = settings.geminiApiKey
             if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
-            const aiResult = await generateGeminiContent(apiKey, systemPrompt, targetKeyword)
+            aiResult = await generateGeminiContent(apiKey, systemPrompt, targetKeyword)
             title = aiResult.title || targetKeyword
-            content = aiResult.content || targetKeyword
+            content = convertMarkdownToHtml(aiResult.content || targetKeyword)
         }
 
         // --- 이미지 생성 및 삽입 로직 ---
@@ -342,25 +381,36 @@ export async function processAutomationJob(jobId: string) {
         const headings = $('h2, h3');
 
         // 헤딩태그가 없으면 이미지 생성 안 함 (요구사항)
+        // 헤딩태그가 없으면 이미지 생성 안 함 (요구사항)
         if (headings.length > 0 && imageSource !== 'NONE') {
 
-            for (let i = 1; i <= imageCount; i++) {
-                // 위치 결정
-                let targetHeading: cheerio.Cheerio<any> | null = null;
-                let position: 'before' | 'after' = 'after';
+            // 삽입 규칙 정의 (Index는 0부터 시작)
+            // 1번(i=1): 1번째(h=0) 비포
+            // 2번(i=2): 3번째(h=2) 애프터
+            // 3번(i=3): 4번째(h=3) 애프터
+            // 4번(i=4): 5번째(h=4) 애프터
+            // 5번(i=5): 6번째(h=5) 애프터
+            const insertionRules = [
+                { imgIdx: 1, headIdx: 0, pos: 'before' },
+                { imgIdx: 2, headIdx: 2, pos: 'after' },
+                { imgIdx: 3, headIdx: 3, pos: 'after' },
+                { imgIdx: 4, headIdx: 4, pos: 'after' },
+                { imgIdx: 5, headIdx: 5, pos: 'after' },
+            ];
 
-                if (i === 1) {
-                    targetHeading = $(headings[0]);
-                    position = 'before';
-                } else {
-                    const idx = i; // i=2 -> idx=2 (3rd heading)
-                    if (headings.length > idx) {
-                        targetHeading = $(headings[idx]);
-                    }
+            for (let i = 1; i <= imageCount; i++) {
+                // 현재 이미지 순번에 맞는 규칙 찾기
+                const rule = insertionRules.find(r => r.imgIdx === i);
+                if (!rule) continue; // 규칙 범위 밖(예: 6개 이상)이면 패스 (현재 UI는 5개 제한이므로 발생 안함)
+
+                // 헤딩 태그 존재 여부 확인
+                if (headings.length <= rule.headIdx) {
+                    console.warn(`Image ${i} skipped: Heading index ${rule.headIdx} not found (Total headings: ${headings.length})`);
+                    continue; // 해당 위치에 헤딩이 없으면 건너뜀
                 }
 
-                if (!targetHeading) continue;
-
+                const targetHeading = $(headings[rule.headIdx]);
+                
                 // 이미지 생성 진행
                 let imageUrl = '';
                 let success = false;
@@ -378,8 +428,28 @@ export async function processAutomationJob(jobId: string) {
                         console.warn('WP/Thumbnail Error:', e);
                     }
                 }
+                // 1번 이미지 (썸네일) 특별 처리 완료
 
-                // 1번인데 WP가 아니거나 실패, 또는 2번 이상인 경우
+                // 2. SCRAP (멀티 프로바이더)
+                if (!imageUrl && imageSource === 'SCRAP') {
+                    // AI 키워드 또는 기본 키워드 사용
+                    const searchKeyword = (aiResult.imageKeywords && aiResult.imageKeywords[i-1]) 
+                        ? aiResult.imageKeywords[i-1] 
+                        : (targetKeyword.split(' ')[0] || 'korea');
+
+                    // 멀티 프로바이더 검색 시도
+                    imageUrl = await fetchRandomImage(settings, searchKeyword, i);
+
+                    // 만약 실패하거나 키 설정이 없으면 기존 LoremFlickr Fallback
+                    if (!imageUrl) {
+                        const w = i === 1 ? 768 : 768;
+                        const h = i === 1 ? 512 : 512;
+                        imageUrl = `https://loremflickr.com/${w}/${h}/${encodeURIComponent(searchKeyword)}?lock=${Math.floor(Math.random() * 100000) + i}&random=${Date.now()}${i}`
+                    }
+                    success = true;
+                }
+
+                // 3. 1번인데 WP가 아니거나 실패, 또는 2번 이상인 경우 (DALLE/FLUX)
                 if (!imageUrl) {
                     try {
                         if (imageSource === 'DALLE') {
@@ -388,11 +458,6 @@ export async function processAutomationJob(jobId: string) {
                             const image = await openai.images.generate({ model: "dall-e-3", prompt: imgPrompt, size: "1024x1024" })
                             imageUrl = image.data?.[0]?.url || ''
                             if (imageUrl) success = true;
-                        } else if (imageSource === 'SCRAP') {
-                            const w = i === 1 ? 500 : 700;
-                            const h = i === 1 ? 500 : 350;
-                            imageUrl = `https://loremflickr.com/${w}/${h}/${encodeURIComponent(targetKeyword)}?lock=${Math.floor(Math.random() * 1000) + i}`
-                            success = true;
                         } else if (imageSource === 'FLUX') {
                             const apiKey = settings.piApiKey
                             if (apiKey) {
@@ -416,7 +481,7 @@ export async function processAutomationJob(jobId: string) {
 
                     const imgTag = `<img src="${imageUrl}" alt="${alt}" style="${style}" />`;
 
-                    if (position === 'before') targetHeading.before(imgTag);
+                    if (rule.pos === 'before') targetHeading.before(imgTag);
                     else targetHeading.after(imgTag);
                 }
             }
