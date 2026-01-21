@@ -269,7 +269,7 @@ export async function testPublishAction(data: {
             } else if (status === 404) {
                 throw new Error('[사이트 주소 오류] REST API 경로를 찾을 수 없습니다. URL 주소를 확인해주세요.')
             }
-            throw new Error(`[발행 실패] ${err.message}`)
+            throw new Error(`[발행 실패] ${err.message} ${err.response?.status ? `(Status: ${err.response.status})` : ''} ${err.response?.data?.message ? `(${err.response.data.message})` : ''}`)
         }
 
         // 성공 시 토큰 차감 (-1)

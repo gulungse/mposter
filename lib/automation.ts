@@ -57,7 +57,7 @@ export async function getAvailableGeminiModels(apiKey: string) {
         // v1beta 엔드포인트에서 모델 목록 조회
         const response = await axios.get(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, {
             headers: { 'Referer': refererUrl },
-            timeout: 10000
+            timeout: 30000
         });
 
         return response.data?.models || [];
@@ -245,7 +245,8 @@ export async function uploadToWordPress(site: any, imageBuffer: Buffer, filename
             auth: {
                 username: site.username,
                 password: site.apiToken
-            }
+            },
+            timeout: 60000
         });
         return { id: response.data.id, url: response.data.source_url };
     } catch (error: any) {
