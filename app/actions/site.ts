@@ -36,7 +36,7 @@ async function validateWordPressConnection(url: string, username: string | undef
         console.error('WP Connection Test Failed:', err.message)
         return {
             success: false,
-            message: `워드프레스 연결 실패: ${err.response?.status === 401 ? '인증 정보가 올바르지 않습니다.' : '사이트에 접속할 수 없거나 REST API가 비활성화되어 있습니다.'}`
+            message: `워드프레스 연결 실패: ${err.message} ${err.response?.status ? `(Status: ${err.response.status})` : ''} ${err.response?.data?.message ? `(${err.response.data.message})` : ''}`
         }
     }
 }
