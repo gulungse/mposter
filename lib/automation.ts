@@ -239,7 +239,8 @@ export async function uploadToWordPress(site: any, imageBuffer: Buffer, filename
         const response = await axios.post(`${site.url}/wp-json/wp/v2/media`, imageBuffer, {
             headers: {
                 'Content-Type': 'image/png',
-                'Content-Disposition': `attachment; filename=${encodeURIComponent(filename)}.png`
+                'Content-Disposition': `attachment; filename=${encodeURIComponent(filename)}.png`,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             },
             auth: {
                 username: site.username,
@@ -434,7 +435,10 @@ export async function processAutomationJob(jobId: string) {
 
             const res = await axios.post(`${job.site.url}/wp-json/wp/v2/posts`, payload, {
                 auth: { username: job.site.username || '', password: job.site.apiToken || '' },
-                timeout: 60000
+                timeout: 60000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
             })
             postUrl = res.data.link
 
@@ -442,7 +446,10 @@ export async function processAutomationJob(jobId: string) {
             if (targetStatus === 'publish') {
                 const pubRes = await axios.post(`${job.site.url}/wp-json/wp/v2/posts/${res.data.id}`, { status: 'publish' }, {
                     auth: { username: job.site.username || '', password: job.site.apiToken || '' },
-                    timeout: 60000
+                    timeout: 60000,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }
                 })
                 postUrl = pubRes.data.link
             }

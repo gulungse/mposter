@@ -207,14 +207,20 @@ export async function testPublishAction(data: {
 
                 const wpRes = await axios.post(`${site.url}/wp-json/wp/v2/posts`, payload, {
                     auth: { username: site.username || '', password: site.apiToken || '' },
-                    timeout: 60000
+                    timeout: 60000,
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }
                 })
 
                 // 2단계: 즉시 발행인 경우 상태 업데이트
                 if (targetStatus === 'publish') {
                     await axios.post(`${site.url}/wp-json/wp/v2/posts/${wpRes.data.id}`, { status: 'publish' }, {
                         auth: { username: site.username || '', password: site.apiToken || '' },
-                        timeout: 60000
+                        timeout: 60000,
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                        }
                     })
                 }
             } else if (site.type === 'BLOGSPOT') {
