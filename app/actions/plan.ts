@@ -215,10 +215,10 @@ export async function checkLimit(type: 'site' | 'keywordGroup' | 'prompt' | 'aut
         }
 
         if (currentCount >= limit) {
-                         console.log(`[Limit Check] Failed: ${type} (Count: ${currentCount} / Limit: ${limit})`)
-            return {
+             console.log(`[Limit Check] Failed: ${type} (Count: ${currentCount} / Limit: ${limit})`)
+             return {
                 success: false,
-                error: `"${type === 'site' ? '사이트' : type === 'keywordGroup' ? '키워드 그룹' : type === 'prompt' ? '프롬프트' : '자동화 작업'}" 생성 한도(${limit}개)를 초과했습니다. 상점에서 슬롯을 확장해 보세요!`
+                error: `[Debug: ${user.email} / ${user.role}] "${type}" 생성 한도(${limit}개)를 초과했습니다.`
             }
         }
         

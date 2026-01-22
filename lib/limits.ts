@@ -26,6 +26,11 @@ export async function getUserLimits(userId: string): Promise<UserLimits> {
         return BASE_LIMITS
     }
 
+    // [Admin Override] 특정 관리자 계정 무제한 (UI 표시용)
+    if (user.email && user.email.toLowerCase().trim() === 'gulungse@gmail.com') {
+        return { sites: 9999, keywords: 9999, prompts: 9999, tasks: 9999 }
+    }
+
     let currentLimits: UserLimits = {
         sites: BASE_LIMITS.sites,
         keywords: BASE_LIMITS.keywords,
