@@ -109,6 +109,7 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
                 parts: [{
                     text: `${systemPrompt}\n\n위 지침을 따라 '${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘. 
 본문은 반드시 5개 이상의 문단으로 구성하고, 독자에게 유용하고 상세한 정보를 제공하는 SEO 최적화된 글이어야 해. 분량은 가급적 1000자 이상으로 풍부하게 작성해줘.
+절대로 <h1> 태그를 사용하지 마. 제목은 이미 글 상단에 있으므로 본문에는 <h2>, <h3>, <h4> 태그만 사용해야 해.
 또한, 이 글과 관련된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 배열로 제공해줘. (LoremFlickr 검색용)
 반드시 JSON 형식 {"title": "...", "content": "...", "imageKeywords": ["keyword1", "keyword2", ...]}으로만 답변하고, JSON 외의 텍스트는 절대 포함하지 마.`
                 }]
@@ -372,6 +373,7 @@ export async function processAutomationJob(jobId: string) {
    - FAQ: 자주 묻는 질문 3~4개와 그에 대한 명확한 답변.
 3. [형식 및 스타일]:
    - 반드시 HTML 태그(<p>, <h3>, <ul>, <li>, <strong>, <blockquote> 등)를 사용하여 가독성을 극대화할 것.
+   - **절영코 <h1> 태그를 본문에 쓰지 말 것.** (제목과 중복됨). <h2>부터 시작할 것.
    - 문체: 친근하고 전문적인 '해요체' 사용.
    - 내용 중 '${targetKeyword}' 키워드를 자연스럽게 8회 이상 포함할 것.
    - [반드시 준수할 포맷 규칙]:
