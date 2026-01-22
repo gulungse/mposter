@@ -230,7 +230,7 @@ export async function generateThumbnail(text: string): Promise<Buffer> {
     const borderColor = `hsl(${hue}, 80%, 30%)`;
 
     // Font loading
-    const fontPath = join(process.cwd(), 'public', 'fonts', 'NotoSansKR-Bold.ttf');
+    const fontPath = join(process.cwd(), 'public', 'fonts', 'NanumGothic-Bold.ttf');
     const fontData = readFileSync(fontPath);
 
     const element = createElement('div', {
@@ -282,7 +282,7 @@ export async function generateThumbnail(text: string): Promise<Buffer> {
         height,
         fonts: [
             {
-                name: 'Noto Sans KR',
+                name: 'NanumGothic',
                 data: fontData,
                 weight: 700,
                 style: 'normal',
