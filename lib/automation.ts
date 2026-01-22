@@ -1,4 +1,3 @@
-
 import { prisma } from '@/lib/prisma'
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import OpenAI from 'openai'
@@ -7,6 +6,10 @@ import { revalidatePath } from 'next/cache'
 import * as cheerio from 'cheerio'
 import { fetchRandomImage } from '@/lib/image_providers'
 import sharp from 'sharp'
+import satori from 'satori'
+import { createElement } from 'react'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 
 /**
  * 블로거(Blogger)의 만료된 Access Token을 Refresh Token으로 갱신합니다.
@@ -226,36 +229,66 @@ export async function generateThumbnail(text: string): Promise<Buffer> {
     const bgColor = `hsl(${hue}, 70%, 85%)`;
     const borderColor = `hsl(${hue}, 80%, 30%)`;
 
-    // 텍스트 줄바꿈 처리 (간단한 로직)
-    // 10자 넘어가면 줄바꿈 시도
-    const words = text.split(' ');
-    let lines = [];
-    let currentLine = words[0] || '';
+    // Font loading
+    const fontPath = join(process.cwd(), 'public', 'fonts', 'NotoSansKR-Bold.ttf');
+    const fontData = readFileSync(fontPath);
 
-    for (let i = 1; i < words.length; i++) {
-        const word = words[i];
-        if ((currentLine + word).length < 8) {
-            currentLine += ' ' + word;
-        } else {
-            lines.push(currentLine);
-            currentLine = word;
+    const element = createElement('div', {
+        style: {
+            display: 'flex',
+            width: '100%',
+            height: '100%',
+            backgroundColor: bgColor,
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
         }
-    }
-    lines.push(currentLine);
-    if (lines.length > 3) lines = lines.slice(0, 3); // 최대 3줄로 제한
+    }, [
+        // Border Container
+        createElement('div', {
+            style: {
+                position: 'absolute',
+                top: 15,
+                left: 15,
+                right: 15,
+                bottom: 15,
+                border: `15px solid ${borderColor}`,
+                borderRadius: 20,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+            }
+        }, [
+            // Text
+            createElement('div', {
+                style: {
+                    color: borderColor,
+                    fontSize: 45,
+                    fontWeight: 900,
+                    textAlign: 'center',
+                    wordBreak: 'keep-all',
+                    lineHeight: 1.3,
+                    padding: '20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                }
+            }, text)
+        ])
+    ]);
 
-    const svgTextLines = lines.map((line, i) => {
-        const yPos = 50 - ((lines.length - 1) * 6) + (i * 12); // 중앙 정렬 보정
-        return `<text x="50%" y="${yPos}%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="45" font-weight="900" fill="${borderColor}">${line}</text>`
-    }).join('');
-
-    const svg = `
-    <svg width="${width}" height="${height}" version="1.1" xmlns="http://www.w3.org/2000/svg">
-        <rect x="0" y="0" width="${width}" height="${height}" fill="${bgColor}" />
-        <rect x="15" y="15" width="${width - 30}" height="${height - 30}" fill="none" stroke="${borderColor}" stroke-width="15" rx="20" />
-        ${svgTextLines}
-    </svg>
-    `;
+    const svg = await satori(element, {
+        width,
+        height,
+        fonts: [
+            {
+                name: 'Noto Sans KR',
+                data: fontData,
+                weight: 700,
+                style: 'normal',
+            },
+        ],
+    });
 
     return sharp(Buffer.from(svg)).png().toBuffer();
 }
