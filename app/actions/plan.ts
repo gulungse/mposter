@@ -185,7 +185,7 @@ export async function getUserWithPlan() {
 export async function checkLimit(type: 'site' | 'keywordGroup' | 'prompt' | 'automationJob') {
     try {
         const user = await getOrCreateUser()
-        if (user.role === 'ADMIN') return { success: true } // 어드민은 무제한
+        if (user.role === 'ADMIN' || user.email === 'gulungse@gmail.com') return { success: true } // 어드민 및 특정 사용자 무제한
 
         const limits = await getUserLimits(user.id)
 
