@@ -75,14 +75,25 @@ function TaskForm() {
                 const taskRes = await getAutomationTask(editTaskId)
                 if (taskRes.success && taskRes.data) {
                     const t = taskRes.data
+
+                    // Handle Manual Keywords
+                    let mode: 'GROUP' | 'MANUAL' = 'GROUP'
+                    let kws = ''
+                    if (t.keywords && t.keywords.length > 0) {
+                        mode = 'MANUAL'
+                        kws = t.keywords.join('\n')
+                        setKeywordMode('MANUAL')
+                        setManualKeywords(kws)
+                    }
+
                     setFormData({
                         name: t.name,
                         siteId: t.siteId || '',
                         keywordGroupId: t.keywordGroupId || '',
                         promptId: t.promptId || '',
-                        scheduleCron: t.scheduleCron || 'MANUAL',
+                        scheduleCron: t.scheduleCron || '0 * * * *',
                         aiModel: (t as any).aiModel || 'GPT4O',
-                        imageSource: (t as any).imageSource || 'DALLE', // Default to DALLE or whatever
+                        imageSource: (t as any).imageSource || 'DALLE',
                         imageCount: (t as any).imageCount || 1,
                         wpCategoryId: (t as any).wpCategoryId,
                         postStatus: (t as any).postStatus || 'publish'
@@ -352,8 +363,8 @@ function TaskForm() {
                                 <ZapIcon className="h-4 w-4" />
                             </div>
                             <div>
-                                <h4 className="font-bold text-sm text-foreground">Gemini 1.5 Pro</h4>
-                                <p className="text-xs text-muted-foreground mt-0.5">사실적이고 데이터 중심의 분석글에 적합합니다.</p>
+                                <h4 className="font-bold text-sm text-foreground">Gemini 1.5 Flash</h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">빠르고 효율적이며 무료 티어 한도가 넉넉합니다.</p>
                             </div>
                             {formData.aiModel === 'GEMINI' && <CheckCircle2Icon className="ml-auto h-4 w-4 text-primary" />}
                         </div>
@@ -402,7 +413,7 @@ function TaskForm() {
                                 <option value="0 */12 * * *">🌗 12시간마다</option>
                                 <option value="0 0 * * *">🌙 24시간마다 (매일)</option>
                                 <option value="0 0 */2 * *">📅 48시간마다 (이틀에 한번)</option>
-                                <option value="MANUAL">🕹️ 수동 실행</option>
+                                <option value="0 0 */2 * *">📅 48시간마다 (이틀에 한번)</option>
                             </select>
                         </div>
                         <div className="space-y-1.5">

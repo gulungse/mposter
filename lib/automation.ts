@@ -80,15 +80,17 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
     console.log('Available Gemini Models:', availableNames);
 
     // 2. 우선순위에 따라 최적의 모델 선택
-    // 사용자 추천: gemini-1.5-pro > gemini-1.5-flash
-    let selectedModelName = availableNames.find((name: string) => name.includes('gemini-1.5-pro'))
+    // 사용자 요청: 무조건 Gemini Flash 계열만 사용 (비용 절감)
+    // 우선순위: 2.5 Flash > 2.0 Flash > 1.5 Flash > 기타 Flash
+    let selectedModelName = availableNames.find((name: string) => name.includes('gemini-2.5-flash'))
+        || availableNames.find((name: string) => name.includes('gemini-2.0-flash'))
         || availableNames.find((name: string) => name.includes('gemini-1.5-flash'))
-        || availableNames.find((name: string) => name.includes('gemini-pro') && !name.includes('vision'));
+        || availableNames.find((name: string) => name.includes('flash'));
 
-    // 목록 조회가 실패했거나 매칭되는 게 없으면 강제로 최신 지정
-    let modelId = selectedModelName ? selectedModelName.replace('models/', '') : 'gemini-1.5-pro';
+    // 목록이 없거나 찾지 못해도 최신 Flash 모델로 안전장치
+    let modelId = selectedModelName ? selectedModelName.replace('models/', '') : 'gemini-1.5-flash';
 
-    // 1.5 계열은 v1beta, 그 외는 상황 봐서 처리하지만 여기선 감지된 모델 위주
+    // 1.5/2.0 등 최신 모델은 v1beta 지원
     const version = 'v1beta';
 
     console.log(`Selected Target Model: ${modelId} (${version})`);
@@ -154,14 +156,14 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
  */
 function convertMarkdownToHtml(text: string): string {
     if (!text) return '';
-    
+
     let html = text;
-    
+
     // 1. 헤더 변환 (### -> <h3>)
     html = html.replace(/^###\s+(.*$)/gim, '<h3>$1</h3>');
     html = html.replace(/^##\s+(.*$)/gim, '<h2>$1</h2>');
     html = html.replace(/^#\s+(.*$)/gim, '<h1>$1</h1>');
-    
+
     // 2. 볼드체 (**text** -> <strong>text</strong>)
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/__((?:(?!__).)+)__/g, '<strong>$1</strong>');
@@ -170,7 +172,7 @@ function convertMarkdownToHtml(text: string): string {
     // <ul> 감싸는 건 복잡하므로 일단 <li>로만 변환하거나, 
     // 간단히 줄바꿈을 <br>로 처리하는 등 최소한의 조치
     html = html.replace(/^\-\s+(.*$)/gim, '<li>$1</li>');
-    
+
     return html;
 }
 
@@ -445,7 +447,7 @@ export async function processAutomationJob(jobId: string) {
                 }
 
                 const targetHeading = $(headings[rule.headIdx]);
-                
+
                 // 이미지 생성 진행
                 let imageUrl = '';
                 let success = false;
@@ -468,8 +470,8 @@ export async function processAutomationJob(jobId: string) {
                 // 2. SCRAP (멀티 프로바이더)
                 if (!imageUrl && imageSource === 'SCRAP') {
                     // AI 키워드 또는 기본 키워드 사용
-                    const searchKeyword = (aiResult.imageKeywords && aiResult.imageKeywords[i-1]) 
-                        ? aiResult.imageKeywords[i-1] 
+                    const searchKeyword = (aiResult.imageKeywords && aiResult.imageKeywords[i - 1])
+                        ? aiResult.imageKeywords[i - 1]
                         : (targetKeyword.split(' ')[0] || 'korea');
 
                     // 멀티 프로바이더 검색 시도
