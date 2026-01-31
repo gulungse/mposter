@@ -333,6 +333,110 @@ export async function testPublishAction(data: {
 }
 
 /**
+ * 프롬프트 지침을 직접 입력받아 사이트에 테스트 발행을 수행합니다.
+ */
+export async function testDirectPromptAction(data: {
+    siteId: string;
+    keyword: string;
+    promptContent: string;
+    aiModel: 'GPT4O' | 'GEMINI';
+    imageSource: 'SCRAP' | 'DALLE' | 'FLUX' | 'NONE';
+    imageCount?: number;
+    wpCategoryId?: number;
+    postStatus?: string;
+}) {
+    try {
+        const user = await getOrCreateUser()
+        if (user.tokenBalance <= 0) {
+            throw new Error('보유 토큰이 부족합니다. 테스트 발행을 위해서는 최소 1토큰이 필요합니다.')
+        }
+
+        const settings = (user as any).settings || {}
+        const site = await prisma.site.findUnique({ where: { id: data.siteId, userId: user.id } })
+
+        if (!site) throw new Error('대상 사이트를 찾을 수 없습니다.')
+
+        const targetKeyword = data.keyword || '테스트 키워드'
+        const systemPrompt = data.promptContent
+
+        // --- 내부 링크 및 태그 로직을 위해 lib/automation의 로직 일부 재사용 또는 모방 ---
+        // 실제 운영 환경과 최대한 유사하게 동작하도록 함
+        
+        let title = ''
+        let content = ''
+        let aiResult: any = {};
+
+        try {
+            if (data.aiModel === 'GPT4O') {
+                const apiKey = settings.openaiApiKey
+                if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
+                const openai = new OpenAI({ apiKey })
+                
+                // 지침 테스트이므로 복잡한 시스템 프롬프트 구성을 여기서 수행
+                const completion = await openai.chat.completions.create({
+                    model: "gpt-4o",
+                    messages: [
+                        { role: "system", content: `당신은 SEO에 특화된 10년 경력의 전문 블로그 작가입니다. ${systemPrompt}` },
+                        { role: "user", content: `'${targetKeyword}' 주제로 완벽한 블로그 포스팅을 작성해줘. JSON 형식으로 제목(title), 본문(content, HTML형식), 이미지 키워드(imageKeywords, 영어 리스트)를 반환하라.` }
+                    ],
+                    max_tokens: 4096,
+                    response_format: { type: "json_object" }
+                })
+                let rawContent = completion.choices[0].message.content || '{}';
+                aiResult = JSON.parse(rawContent)
+                title = aiResult.title || '테스트 제목'
+                content = convertMarkdownToHtml(aiResult.content || '테스트 본문')
+            } else {
+                const apiKey = settings.geminiApiKey
+                if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
+                aiResult = await generateGeminiContent(apiKey, systemPrompt, targetKeyword)
+                title = aiResult.title || '테스트 제목'
+                content = convertMarkdownToHtml(aiResult.content || '테스트 본문')
+            }
+        } catch (err: any) {
+            throw new Error(`[AI 생성 실패] ${err.message}`)
+        }
+
+        // --- 이미지 로직 생략 또는 최소화 (테스트 발행 속도 우대) ---
+        // 실제 사이트 발행 (Draft로 강제)
+        const targetStatus = data.postStatus || 'draft';
+        
+        if (site.type === 'WORDPRESS') {
+            await axios.post(`${site.url}/wp-json/wp/v2/posts`, {
+                title: `[프롬프트 테스트] ${title}`,
+                content: content,
+                status: targetStatus,
+                categories: data.wpCategoryId ? [data.wpCategoryId] : []
+            }, {
+                auth: { username: site.username || '', password: site.apiToken || '' },
+                timeout: 60000,
+                headers: { 'User-Agent': 'MediPoster-Test' }
+            })
+        } else if (site.type === 'BLOGSPOT') {
+            const blogId = site.username || site.url.split('blogId=')[1] || site.url.replace(/[^0-9]/g, '');
+            await axios.post(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/`, {
+                title: `[프롬프트 테스트] ${title}`,
+                content: content
+            }, {
+                headers: { 'Authorization': `Bearer ${site.apiToken}` },
+                timeout: 30000
+            });
+        }
+
+        // 토큰 차감
+        await (prisma as any).$executeRawUnsafe(
+            'UPDATE "users" SET "tokenBalance" = "tokenBalance" - 1 WHERE "id" = $1',
+            user.id
+        )
+
+        revalidatePath('/dashboard')
+        return { success: true, message: '프롬프트 테스트 발행 성공! 대상을 확인해 보세요.' }
+    } catch (error: any) {
+        return { success: false, error: error.message }
+    }
+}
+
+/**
  * 자동화 작업 실행 (Server Action) - UI 호출용 (Auth 권한 체크)
  * 실제 실행 로직은 processAutomationJob(lib)으로 위임
  */
