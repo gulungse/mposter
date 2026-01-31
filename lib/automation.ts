@@ -75,8 +75,28 @@ export async function getAvailableGeminiModels(apiKey: string) {
  * 텍스트에서 해시태그(#태그)를 추출합니다.
  */
 function extractHashtags(text: string): string[] {
+    if (!text) return [];
+    // #태그1 #태그2 형태 매칭 (공백이나 줄바꿈으로 구분된 경우)
     const matches = text.match(/#([a-zA-Z0-9가-힣]+)/g);
     return matches ? matches.map(m => m.slice(1)) : [];
+}
+
+/**
+ * 워드프레스 사이트에서 랜덤한 태그 2개를 가져옵니다.
+ */
+async function fetchRandomWordPressTags(site: any): Promise<{id: number, name: string}[]> {
+    try {
+        const response = await axios.get(`${site.url}/wp-json/wp/v2/tags?per_page=50&orderby=count&order=desc`, {
+            auth: { username: site.username, password: site.apiToken },
+            timeout: 10000
+        });
+        const tags = response.data.map((t: any) => ({ id: t.id, name: t.name }));
+        if (tags.length === 0) return [];
+        return tags.sort(() => 0.5 - Math.random()).slice(0, 2);
+    } catch (e) {
+        console.warn('[WP Tag] Failed to fetch random tags:', e);
+        return [];
+    }
 }
 
 /**
@@ -86,12 +106,12 @@ async function syncWordPressTags(site: any, tags: string[]): Promise<number[]> {
     const tagIds: number[] = [];
     for (const tagName of tags) {
         try {
-            // 1. 기존 태그 검색
+            // 1. 기존 태그 검색 (완전 일치 검색을 위해 slug 사용 시도)
             const searchRes = await axios.get(`${site.url}/wp-json/wp/v2/tags?search=${encodeURIComponent(tagName)}`, {
                 auth: { username: site.username, password: site.apiToken },
                 timeout: 10000
             });
-            const existingTag = searchRes.data.find((t: any) => t.name === tagName);
+            const existingTag = searchRes.data.find((t: any) => t.name.toLowerCase() === tagName.toLowerCase());
             
             if (existingTag) {
                 tagIds.push(existingTag.id);
@@ -128,6 +148,51 @@ async function fetchPostsByTags(site: any, tagIds: number[]) {
         return response.data.map((p: any) => ({ title: p.title.rendered, url: p.link }));
     } catch (e) {
         console.warn('[Internal Link] Failed to fetch posts by tags:', e);
+        return [];
+    }
+}
+
+/**
+ * 블로거 사이트에서 최근 사용된 라벨(태그)들을 가져옵니다.
+ */
+async function fetchRandomBloggerLabels(site: any): Promise<string[]> {
+    try {
+        const blogId = site.username || site.url.split('blogId=')[1] || site.url.replace(/[^0-9]/g, '');
+        const url = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts?maxResults=20&fields=items(labels)`;
+        const response = await axios.get(url, {
+            headers: { 'Authorization': `Bearer ${site.apiToken}` },
+            timeout: 10000
+        });
+        const allLabels = new Set<string>();
+        (response.data.items || []).forEach((post: any) => {
+            (post.labels || []).forEach((label: string) => allLabels.add(label));
+        });
+        const labelList = Array.from(allLabels);
+        if (labelList.length === 0) return [];
+        return labelList.sort(() => 0.5 - Math.random()).slice(0, 2);
+    } catch (e) {
+        console.warn('[Blogger Tag] Failed to fetch random labels:', e);
+        return [];
+    }
+}
+
+/**
+ * 특정 라벨을 포함하는 최근 글 목록을 가져옵니다. (블로거용)
+ */
+async function fetchBloggerPostsByLabels(site: any, labels: string[]) {
+    if (labels.length === 0) return [];
+    try {
+        const blogId = site.username || site.url.split('blogId=')[1] || site.url.replace(/[^0-9]/g, '');
+        // 블로거 API는 여러 라벨 검색 시 q 파라미터나 필터링이 복잡하므로 첫 번째 라벨로 검색
+        const label = labels[0];
+        const url = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts?labels=${encodeURIComponent(label)}&maxResults=5`;
+        const response = await axios.get(url, {
+            headers: { 'Authorization': `Bearer ${site.apiToken}` },
+            timeout: 10000
+        });
+        return (response.data.items || []).map((p: any) => ({ title: p.title, url: p.url }));
+    } catch (e) {
+        console.warn('[Internal Link] Failed to fetch Blogger posts by labels:', e);
         return [];
     }
 }
@@ -186,7 +251,11 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
     // 내부 링크 정보 구성
     let internalLinkContext = '';
     if (existingPosts.length > 0) {
-        internalLinkContext = `\n\n[내부 링크 참고 정보]: 현재 사이트의 같은 카테고리에 아래와 같은 관련 글들이 이미 존재합니다. 글 내용 중 자연스러운 맥락에서 아래 글들 중 1~2개에 대해 <a href="URL">제목</a> 형태의 HTML 내부 링크를 포함해서 작성해주세요:\n${existingPosts.map(p => `- ${p.title} (${p.url})`).join('\n')}`;
+        internalLinkContext = `\n\n[내부 링크 필수 지시사항]: 
+당신은 현재 작성 중인 글과 관련성이 높은 기존 포스팅 목록을 가지고 있습니다. 
+SEO 점수를 높이기 위해 본문 내용 중 가장 자연스러운 맥락에서 아래 링크들 중 최소 1~2개를 반드시 <a href="URL">제목</a> 형태의 HTML 태그로 포함시켜주세요. 
+단순히 하단에 목록을 나열하지 말고, 본문의 문장 속에서 자연스럽게 언급해야 합니다:
+${existingPosts.map(p => `- ${p.title} (${p.url})`).join('\n')}`;
     }
 
     let text = ''
@@ -450,34 +519,65 @@ export async function processAutomationJob(jobId: string) {
         const aiModel = (job as any).aiModel || 'GPT4O'
         const systemPrompt = job.prompt?.content || 'SEO 블로거로서 글을 작성해줘.'
 
-        // --- 해시태그 및 내부 링크용 기존 글 가져오기 ---
-        const hashtags = extractHashtags(systemPrompt);
-        let wpTagIds: number[] = [];
+        // --- [1단계] 해시태그 추출 (새 글의 태그/라벨용) ---
+        const hashtags = Array.from(new Set([
+            ...extractHashtags(systemPrompt),
+            ...extractHashtags(targetKeyword)
+        ]));
+        console.log(`[Tag Config] Extracted Hashtags for new post: ${hashtags.join(', ') || 'none'}`);
+
+        // --- [2단계] 내부 링크용 기존 글 발견 (사이트 내 랜덤 태그 검색) ---
+        let wpTagIdsForNewPost: number[] = [];
         let existingPosts: any[] = [];
 
         if (job.site.type === 'WORDPRESS') {
+            // 새 글을 위한 태그 동기화 (ID 획득)
             if (hashtags.length > 0) {
-                wpTagIds = await syncWordPressTags(job.site, hashtags);
-                existingPosts = await fetchPostsByTags(job.site, wpTagIds);
+                wpTagIdsForNewPost = await syncWordPressTags(job.site, hashtags);
             }
+
+            // [발견 로직] 사이트의 전체 태그 중 랜덤하게 2개 선택하여 관련 글 가져오기
+            console.log('[Internal Link] Searching for random tags on site for discovery...');
+            const randomTags = await fetchRandomWordPressTags(job.site);
+            if (randomTags.length > 0) {
+                const discoveryTagIds = randomTags.map(t => t.id);
+                existingPosts = await fetchPostsByTags(job.site, discoveryTagIds);
+                console.log(`[Internal Link] Discovered ${existingPosts.length} posts via random tags: ${randomTags.map(t => t.name).join(', ')}`);
+            }
+
+            // 만약 태그가 없거나 관련 글을 못 찾았다면 최근 카테고리 글이라도 가져옴
             if (existingPosts.length === 0) {
                 existingPosts = await fetchRecentCategoryPosts(job.site, (job as any).wpCategoryId);
+                console.log(`[Internal Link] Fallback to recent category posts: ${existingPosts.length} found.`);
             }
         } else if (job.site.type === 'BLOGSPOT') {
-            // 블로거는 태그(라벨) 검색 API가 제한적이므로 카테고리(최근글) 기반 유지
-            existingPosts = await fetchRecentCategoryPosts(job.site);
+            // 블로거 라벨 기반 발견
+            const randomLabels = await fetchRandomBloggerLabels(job.site);
+            if (randomLabels.length > 0) {
+                existingPosts = await fetchBloggerPostsByLabels(job.site, randomLabels);
+                console.log(`[Internal Link] Discovered ${existingPosts.length} Blogger posts via random labels: ${randomLabels.join(', ')}`);
+            }
+
+            if (existingPosts.length === 0) {
+                existingPosts = await fetchRecentCategoryPosts(job.site);
+                console.log(`[Internal Link] Fallback to recent Blogger posts.`);
+            }
         }
-        
-        console.log(`[Internal Link] Found ${existingPosts.length} posts for context using hashtags: ${hashtags.join(', ') || 'none'}`);
 
         if (aiModel === 'GPT4O') {
             const apiKey = settings.openaiApiKey
             const openai = new OpenAI({ apiKey })
 
-            // 내부 링크 정보 구성
+            // 내부 링크 정보 구성 (AI에게 필수 지시)
             let internalLinkContext = '';
             if (existingPosts.length > 0) {
-                internalLinkContext = `\n\n[내부 링크 참고 정보]: 현재 사이트의 같은 카테고리에 아래와 같은 관련 글들이 이미 존재합니다. 글 내용 중 자연스러운 맥락에서 아래 글들 중 1~2개에 대해 <a href="URL">제목</a> 형태의 HTML 내부 링크를 포함해서 작성해주세요:\n${existingPosts.map((p: any) => `- ${p.title} (${p.url})`).join('\n')}`;
+                // 상위 2개 글만 사용하여 정확성 높임
+                const linkTargets = existingPosts.slice(0, 2);
+                internalLinkContext = `\n\n[내부 링크 생성 필수 지침]: 
+당신은 현재 작성 중인 글과 연관 지을 수 있는 사이트 내 기존 포스팅 정보를 가지고 있습니다. 
+SEO 지수를 높이기 위해, 아래 링크들 중 최소 1~2개를 본문의 가장 적절한 위치에 자연스러운 문장으로 녹여내어 <a href="URL">제목</a> 형태의 HTML 앵커 텍스트로 삽입해주세요. 
+단순 나열이 아닌, 문맥 속에서 해당 글을 소개하는 방식을 사용하세요:
+${linkTargets.map((p: any) => `- ${p.title} (${p.url})`).join('\n')}`;
             }
 
             const completion = await openai.chat.completions.create({
@@ -652,7 +752,7 @@ export async function processAutomationJob(jobId: string) {
             const payload: any = {
                 title, content, status: 'draft', // 1단계: 일단 임시저장
                 categories: (job as any).wpCategoryId ? [(job as any).wpCategoryId] : [],
-                tags: wpTagIds // 추출된 태그 ID들 추가
+                tags: wpTagIdsForNewPost // 추출된 태그 ID들 추가
             };
             if (featuredMediaId > 0) {
                 payload.featured_media = featuredMediaId;
