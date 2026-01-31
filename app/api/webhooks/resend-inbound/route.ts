@@ -9,12 +9,21 @@ import axios from 'axios'
 export async function POST(req: Request) {
     try {
         const payload = await req.json()
-        const RESEND_API_KEY = process.env.RESEND_API_KEY
+        
+        // API 키 정교하게 추출 및 청소
+        const RAW_KEY = process.env.RESEND_API_KEY || ''
+        const CLEAN_KEY = RAW_KEY.replace(/["']/g, '').trim()
         
         console.log('[Resend Inbound] Webhook received. Event type:', payload.type)
-        
-        if (payload.type !== 'email.received') {
-            return NextResponse.json({ message: 'Not an email event' }, { status: 200 })
+        console.log('[Resend Inbound] API Key Diagnostics:', {
+            rawLength: RAW_KEY.length,
+            cleanLength: CLEAN_KEY.length,
+            startsWithRe: CLEAN_KEY.startsWith('re_'),
+            masked: CLEAN_KEY ? `${CLEAN_KEY.slice(0, 5)}...${CLEAN_KEY.slice(-4)}` : 'MISSING'
+        })
+
+        if (!CLEAN_KEY) {
+            return NextResponse.json({ error: 'RESEND_API_KEY is missing in server environment' }, { status: 500 })
         }
 
         const data = payload.data
@@ -25,14 +34,14 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'No email_id' }, { status: 400 })
         }
 
-        // 1. Resend API를 통해 이메일 본문 가져오기
+        // 1. Resend API를 통해 이메일 본문 가져오기 (Inbound는 /emails/receiving/ 경로를 사용해야 함)
         console.log(`[Resend Inbound] Fetching email content for ID: ${emailId}`)
         
         let response;
         try {
-            response = await axios.get(`https://api.resend.com/emails/${emailId}`, {
+            response = await axios.get(`https://api.resend.com/emails/receiving/${emailId}`, {
                 headers: {
-                    'Authorization': `Bearer ${RESEND_API_KEY}`
+                    'Authorization': `Bearer ${CLEAN_KEY}`
                 }
             })
         } catch (axiosError: any) {
@@ -40,7 +49,8 @@ export async function POST(req: Request) {
             return NextResponse.json({ 
                 error: 'Resend API fetch failed', 
                 details: axiosError.response?.data || axiosError.message,
-                emailId 
+                emailId,
+                endpoint: `/emails/receiving/${emailId}`
             }, { status: 500 })
         }
 
