@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import axios from 'axios'
 
 /**
  * Resend Inbound Webhook Handler
@@ -8,31 +9,44 @@ import { prisma } from '@/lib/prisma'
 export async function POST(req: Request) {
     try {
         const payload = await req.json()
+        const RESEND_API_KEY = process.env.RESEND_API_KEY
         
-        // Resend Inbound Payload 구조분해
-        // data 필드 내부에 있거나 최상위에 있을 수 있습니다.
-        const data = payload.data || payload;
-        const { text, html, subject, from } = data;
+        console.log('[Resend Inbound] Webhook received. Event type:', payload.type)
+        
+        if (payload.type !== 'email.received') {
+            return NextResponse.json({ message: 'Not an email event' }, { status: 200 })
+        }
 
-        console.log('[Resend Inbound] Received email keys:', Object.keys(data))
-        console.log('[Resend Inbound] Details:', { 
-            subject, 
-            from, 
-            hasText: !!text, 
-            hasHtml: !!html 
+        const data = payload.data
+        const emailId = data.email_id
+
+        if (!emailId) {
+            console.error('[Resend Inbound] No email_id found in payload')
+            return NextResponse.json({ error: 'No email_id' }, { status: 400 })
+        }
+
+        // 1. Resend API를 통해 이메일 본문 가져오기
+        console.log(`[Resend Inbound] Fetching email content for ID: ${emailId}`)
+        
+        const response = await axios.get(`https://api.resend.com/emails/${emailId}`, {
+            headers: {
+                'Authorization': `Bearer ${RESEND_API_KEY}`
+            }
         })
 
+        const emailData = response.data
+        const text = emailData.text
+        const html = emailData.html
+        
         // text가 없으면 html이라도 시도
         const emailContent = text || html?.replace(/<[^>]*>?/gm, '') || ''
 
         if (!emailContent) {
-            console.error('[Resend Inbound] No content found in email')
-            return NextResponse.json({ 
-                error: 'No content found',
-                received_keys: Object.keys(data),
-                is_email_received_event: payload.type === 'email.received'
-            }, { status: 400 })
+            console.error('[Resend Inbound] No content found via API')
+            return NextResponse.json({ error: 'Email content empty' }, { status: 400 })
         }
+
+        console.log('[Resend Inbound] Content fetched successfully')
 
         // 1. 이메일 파싱 (Littly 포맷)
         // * 주문자 : 이름 / 전화번호 / gulungse@gmail.com
