@@ -76,9 +76,10 @@ export async function POST(req: Request) {
         const emailMatch = emailContent.match(/\/\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/)
         const customerEmail = emailMatch ? emailMatch[1].trim() : null
 
-        // 상품명에서 토큰 수량 추출 정규식 (예: 토큰 100)
-        const productMatch = emailContent.match(/구매상품\s*:\s*토큰\s*(\d+)/)
-        const tokenAmount = productMatch ? parseInt(productMatch[1], 10) : null
+        // 상품명에서 토큰 수량 추출 정규식 (예: 토큰 100, 토큰 11,000, M-Poster 토큰 5,000)
+        // 숫자에 쉼표(,)가 포함된 경우도 처리합니다.
+        const productMatch = emailContent.match(/구매상품\s*:\s*.*?토큰\s*([\d,]+)/)
+        const tokenAmount = productMatch ? parseInt(productMatch[1].replace(/,/g, ''), 10) : null
 
         console.log('[Resend Inbound] Parsed Data:', { customerEmail, tokenAmount })
 
