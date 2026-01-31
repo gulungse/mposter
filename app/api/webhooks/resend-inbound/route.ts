@@ -15,16 +15,22 @@ export async function POST(req: Request) {
             return NextResponse.json({ message: 'Not an email event' }, { status: 200 })
         }
 
-        const { text, subject, from } = payload.data
+        const { text, html, subject, from } = payload.data
 
-        console.log('[Resend Inbound] Received email:', { 
+        console.log('[Resend Inbound] Received email keys:', Object.keys(payload.data))
+        console.log('[Resend Inbound] Details:', { 
             subject, 
-            from,
-            textSnippet: text?.substring(0, 100) 
+            from, 
+            hasText: !!text, 
+            hasHtml: !!html 
         })
 
-        if (!text) {
-            return NextResponse.json({ error: 'No text content' }, { status: 400 })
+        // text가 없으면 html이라도 시도 (HTML에서 태그 제거는 간단히 처리)
+        const emailContent = text || html?.replace(/<[^>]*>?/gm, '') || ''
+
+        if (!emailContent) {
+            console.error('[Resend Inbound] No content found in email')
+            return NextResponse.json({ error: 'No content found' }, { status: 400 })
         }
 
         // 1. 이메일 파싱 (Littly 포맷)
@@ -32,11 +38,11 @@ export async function POST(req: Request) {
         // * 구매상품 : 토큰 100(1개) 100원
         
         // 이메일 추출 정규식
-        const emailMatch = text.match(/\/\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/)
+        const emailMatch = emailContent.match(/\/\s*([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/)
         const customerEmail = emailMatch ? emailMatch[1].trim() : null
 
         // 상품명에서 토큰 수량 추출 정규식 (예: 토큰 100)
-        const productMatch = text.match(/구매상품\s*:\s*토큰\s*(\d+)/)
+        const productMatch = emailContent.match(/구매상품\s*:\s*토큰\s*(\d+)/)
         const tokenAmount = productMatch ? parseInt(productMatch[1], 10) : null
 
         console.log('[Resend Inbound] Parsed Data:', { customerEmail, tokenAmount })
@@ -57,7 +63,7 @@ export async function POST(req: Request) {
         }
 
         // 3. 중복 처리 방지 (주문번호 활용)
-        const orderNoMatch = text.match(/주문번호\s*:\s*(\d+)/)
+        const orderNoMatch = emailContent.match(/주문번호\s*:\s*(\d+)/)
         const orderNo = orderNoMatch ? orderNoMatch[1] : `LIT_${Date.now()}`
 
         const existingPayment = await prisma.payment.findUnique({
