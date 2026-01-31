@@ -11,7 +11,9 @@ import {
     generateFluxImage,
     generateThumbnail,
     uploadToWordPress,
-    refreshBloggerToken
+    refreshBloggerToken,
+    extractHashtags,
+    syncWordPressTags
 } from '@/lib/automation'
 import { fetchRandomImage } from '@/lib/image_providers'
 import axios from 'axios'
@@ -112,12 +114,10 @@ export async function testPublishAction(data: {
    - **절영코 <h1> 태그를 본문에 쓰지 말 것.** (제목과 중복됨). <h2>부터 시작할 것.
    - 문체: 친근하고 전문적인 '해요체' 사용.
    - 내용 중 '${targetKeyword}' 키워드를 자연스럽게 8회 이상 포함할 것.
-   - [반드시 준수할 포맷 규칙]:
-   - **반드시** 순수한 JSON만 반환할 것.
-   - **마크다운(Markdown) 문법을 절대 본문에 포함하지 마시오.** (예: ###, **, - 등 금지)
    - 모든 제목과 강조는 오직 HTML 태그(h2, h3, strong)로만 작성해야 함. 만약 마크다운이 발견되면 시스템 오류로 처리됨.
    - 키워드와 연관된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 포함할 것.
-   - 예시: {"title": "...", "content": "...", "imageKeywords": ["tax", "office", "money", "paper", "calculator"]}` }
+   - 글의 주제를 대표하는 **핵심 키워드 3~5개**를 'tags' 필드에 리스트 형태로 포함할 것.
+   - 예시: {"title": "...", "content": "...", "imageKeywords": ["tax", "office", "..."], "tags": ["자산관리", "노후대비", "절세비법"]}` }
                     ],
                     max_tokens: 4096,
                     response_format: { type: "json_object" }
@@ -239,15 +239,30 @@ export async function testPublishAction(data: {
         content = $.html();
 
 
+        // --- 태그 추출 및 동기화 (AI 제안 태그 포함) ---
+        const aiGeneratedTags = aiResult.tags || aiResult.keywords || [];
+        const hashtags = Array.from(new Set([
+            ...aiGeneratedTags,
+            ...extractHashtags(systemPrompt),
+            ...extractHashtags(targetKeyword),
+            ...extractHashtags(title),
+            ...extractHashtags(content)
+        ]));
+        let wpTagIds: number[] = [];
+
         // 실제 사이트 발행
         try {
             if (site.type === 'WORDPRESS') {
+                if (hashtags.length > 0) {
+                    wpTagIds = await syncWordPressTags(site, hashtags);
+                }
                 const targetStatus = data.postStatus || 'publish';
                 const payload: any = {
                     title: `[테스트] ${title}`,
                     content: content,
                     status: 'draft', // 1단계: 일단 임시저장으로 생성 (안정성 확보)
-                    categories: data.wpCategoryId ? [data.wpCategoryId] : []
+                    categories: data.wpCategoryId ? [data.wpCategoryId] : [],
+                    tags: wpTagIds
                 };
                 if (featuredMediaId > 0) payload.featured_media = featuredMediaId;
 
@@ -274,7 +289,8 @@ export async function testPublishAction(data: {
                 const postToBlogger = async (token: string) => {
                     return axios.post(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/`, {
                         title: `[테스트] ${title}`,
-                        content: content
+                        content: content,
+                        labels: hashtags
                     }, {
                         headers: { 'Authorization': `Bearer ${token}` },
                         timeout: 30000
@@ -344,6 +360,7 @@ export async function testDirectPromptAction(data: {
     imageCount?: number;
     wpCategoryId?: number;
     postStatus?: string;
+    tags?: string[]; // 추가된 수동 태그
 }) {
     try {
         const user = await getOrCreateUser()
@@ -377,7 +394,7 @@ export async function testDirectPromptAction(data: {
                     model: "gpt-4o",
                     messages: [
                         { role: "system", content: `당신은 SEO에 특화된 10년 경력의 전문 블로그 작가입니다. ${systemPrompt}` },
-                        { role: "user", content: `'${targetKeyword}' 주제로 완벽한 블로그 포스팅을 작성해줘. JSON 형식으로 제목(title), 본문(content, HTML형식), 이미지 키워드(imageKeywords, 영어 리스트)를 반환하라.` }
+                        { role: "user", content: `'${targetKeyword}' 주제로 완벽한 블로그 포스팅을 작성해줘. JSON 형식으로 제목(title), 본문(content, HTML형식), 이미지 키워드(imageKeywords, 영어 리스트), 그리고 글의 가치를 높이는 핵심 태그(tags, 3~5개 리스트)를 반환하라.` }
                     ],
                     max_tokens: 4096,
                     response_format: { type: "json_object" }
@@ -397,16 +414,31 @@ export async function testDirectPromptAction(data: {
             throw new Error(`[AI 생성 실패] ${err.message}`)
         }
 
-        // --- 이미지 로직 생략 또는 최소화 (테스트 발행 속도 우대) ---
+        // --- 태그 추출 및 동기화 (AI 제안 태그 포함) ---
+        const aiGeneratedTags = aiResult.tags || aiResult.keywords || [];
+        const hashtags = Array.from(new Set([
+            ...(data.tags || []), // 수동 입력 태그 포함
+            ...aiGeneratedTags,
+            ...extractHashtags(systemPrompt),
+            ...extractHashtags(targetKeyword),
+            ...extractHashtags(title),
+            ...extractHashtags(content)
+        ]));
+        let wpTagIds: number[] = [];
+
         // 실제 사이트 발행 (Draft로 강제)
         const targetStatus = data.postStatus || 'draft';
         
         if (site.type === 'WORDPRESS') {
+            if (hashtags.length > 0) {
+                wpTagIds = await syncWordPressTags(site, hashtags);
+            }
             await axios.post(`${site.url}/wp-json/wp/v2/posts`, {
                 title: `[프롬프트 테스트] ${title}`,
                 content: content,
                 status: targetStatus,
-                categories: data.wpCategoryId ? [data.wpCategoryId] : []
+                categories: data.wpCategoryId ? [data.wpCategoryId] : [],
+                tags: wpTagIds
             }, {
                 auth: { username: site.username || '', password: site.apiToken || '' },
                 timeout: 60000,
@@ -416,7 +448,8 @@ export async function testDirectPromptAction(data: {
             const blogId = site.username || site.url.split('blogId=')[1] || site.url.replace(/[^0-9]/g, '');
             await axios.post(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/`, {
                 title: `[프롬프트 테스트] ${title}`,
-                content: content
+                content: content,
+                labels: hashtags
             }, {
                 headers: { 'Authorization': `Bearer ${site.apiToken}` },
                 timeout: 30000

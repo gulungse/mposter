@@ -74,11 +74,29 @@ export async function getAvailableGeminiModels(apiKey: string) {
 /**
  * 텍스트에서 해시태그(#태그)를 추출합니다.
  */
-function extractHashtags(text: string): string[] {
+export function extractHashtags(text: string): string[] {
     if (!text) return [];
-    // #태그1 #태그2 형태 매칭 (공백이나 줄바꿈으로 구분된 경우)
-    const matches = text.match(/#([a-zA-Z0-9가-힣]+)/g);
-    return matches ? matches.map(m => m.slice(1)) : [];
+    
+    // 1. HTML 태그 제거 (태그 내부의 #색상코드 방지)
+    // <span style="color:#ffffff">#태그</span> 형태에서 #ffffff를 무시하고 #태그만 가져오기 위함
+    const plainText = text.replace(/<[^>]*>?/gm, ' ');
+    
+    // 2. 해시태그 추출
+    const matches = plainText.match(/#([a-zA-Z0-9가-힣]+)/g);
+    if (!matches) return [];
+
+    return matches
+        .map(m => m.slice(1))
+        .filter(tag => {
+            // 단순 숫자만 있는 경우 제외 (예: #123) - 여전히 유효함
+            if (/^\d+$/.test(tag)) return false;
+
+            // '연관검색어' 같은 플레이스홀더 패턴 제외
+            if (tag.includes('연관검색어')) return false;
+
+            // 최소 2자 이상인 경우만 태그로 인정
+            return tag.length >= 2;
+        });
 }
 
 /**
@@ -102,7 +120,7 @@ async function fetchRandomWordPressTags(site: any): Promise<{id: number, name: s
 /**
  * 워드프레스에 태그를 동기화하고 ID 목록을 반환합니다.
  */
-async function syncWordPressTags(site: any, tags: string[]): Promise<number[]> {
+export async function syncWordPressTags(site: any, tags: string[]): Promise<number[]> {
     const tagIds: number[] = [];
     for (const tagName of tags) {
         try {
@@ -276,7 +294,8 @@ ${existingPosts.map(p => `- ${p.title} (${p.url})`).join('\n')}`;
 본문은 반드시 5개 이상의 문단으로 구성하고, 독자에게 유용하고 상세한 정보를 제공하는 SEO 최적화된 글이어야 해. 분량은 가급적 1000자 이상으로 풍부하게 작성해줘.
 절대로 <h1> 태그를 사용하지 마. 제목은 이미 글 상단에 있으므로 본문에는 <h2>, <h3>, <h4> 태그만 사용해야 해.
 또한, 이 글과 관련된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 배열로 제공해줘. (LoremFlickr 검색용)
-반드시 JSON 형식 {"title": "...", "content": "...", "imageKeywords": ["keyword1", "keyword2", ...]}으로만 답변하고, JSON 외의 텍스트는 절대 포함하지 마.`
+글의 주제를 대표하는 **핵심 키워드 3~5개**를 'tags' 필드에 리스트 형태로 포함해줘.
+반드시 JSON 형식 {"title": "...", "content": "...", "imageKeywords": ["keyword1", "keyword2", ...], "tags": ["tag1", "tag2", ...]}으로만 답변하고, JSON 외의 텍스트는 절대 포함하지 마.`
                 }]
             }]
         }, {
@@ -605,7 +624,8 @@ ${linkTargets.map((p: any) => `- ${p.title} (${p.url})`).join('\n')}`;
    - 모든 제목과 강조는 오직 HTML 태그(h2, h3, strong)로만 작성해야 함. 만약 마크다운이 발견되면 시스템 오류로 처리됨.
    - 키워드와 연관된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 포함할 것.
    - 키워드와 연관된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 포함할 것.
-   - 예시: {"title": "...", "content": "...", "imageKeywords": ["tax", "office", "money", "paper", "calculator"]}` }
+   - 글의 주제를 대표하는 **핵심 키워드 3~5개**를 'tags' 필드에 리스트 형태로 포함할 것.
+   - 예시: {"title": "...", "content": "...", "imageKeywords": ["tax", "office", "..."], "tags": ["자산관리", "노후대비", "절세비법"]}` }
                 ],
                 max_tokens: 4096,
                 response_format: { type: "json_object" }
@@ -615,8 +635,8 @@ ${linkTargets.map((p: any) => `- ${p.title} (${p.url})`).join('\n')}`;
             rawContent = rawContent.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
 
             aiResult = JSON.parse(rawContent)
-            title = aiResult.title || aiResult.subject || targetKeyword
-            content = convertMarkdownToHtml(aiResult.content || aiResult.body || aiResult.text || targetKeyword)
+            title = aiResult.title || aiResult.subject || aiResult.header || targetKeyword
+            content = convertMarkdownToHtml(aiResult.content || aiResult.body || aiResult.text || aiResult.article || targetKeyword)
 
             if (content === targetKeyword && completion.choices[0].message.content) {
                 content = completion.choices[0].message.content;
@@ -628,6 +648,21 @@ ${linkTargets.map((p: any) => `- ${p.title} (${p.url})`).join('\n')}`;
             title = aiResult.title || targetKeyword
             content = convertMarkdownToHtml(aiResult.content || targetKeyword)
         }
+        
+        const aiGeneratedTags = aiResult.tags || aiResult.keywords || [];
+        
+        // --- [발행 전 최종 태그 추출 (AI 생성 태그 + 본문 해시태그)] ---
+        const finalHashtags = Array.from(new Set([
+            ...hashtags,
+            ...aiGeneratedTags,
+            ...extractHashtags(title),
+            ...extractHashtags(content)
+        ]));
+        
+        if (job.site.type === 'WORDPRESS' && finalHashtags.length > 0) {
+            wpTagIdsForNewPost = await syncWordPressTags(job.site, finalHashtags);
+        }
+        // 블로거는 별도 동기화 없이 hashtags 배열을 그대로 사용합니다 (아래 publish logic에서 finalHashtags 사용)
 
         // --- 이미지 생성 및 삽입 로직 ---
         const imageSource = (job as any).imageSource || 'NONE'
@@ -784,8 +819,8 @@ ${linkTargets.map((p: any) => `- ${p.title} (${p.url})`).join('\n')}`;
                 return axios.post(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/`, {
                     title: title,
                     content: content,
-                    labels: hashtags // 추출된 해시태그를 라벨로 추가
-                }, {
+                labels: finalHashtags // 추출된 모든 해시태그를 라벨로 추가
+            }, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
             };

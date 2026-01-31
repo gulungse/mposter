@@ -29,6 +29,7 @@ export default function PromptTestPage() {
         siteId: '',
         keyword: '',
         promptContent: '',
+        manualTags: '', // 추가된 필드
         aiModel: 'GPT4O',
         imageSource: 'NONE',
         imageCount: 1,
@@ -73,10 +74,16 @@ export default function PromptTestPage() {
 
         setTesting(true)
         try {
+            // 태그 배열 처리
+            const tags = formData.manualTags
+                ? formData.manualTags.split(/[\n,]+/).map(t => t.trim()).filter(t => t)
+                : [];
+
             const result = await testDirectPromptAction({
                 siteId: formData.siteId,
                 keyword: formData.keyword,
                 promptContent: formData.promptContent,
+                tags: tags, // 수동 태그 전달
                 aiModel: formData.aiModel as any,
                 imageSource: formData.imageSource as any,
                 imageCount: formData.imageCount,
@@ -188,6 +195,18 @@ export default function PromptTestPage() {
                                     <option value="DALLE">DALL-E 3</option>
                                     <option value="FLUX">FLUX Pro</option>
                                 </select>
+                            </div>
+
+                            <div className="space-y-1.5 pt-4 border-t border-border/50">
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">추가 태그 (쉼표 구분)</label>
+                                <input
+                                    type="text"
+                                    value={formData.manualTags}
+                                    onChange={e => setFormData({ ...formData, manualTags: e.target.value })}
+                                    placeholder="태그1, 태그2, 태그3"
+                                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                                />
+                                <p className="text-[9px] text-muted-foreground">이곳에 직접 태그를 입력하거나, 본문에 #해시태그를 넣으면 자동으로 등록됩니다.</p>
                             </div>
                         </div>
                     </section>
