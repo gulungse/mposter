@@ -71,7 +71,34 @@ export async function getAvailableGeminiModels(apiKey: string) {
     }
 }
 
-export async function generateGeminiContent(apiKey: string, systemPrompt: string, targetKeyword: string) {
+/**
+ * 해당 카테고리의 최근 글 목록을 가져옵니다. (내부 링크용)
+ */
+async function fetchRecentCategoryPosts(site: any, categoryId?: string) {
+    try {
+        if (site.type === 'WORDPRESS') {
+            const url = `${site.url}/wp-json/wp/v2/posts?per_page=5${categoryId ? `&categories=${categoryId}` : ''}`;
+            const response = await axios.get(url, {
+                auth: { username: site.username, password: site.apiToken },
+                timeout: 10000
+            });
+            return response.data.map((p: any) => ({ title: p.title.rendered, url: p.link }));
+        } else if (site.type === 'BLOGSPOT') {
+            const blogId = site.username || site.url.split('blogId=')[1] || site.url.replace(/[^0-9]/g, '');
+            const url = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts?maxResults=5`;
+            const response = await axios.get(url, {
+                headers: { 'Authorization': `Bearer ${site.apiToken}` },
+                timeout: 10000
+            });
+            return (response.data.items || []).map((p: any) => ({ title: p.title, url: p.url }));
+        }
+    } catch (e) {
+        console.warn('[Internal Link] Failed to fetch recent posts:', e);
+    }
+    return [];
+}
+
+export async function generateGeminiContent(apiKey: string, systemPrompt: string, targetKeyword: string, existingPosts: any[] = []) {
     const trimmedKey = apiKey.trim()
 
     // 1. 사용 가능한 모델 목록 조회 (스마트 감지)
@@ -95,6 +122,12 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
 
     console.log(`Selected Target Model: ${modelId} (${version})`);
 
+    // 내부 링크 정보 구성
+    let internalLinkContext = '';
+    if (existingPosts.length > 0) {
+        internalLinkContext = `\n\n[내부 링크 참고 정보]: 현재 사이트의 같은 카테고리에 아래와 같은 관련 글들이 이미 존재합니다. 글 내용 중 자연스러운 맥락에서 아래 글들 중 1~2개에 대해 <a href="URL">제목</a> 형태의 HTML 내부 링크를 포함해서 작성해주세요:\n${existingPosts.map(p => `- ${p.title} (${p.url})`).join('\n')}`;
+    }
+
     let text = ''
     let lastError = ''
 
@@ -109,7 +142,7 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
         const response = await axios.post(url, {
             contents: [{
                 parts: [{
-                    text: `${systemPrompt}\n\n위 지침을 따라 '${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘. 
+                    text: `${systemPrompt}${internalLinkContext}\n\n위 지침을 따라 '${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘. 
 본문은 반드시 5개 이상의 문단으로 구성하고, 독자에게 유용하고 상세한 정보를 제공하는 SEO 최적화된 글이어야 해. 분량은 가급적 1000자 이상으로 풍부하게 작성해줘.
 절대로 <h1> 태그를 사용하지 마. 제목은 이미 글 상단에 있으므로 본문에는 <h2>, <h3>, <h4> 태그만 사용해야 해.
 또한, 이 글과 관련된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 배열로 제공해줘. (LoremFlickr 검색용)
@@ -356,13 +389,25 @@ export async function processAutomationJob(jobId: string) {
         const aiModel = (job as any).aiModel || 'GPT4O'
         const systemPrompt = job.prompt?.content || 'SEO 블로거로서 글을 작성해줘.'
 
+        // --- 내부 링크용 기존 글 가져오기 ---
+        const categoryId = (job as any).wpCategoryId || (job as any).bloggerCategoryId;
+        const existingPosts = await fetchRecentCategoryPosts(job.site, categoryId);
+        console.log(`[Internal Link] Found ${existingPosts.length} posts for context.`);
+
         if (aiModel === 'GPT4O') {
             const apiKey = settings.openaiApiKey
             const openai = new OpenAI({ apiKey })
+
+            // 내부 링크 정보 구성
+            let internalLinkContext = '';
+            if (existingPosts.length > 0) {
+                internalLinkContext = `\n\n[내부 링크 참고 정보]: 현재 사이트의 같은 카테고리에 아래와 같은 관련 글들이 이미 존재합니다. 글 내용 중 자연스러운 맥락에서 아래 글들 중 1~2개에 대해 <a href="URL">제목</a> 형태의 HTML 내부 링크를 포함해서 작성해주세요:\n${existingPosts.map((p: any) => `- ${p.title} (${p.url})`).join('\n')}`;
+            }
+
             const completion = await openai.chat.completions.create({
                 model: "gpt-4o",
                 messages: [
-                    { role: "system", content: `당신은 SEO에 특화된 10년 경력의 전문 블로그 작가입니다. 독자가 궁금해하는 정보를 깊이 있게 분석하고, 매우 상세하고 친절한 어조로 글을 작성해야 합니다. 단순한 요약이 아닌, 독자에게 실질적인 도움이 되는 가치 있는 콘텐츠를 생산하세요. ${systemPrompt}` },
+                    { role: "system", content: `당신은 SEO에 특화된 10년 경력의 전문 블로그 작가입니다. 독자가 궁금해하는 정보를 깊이 있게 분석하고, 매우 상세하고 친절한 어조로 글을 작성해야 합니다. 단순한 요약이 아닌, 독자에게 실질적인 도움이 되는 가치 있는 콘텐츠를 생산하세요. ${systemPrompt}${internalLinkContext}` },
                     {
                         role: "user", content: `'${targetKeyword}' 주제로 완벽한 블로그 포스팅을 작성해줘. 다음 지침을 엄격히 준수하라:
 
@@ -403,7 +448,7 @@ export async function processAutomationJob(jobId: string) {
         } else {
             const apiKey = settings.geminiApiKey
             if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
-            aiResult = await generateGeminiContent(apiKey, systemPrompt, targetKeyword)
+            aiResult = await generateGeminiContent(apiKey, systemPrompt, targetKeyword, existingPosts)
             title = aiResult.title || targetKeyword
             content = convertMarkdownToHtml(aiResult.content || targetKeyword)
         }
