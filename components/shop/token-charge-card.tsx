@@ -16,66 +16,30 @@ interface Props {
     userId: string
 }
 
-declare global {
-    interface Window {
-        PayApp?: any
-    }
-}
 
 export function TokenChargeCard({ id, name, amount, price, isPopular, buyerEmail, buyerName, buyerTel, userId }: Props) {
     const router = useRouter()
     const [isLoading, setIsLoading] = useState(false)
 
     const handleCharge = async () => {
-        if (!window.PayApp) {
-            alert('결제 모듈이 로드되지 않았습니다. 새로고침 후 다시 시도해주세요.')
-            return
-        }
-
+        const LITTLY_URL = process.env.NEXT_PUBLIC_LITTLY_URL || 'https://litt.ly/mposter'
+        
         if (isLoading) return
         setIsLoading(true)
 
-        const PAYAPP_ID = process.env.NEXT_PUBLIC_PAYAPP_USER_ID
-        if (!PAYAPP_ID) {
-            alert('상점 아이디(M-Poster)가 설정되지 않았습니다.\n관리자에게 문의해주세요.')
+        try {
+            // 리틀리 상점으로 이동
+            window.open(LITTLY_URL, '_blank')
+            
+            // 안내 메시지
+            alert('리틀리 상점 페이지로 이동합니다.\n결제 완료 후 자동으로 토큰이 충전됩니다.')
+        } catch (error) {
+            console.error('Redirect error:', error)
+            alert('페이지 이동 중 오류가 발생했습니다.')
+        } finally {
             setIsLoading(false)
-            return
+            router.refresh()
         }
-
-        const merchant_uid = `mid_${new Date().getTime()}`
-        const origin = window.location.origin
-
-        window.PayApp.payrequest({
-            userid: PAYAPP_ID,
-            shopname: 'M-Poster',
-            goodname: name,
-            price: price,
-            mul_no: merchant_uid,
-            buyerid: buyerEmail, // 구매자 식별자(이메일 사용)
-            buyername: buyerName,
-            buyertel: buyerTel,
-            // 웹훅 및 리다이렉트 설정
-            returnurl: `${origin}/dashboard/shop`,
-            feedbackurl: `${origin}/api/payments/feedback`,
-            var1: userId,    // 사용자 ID
-            var2: id,        // 패키지 ID
-            smsuse: 'n',     // 결제요청 SMS 발송 안함
-            reqaddr: '0',    // 주소 요청 안함
-            checkretry: 'y', // Feedback 재시도 설정
-        }, function (ret: any) {
-            // 콜백 함수 (결제창 닫힘 등)
-            // PayApp Lite는 보통 리턴 URL로 이동하거나, 여기서 성공/실패 확인 가능
-            if (ret.state === 'SA' || ret.state === 'OK') {
-                // 결제 성공 (또는 승인 대기)
-                // 실제 토큰 지급은 Feedback URL(webhook)을 통해 처리됩니다.
-                alert('결제가 완료되었습니다. 토큰이 지급될 때까지 잠시만 기다려주세요.')
-                router.refresh()
-            } else {
-                // 사용자가 취소했거나 오류 발생
-                if (ret.message) alert(ret.message)
-            }
-            setIsLoading(false)
-        })
     }
 
     return (
