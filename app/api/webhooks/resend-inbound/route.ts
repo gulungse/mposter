@@ -10,14 +10,11 @@ export async function POST(req: Request) {
         const payload = await req.json()
         
         // Resend Inbound Payload 구조분해
-        // data 필드 내부에 실제 이메일 정보가 들어있습니다.
-        if (payload.type !== 'email.received') {
-            return NextResponse.json({ message: 'Not an email event' }, { status: 200 })
-        }
+        // data 필드 내부에 있거나 최상위에 있을 수 있습니다.
+        const data = payload.data || payload;
+        const { text, html, subject, from } = data;
 
-        const { text, html, subject, from } = payload.data
-
-        console.log('[Resend Inbound] Received email keys:', Object.keys(payload.data))
+        console.log('[Resend Inbound] Received email keys:', Object.keys(data))
         console.log('[Resend Inbound] Details:', { 
             subject, 
             from, 
@@ -25,12 +22,16 @@ export async function POST(req: Request) {
             hasHtml: !!html 
         })
 
-        // text가 없으면 html이라도 시도 (HTML에서 태그 제거는 간단히 처리)
+        // text가 없으면 html이라도 시도
         const emailContent = text || html?.replace(/<[^>]*>?/gm, '') || ''
 
         if (!emailContent) {
             console.error('[Resend Inbound] No content found in email')
-            return NextResponse.json({ error: 'No content found' }, { status: 400 })
+            return NextResponse.json({ 
+                error: 'No content found',
+                received_keys: Object.keys(data),
+                is_email_received_event: payload.type === 'email.received'
+            }, { status: 400 })
         }
 
         // 1. 이메일 파싱 (Littly 포맷)
