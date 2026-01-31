@@ -72,7 +72,68 @@ export async function getAvailableGeminiModels(apiKey: string) {
 }
 
 /**
- * 해당 카테고리의 최근 글 목록을 가져옵니다. (내부 링크용)
+ * 텍스트에서 해시태그(#태그)를 추출합니다.
+ */
+function extractHashtags(text: string): string[] {
+    const matches = text.match(/#([a-zA-Z0-9가-힣]+)/g);
+    return matches ? matches.map(m => m.slice(1)) : [];
+}
+
+/**
+ * 워드프레스에 태그를 동기화하고 ID 목록을 반환합니다.
+ */
+async function syncWordPressTags(site: any, tags: string[]): Promise<number[]> {
+    const tagIds: number[] = [];
+    for (const tagName of tags) {
+        try {
+            // 1. 기존 태그 검색
+            const searchRes = await axios.get(`${site.url}/wp-json/wp/v2/tags?search=${encodeURIComponent(tagName)}`, {
+                auth: { username: site.username, password: site.apiToken },
+                timeout: 10000
+            });
+            const existingTag = searchRes.data.find((t: any) => t.name === tagName);
+            
+            if (existingTag) {
+                tagIds.push(existingTag.id);
+            } else {
+                // 2. 없으면 생성
+                const createRes = await axios.post(`${site.url}/wp-json/wp/v2/tags`, { name: tagName }, {
+                    auth: { username: site.username, password: site.apiToken },
+                    timeout: 10000
+                });
+                tagIds.push(createRes.data.id);
+            }
+        } catch (e) {
+            console.warn(`[WP Tag Sync] Failed for ${tagName}:`, e);
+        }
+    }
+    return tagIds;
+}
+
+/**
+ * 특정 태그들을 포함하는 최근 글 목록을 가져옵니다. (워드프레스용)
+ */
+async function fetchPostsByTags(site: any, tagIds: number[]) {
+    if (tagIds.length === 0) return [];
+    try {
+        // 태그 중 랜덤하게 2개 선택 (검색 결과 최적화)
+        const shuffled = [...tagIds].sort(() => 0.5 - Math.random());
+        const targetTagIds = shuffled.slice(0, 2).join(',');
+        
+        const url = `${site.url}/wp-json/wp/v2/posts?tags=${targetTagIds}&per_page=5`;
+        const response = await axios.get(url, {
+            auth: { username: site.username, password: site.apiToken },
+            timeout: 10000
+        });
+        return response.data.map((p: any) => ({ title: p.title.rendered, url: p.link }));
+    } catch (e) {
+        console.warn('[Internal Link] Failed to fetch posts by tags:', e);
+        return [];
+    }
+}
+
+/**
+ * 해당 카테고리의 최근 글 목록을 가져옵니다. (내부 링크용 Fallback)
  */
 async function fetchRecentCategoryPosts(site: any, categoryId?: string) {
     try {
@@ -389,10 +450,25 @@ export async function processAutomationJob(jobId: string) {
         const aiModel = (job as any).aiModel || 'GPT4O'
         const systemPrompt = job.prompt?.content || 'SEO 블로거로서 글을 작성해줘.'
 
-        // --- 내부 링크용 기존 글 가져오기 ---
-        const categoryId = (job as any).wpCategoryId || (job as any).bloggerCategoryId;
-        const existingPosts = await fetchRecentCategoryPosts(job.site, categoryId);
-        console.log(`[Internal Link] Found ${existingPosts.length} posts for context.`);
+        // --- 해시태그 및 내부 링크용 기존 글 가져오기 ---
+        const hashtags = extractHashtags(systemPrompt);
+        let wpTagIds: number[] = [];
+        let existingPosts: any[] = [];
+
+        if (job.site.type === 'WORDPRESS') {
+            if (hashtags.length > 0) {
+                wpTagIds = await syncWordPressTags(job.site, hashtags);
+                existingPosts = await fetchPostsByTags(job.site, wpTagIds);
+            }
+            if (existingPosts.length === 0) {
+                existingPosts = await fetchRecentCategoryPosts(job.site, (job as any).wpCategoryId);
+            }
+        } else if (job.site.type === 'BLOGSPOT') {
+            // 블로거는 태그(라벨) 검색 API가 제한적이므로 카테고리(최근글) 기반 유지
+            existingPosts = await fetchRecentCategoryPosts(job.site);
+        }
+        
+        console.log(`[Internal Link] Found ${existingPosts.length} posts for context using hashtags: ${hashtags.join(', ') || 'none'}`);
 
         if (aiModel === 'GPT4O') {
             const apiKey = settings.openaiApiKey
@@ -575,7 +651,8 @@ export async function processAutomationJob(jobId: string) {
             const targetStatus = (job as any).postStatus || 'publish';
             const payload: any = {
                 title, content, status: 'draft', // 1단계: 일단 임시저장
-                categories: (job as any).wpCategoryId ? [(job as any).wpCategoryId] : []
+                categories: (job as any).wpCategoryId ? [(job as any).wpCategoryId] : [],
+                tags: wpTagIds // 추출된 태그 ID들 추가
             };
             if (featuredMediaId > 0) {
                 payload.featured_media = featuredMediaId;
@@ -606,7 +683,8 @@ export async function processAutomationJob(jobId: string) {
             const postToBlogger = async (token: string) => {
                 return axios.post(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/`, {
                     title: title,
-                    content: content
+                    content: content,
+                    labels: hashtags // 추출된 해시태그를 라벨로 추가
                 }, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
