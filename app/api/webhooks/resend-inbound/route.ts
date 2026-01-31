@@ -28,11 +28,21 @@ export async function POST(req: Request) {
         // 1. Resend API를 통해 이메일 본문 가져오기
         console.log(`[Resend Inbound] Fetching email content for ID: ${emailId}`)
         
-        const response = await axios.get(`https://api.resend.com/emails/${emailId}`, {
-            headers: {
-                'Authorization': `Bearer ${RESEND_API_KEY}`
-            }
-        })
+        let response;
+        try {
+            response = await axios.get(`https://api.resend.com/emails/${emailId}`, {
+                headers: {
+                    'Authorization': `Bearer ${RESEND_API_KEY}`
+                }
+            })
+        } catch (axiosError: any) {
+            console.error('[Resend Inbound] Resend API Error:', axiosError.response?.data || axiosError.message)
+            return NextResponse.json({ 
+                error: 'Resend API fetch failed', 
+                details: axiosError.response?.data || axiosError.message,
+                emailId 
+            }, { status: 500 })
+        }
 
         const emailData = response.data
         const text = emailData.text
