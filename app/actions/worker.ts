@@ -23,20 +23,20 @@ import axios from 'axios'
  */
 function convertMarkdownToHtml(text: string): string {
     if (!text) return '';
-    
+
     let html = text;
     // 1. 헤더 변환 (### -> <h3>)
     html = html.replace(/^###\s+(.*$)/gim, '<h3>$1</h3>');
     html = html.replace(/^##\s+(.*$)/gim, '<h2>$1</h2>');
     html = html.replace(/^#\s+(.*$)/gim, '<h1>$1</h1>');
-    
+
     // 2. 볼드체 (**text** -> <strong>text</strong>)
     html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/__((?:(?!__).)+)__/g, '<strong>$1</strong>');
 
     // 3. 리스트 (- item -> <li>item</li>)
     html = html.replace(/^\-\s+(.*$)/gim, '<li>$1</li>');
-    
+
     return html;
 }
 
@@ -96,7 +96,7 @@ export async function testPublishAction(data: {
                 const completion = await openai.chat.completions.create({
                     model: "gpt-4o",
                     messages: [
-                        { role: "system", content: `당신은 SEO에 특화된 10년 경력의 전문 블로그 작가입니다. 독자가 궁금해하는 정보를 깊이 있게 분석하고, 매우 상세하고 친절한 어조로 글을 작성해야 합니다. 단순한 요약이 아닌, 독자에게 실질적인 도움이 되는 가치 있는 콘텐츠를 생산하세요. ${systemPrompt}` },
+                        { role: "system", content: `당신은 SEO에 특화된 10년 경력의 전문 블로그 작가입니다. 독자가 궁금해하는 정보를 깊이 있게 분석하고, 매우 상세하고 친절한 어조로 글을 작성해야 합니다. 단순한 요약이 아닌, 독자에게 실질적인 도움이 되는 가치 있는 콘텐츠를 생산하세요. 반드시 JSON 형식으로 결과를 반환하세요. ${systemPrompt}` },
                         {
                             role: "user", content: `'${targetKeyword}' 주제로 완벽한 블로그 포스팅을 작성해줘. 다음 지침을 엄격히 준수하라:
 
@@ -124,7 +124,7 @@ export async function testPublishAction(data: {
                 })
                 let rawContent = completion.choices[0].message.content || '{}';
                 rawContent = rawContent.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
-                
+
                 aiResult = JSON.parse(rawContent)
                 title = aiResult.title || aiResult.subject || aiResult.header || '테스트 제목'
                 content = convertMarkdownToHtml(aiResult.content || aiResult.body || aiResult.text || aiResult.article || '테스트 본문')
@@ -199,8 +199,8 @@ export async function testPublishAction(data: {
                             }
                         } else if (imageSource === 'SCRAP') {
                             // AI가 생성한 영문 키워드 사용 (없으면 기본 키워드의 첫 단어 사용)
-                            const searchKeyword = (aiResult.imageKeywords && aiResult.imageKeywords[i-1]) 
-                                ? aiResult.imageKeywords[i-1] 
+                            const searchKeyword = (aiResult.imageKeywords && aiResult.imageKeywords[i - 1])
+                                ? aiResult.imageKeywords[i - 1]
                                 : (targetKeyword.split(' ')[0] || 'korea');
 
                             // Multi-Source Image Fetch
