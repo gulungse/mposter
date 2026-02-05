@@ -380,7 +380,10 @@ function TaskForm() {
                             >
                                 <option value="">AI 프롬프트를 선택하세요...</option>
                                 {prompts.map(p => (
-                                    <option key={p.id} value={p.id}>{p.title}</option>
+                                    <option key={p.id} value={p.id}>
+                                        {p.type === 'SYSTEM' ? '🤖 [시스템] ' : '👤 [커스텀] '}
+                                        {p.title}
+                                    </option>
                                 ))}
                             </select>
                         </div>
