@@ -379,12 +379,24 @@ function TaskForm() {
                                 className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
                             >
                                 <option value="">AI 프롬프트를 선택하세요...</option>
-                                {prompts.map(p => (
-                                    <option key={p.id} value={p.id}>
-                                        {p.type === 'SYSTEM' ? '🤖 [시스템] ' : '👤 [커스텀] '}
-                                        {p.title}
-                                    </option>
-                                ))}
+                                {prompts.filter(p => p.type === 'SYSTEM').length > 0 && (
+                                    <optgroup label="🤖 시스템 프롬프트" className="font-bold text-blue-600 dark:text-blue-400">
+                                        {prompts.filter(p => p.type === 'SYSTEM').map(p => (
+                                            <option key={p.id} value={p.id} className="text-blue-900 bg-blue-100 dark:text-white dark:bg-blue-900">
+                                                {p.title}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                )}
+                                {prompts.filter(p => p.type !== 'SYSTEM').length > 0 && (
+                                    <optgroup label="👤 커스텀 프롬프트" className="font-bold text-green-600 dark:text-green-400">
+                                        {prompts.filter(p => p.type !== 'SYSTEM').map(p => (
+                                            <option key={p.id} value={p.id} className="text-green-900 bg-green-100 dark:text-white dark:bg-green-900">
+                                                {p.title}
+                                            </option>
+                                        ))}
+                                    </optgroup>
+                                )}
                             </select>
                         </div>
                         <div className="space-y-1.5">
