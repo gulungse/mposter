@@ -4,11 +4,15 @@ import { useState, useEffect } from 'react'
 import { Key, Save, AlertCircle, Info, Loader2, CheckCircle2, XCircle, Sparkles, Brain, Image as ImageIcon, Globe, ExternalLink } from 'lucide-react'
 import { updateUserSettings, getUserSettings, validateOpenAI, validateGemini, validateAnthropic, validatePiApi, validatePixabay, validatePexels, validateUnsplash, validateFreepik } from '@/app/actions/user'
 import { clsx } from 'clsx'
+import { createPortal } from 'react-dom'
 
 export default function ApiManagementPage() {
     const [loading, setLoading] = useState(true)
-    const [saving, setSaving] = useState(false)
-    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+    // saving state can be general or per key, but for simplicity we keep it general or use a Set for tracking per-row saving?
+    // Let's use a state to track which key is saving.
+    const [savingKey, setSavingKey] = useState<string | null>(null)
+
+    const [toast, setToast] = useState<{ show: boolean, message: string, type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
 
     // API Keys State
     const [keys, setKeys] = useState({
@@ -54,16 +58,47 @@ export default function ApiManagementPage() {
         loadSettings()
     }, [])
 
-    const handleSave = async () => {
-        setSaving(true)
-        setMessage(null)
-        const res = await updateUserSettings(keys)
-        if (res.success) {
-            setMessage({ type: 'success', text: '모든 설정이 성공적으로 저장되었습니다.' })
-        } else {
-            setMessage({ type: 'error', text: res.error || '저장 중 오류가 발생했습니다.' })
+    const handleChange = (field: keyof typeof keys, type: string, value: string) => {
+        setKeys(prev => ({ ...prev, [field]: value }))
+        // 입력값이 변경되면 해당 타입의 검증 결과 초기화
+        setValidationResults(prev => ({ ...prev, [type]: null }))
+    }
+
+    const showToast = (message: string, type: 'success' | 'error') => {
+        setToast({ show: true, message, type })
+        setTimeout(() => setToast(prev => ({ ...prev, show: false })), 3000)
+    }
+
+    const handleSaveSingle = async (
+        keyName: string,
+        label: string,
+        validation: { success: boolean, message: string } | null | undefined,
+        skipValidation = false
+    ) => {
+        // 1. 검증 여부 확인 (skipValidation이 false일 때만 체크)
+        if (!skipValidation) {
+            if (!validation) {
+                showToast("먼저 '연결 테스트'를 진행해주세요.", 'error')
+                return
+            }
+
+            if (!validation.success) {
+                showToast("유효하지 않은 API 키입니다. 테스트를 통과해야 합니다.", 'error')
+                return
+            }
         }
-        setSaving(false)
+
+        setSavingKey(keyName)
+
+        // 현재 상태의 keys를 모두 저장하지만, 사용자에게는 해당 키만 저장한 것처럼 피드백
+        const res = await updateUserSettings(keys)
+
+        if (res.success) {
+            showToast(`${label} API 키 적용 완료!`, 'success')
+        } else {
+            showToast(res.error || '저장 중 오류가 발생했습니다.', 'error')
+        }
+        setSavingKey(null)
     }
 
     const testConnection = async (type: 'openai' | 'anthropic' | 'gemini' | 'piapi' | 'pixabay' | 'pexels' | 'unsplash' | 'freepik') => {
@@ -94,7 +129,7 @@ export default function ApiManagementPage() {
     }
 
     return (
-        <div className="p-8 space-y-8 max-w-5xl">
+        <div className="p-8 space-y-8 max-w-5xl relative">
             {/* Header */}
             <div>
                 <h1 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
@@ -106,13 +141,23 @@ export default function ApiManagementPage() {
                 </p>
             </div>
 
-            {message && (
-                <div className={clsx(
-                    "p-4 rounded-xl border text-sm font-bold flex items-center gap-3 animate-in fade-in slide-in-from-top-2",
-                    message.type === 'success' ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"
-                )}>
-                    {message.type === 'success' ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
-                    {message.text}
+            {/* Toast Notification */}
+            {toast.show && (
+                <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[9999] animate-in fade-in zoom-in duration-300">
+                    <div className={clsx(
+                        "px-12 py-10 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.2)] border flex flex-col items-center gap-6 min-w-[400px] bg-white/95 dark:bg-[#1a2333]/95 backdrop-blur-xl",
+                        toast.type === 'success'
+                            ? "border-green-500/30 text-green-600 dark:text-green-400"
+                            : "border-red-500/30 text-red-600 dark:text-red-400"
+                    )}>
+                        <div className={clsx(
+                            "p-4 rounded-full",
+                            toast.type === 'success' ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30"
+                        )}>
+                            {toast.type === 'success' ? <CheckCircle2 className="h-12 w-12" /> : <AlertCircle className="h-12 w-12" />}
+                        </div>
+                        <span className="font-black text-2xl text-slate-800 dark:text-white text-center">{toast.message}</span>
+                    </div>
                 </div>
             )}
 
@@ -141,8 +186,10 @@ export default function ApiManagementPage() {
                                 label="ChatGPT (OpenAI)"
                                 description="GPT-4o, GPT-4o-mini 모델을 사용하여 텍스트 콘텐츠를 생성합니다."
                                 value={keys.openaiApiKey}
-                                onChange={(v) => setKeys({ ...keys, openaiApiKey: v })}
+                                onChange={(v) => handleChange('openaiApiKey', 'openai', v)}
                                 onTest={() => testConnection('openai')}
+                                onSave={() => handleSaveSingle('openai', 'ChatGPT', validationResults['openai'])}
+                                isSaving={savingKey === 'openai'}
                                 isValidating={validating['openai']}
                                 validationResult={validationResults['openai']}
                                 icon={<Brain className="h-5 w-5 text-emerald-500" />}
@@ -153,8 +200,10 @@ export default function ApiManagementPage() {
                                 label="Claude 3 (Anthropic)"
                                 description="Claude 3 Opus 모델을 사용하여 고품질 텍스트 콘텐츠를 생성합니다."
                                 value={keys.anthropicApiKey}
-                                onChange={(v) => setKeys({ ...keys, anthropicApiKey: v })}
+                                onChange={(v) => handleChange('anthropicApiKey', 'anthropic', v)}
                                 onTest={() => testConnection('anthropic')}
+                                onSave={() => handleSaveSingle('anthropic', 'Claude 3', validationResults['anthropic'])}
+                                isSaving={savingKey === 'anthropic'}
                                 isValidating={validating['anthropic']}
                                 validationResult={validationResults['anthropic']}
                                 icon={<Sparkles className="h-5 w-5 text-orange-500" />}
@@ -165,8 +214,10 @@ export default function ApiManagementPage() {
                                 label="Gemini (Google)"
                                 description="Google의 최신 LLM을 사용하여 텍스트 및 멀티모달 콘텐츠를 생성합니다."
                                 value={keys.geminiApiKey}
-                                onChange={(v) => setKeys({ ...keys, geminiApiKey: v })}
+                                onChange={(v) => handleChange('geminiApiKey', 'gemini', v)}
                                 onTest={() => testConnection('gemini')}
+                                onSave={() => handleSaveSingle('gemini', 'Gemini', validationResults['gemini'])}
+                                isSaving={savingKey === 'gemini'}
                                 isValidating={validating['gemini']}
                                 validationResult={validationResults['gemini']}
                                 icon={<Sparkles className="h-5 w-5 text-blue-500" />}
@@ -177,8 +228,10 @@ export default function ApiManagementPage() {
                                 label="piAPI (FLUX)"
                                 description="FLUX 모델을 사용하여 고품질의 블로그 이미지를 생성합니다."
                                 value={keys.piApiKey}
-                                onChange={(v) => setKeys({ ...keys, piApiKey: v })}
+                                onChange={(v) => handleChange('piApiKey', 'piapi', v)}
                                 onTest={() => testConnection('piapi')}
+                                onSave={() => handleSaveSingle('piapi', 'piAPI', validationResults['piapi'])}
+                                isSaving={savingKey === 'piapi'}
                                 isValidating={validating['piapi']}
                                 validationResult={validationResults['piapi']}
                                 icon={<ImageIcon className="h-5 w-5 text-purple-500" />}
@@ -189,8 +242,10 @@ export default function ApiManagementPage() {
                                 label="Pixabay (무료 이미지)"
                                 description="Pixabay의 방대한 무료 이미지 라이브러리를 사용합니다."
                                 value={keys.pixabayApiKey}
-                                onChange={(v) => setKeys({ ...keys, pixabayApiKey: v })}
+                                onChange={(v) => handleChange('pixabayApiKey', 'pixabay', v)}
                                 onTest={() => testConnection('pixabay')}
+                                onSave={() => handleSaveSingle('pixabay', 'Pixabay', validationResults['pixabay'])}
+                                isSaving={savingKey === 'pixabay'}
                                 isValidating={validating['pixabay']}
                                 validationResult={validationResults['pixabay']}
                                 icon={<ImageIcon className="h-5 w-5 text-green-500" />}
@@ -201,8 +256,10 @@ export default function ApiManagementPage() {
                                 label="Pexels (무료 이미지)"
                                 description="Pexels의 감각적인 무료 사진을 사용합니다."
                                 value={keys.pexelsApiKey}
-                                onChange={(v) => setKeys({ ...keys, pexelsApiKey: v })}
+                                onChange={(v) => handleChange('pexelsApiKey', 'pexels', v)}
                                 onTest={() => testConnection('pexels')}
+                                onSave={() => handleSaveSingle('pexels', 'Pexels', validationResults['pexels'])}
+                                isSaving={savingKey === 'pexels'}
                                 isValidating={validating['pexels']}
                                 validationResult={validationResults['pexels']}
                                 icon={<ImageIcon className="h-5 w-5 text-teal-500" />}
@@ -213,8 +270,10 @@ export default function ApiManagementPage() {
                                 label="Freepik (고품질 이미지)"
                                 description="Freepik의 프리미엄급 이미지를 사용합니다."
                                 value={keys.freepikApiKey}
-                                onChange={(v) => setKeys({ ...keys, freepikApiKey: v })}
+                                onChange={(v) => handleChange('freepikApiKey', 'freepik', v)}
                                 onTest={() => testConnection('freepik')}
+                                onSave={() => handleSaveSingle('freepik', 'Freepik', validationResults['freepik'])}
+                                isSaving={savingKey === 'freepik'}
                                 isValidating={validating['freepik']}
                                 validationResult={validationResults['freepik']}
                                 icon={<ImageIcon className="h-5 w-5 text-blue-600" />}
@@ -237,7 +296,10 @@ export default function ApiManagementPage() {
                                     label="App ID"
                                     description="Application ID"
                                     value={keys.unsplashAppId}
-                                    onChange={(v) => setKeys({ ...keys, unsplashAppId: v })}
+                                    onChange={(v) => handleChange('unsplashAppId', 'unsplash', v)}
+                                    // App ID는 Access Key 테스트에 의존하거나 별도 테스트 없으므로 일단 검증 생략
+                                    onSave={() => handleSaveSingle('unsplash', 'Unsplash', null, true)}
+                                    isSaving={savingKey === 'unsplash'}
                                     isValidating={false}
                                     validationResult={null}
                                     icon={<ImageIcon className="h-5 w-5 text-gray-500" />}
@@ -247,8 +309,10 @@ export default function ApiManagementPage() {
                                     label="Access Key"
                                     description="Public Access Key"
                                     value={keys.unsplashAccessKey}
-                                    onChange={(v) => setKeys({ ...keys, unsplashAccessKey: v })}
+                                    onChange={(v) => handleChange('unsplashAccessKey', 'unsplash', v)}
                                     onTest={() => testConnection('unsplash')}
+                                    onSave={() => handleSaveSingle('unsplash', 'Unsplash', validationResults['unsplash'])}
+                                    isSaving={savingKey === 'unsplash'}
                                     isValidating={validating['unsplash']}
                                     validationResult={validationResults['unsplash']}
                                     icon={<Key className="h-5 w-5 text-gray-500" />}
@@ -258,7 +322,10 @@ export default function ApiManagementPage() {
                                     label="Secret Key"
                                     description="Secret Key (보안 주의)"
                                     value={keys.unsplashSecretKey}
-                                    onChange={(v) => setKeys({ ...keys, unsplashSecretKey: v })}
+                                    onChange={(v) => handleChange('unsplashSecretKey', 'unsplash', v)}
+                                    // Secret Key도 검증 생략
+                                    onSave={() => handleSaveSingle('unsplash', 'Unsplash', null, true)}
+                                    isSaving={savingKey === 'unsplash'}
                                     isValidating={false}
                                     validationResult={null}
                                     icon={<Key className="h-5 w-5 text-gray-500" />}
@@ -282,8 +349,10 @@ export default function ApiManagementPage() {
                                     label="Google Client ID"
                                     description="블로그스팟 연결을 위한 OAuth 2.0 클라이언트 ID입니다."
                                     value={keys.googleClientId || ''}
-                                    onChange={(v) => setKeys({ ...keys, googleClientId: v })}
-                                    onTest={() => { }}
+                                    onChange={(v) => handleChange('googleClientId', 'google', v)}
+                                    // Google OAuth는 테스트 버튼이 없으므로 검증 생략
+                                    onSave={() => handleSaveSingle('google', 'Google OAuth', null, true)}
+                                    isSaving={savingKey === 'google'}
                                     isValidating={false}
                                     validationResult={null}
                                     icon={<Globe className="h-5 w-5 text-amber-500" />}
@@ -294,8 +363,10 @@ export default function ApiManagementPage() {
                                     label="Google Client Secret"
                                     description="OAuth 2.0 클라이언트 보안 비밀번호입니다."
                                     value={keys.googleClientSecret || ''}
-                                    onChange={(v) => setKeys({ ...keys, googleClientSecret: v })}
-                                    onTest={() => { }}
+                                    onChange={(v) => handleChange('googleClientSecret', 'google', v)}
+                                    // Google OAuth는 테스트 버튼이 없으므로 검증 생략
+                                    onSave={() => handleSaveSingle('google', 'Google OAuth', null, true)}
+                                    isSaving={savingKey === 'google'}
                                     isValidating={false}
                                     validationResult={null}
                                     icon={<Globe className="h-5 w-5 text-amber-500" />}
@@ -304,17 +375,6 @@ export default function ApiManagementPage() {
                             </div>
                         </div>
 
-                        {/* Save Button */}
-                        <div className="flex justify-end pt-4">
-                            <button
-                                onClick={handleSave}
-                                disabled={saving}
-                                className="bg-blue-600 text-white px-8 py-3 rounded-xl text-base font-black flex items-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 active:scale-95"
-                            >
-                                {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                                모든 설정 저장하기
-                            </button>
-                        </div>
                     </div>
                 </div>
 
@@ -402,13 +462,15 @@ interface ApiInputRowProps {
     value: string
     onChange: (val: string) => void
     onTest?: () => void
+    onSave: () => void
+    isSaving: boolean
     isValidating: boolean
     validationResult: { success: boolean, message: string } | null | undefined
     icon: React.ReactNode
     placeholder: string
 }
 
-function ApiInputRow({ label, description, value, onChange, onTest, isValidating, validationResult, icon, placeholder }: ApiInputRowProps) {
+function ApiInputRow({ label, description, value, onChange, onTest, onSave, isSaving, isValidating, validationResult, icon, placeholder }: ApiInputRowProps) {
     return (
         <div className="bg-white dark:bg-[#111722] rounded-2xl border border-slate-200 dark:border-[#324467] shadow-sm overflow-hidden group transition-all hover:border-blue-400/50">
             <div className="p-6 space-y-4">
@@ -422,21 +484,37 @@ function ApiInputRow({ label, description, value, onChange, onTest, isValidating
                             <p className="text-xs text-slate-500 mt-0.5">{description}</p>
                         </div>
                     </div>
-                    {onTest && (
+
+                    <div className="flex items-center gap-2">
+                        {onTest && (
+                            <button
+                                onClick={onTest}
+                                disabled={isValidating || !value}
+                                className={clsx(
+                                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border",
+                                    !value
+                                        ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
+                                        : "bg-white dark:bg-transparent text-blue-600 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                )}
+                            >
+                                {isValidating ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                                연결 테스트
+                            </button>
+                        )}
+
                         <button
-                            onClick={onTest}
-                            disabled={isValidating || !value}
+                            onClick={onSave}
+                            disabled={isSaving}
                             className={clsx(
-                                "px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border",
-                                !value
-                                    ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
-                                    : "bg-white dark:bg-transparent text-blue-600 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border",
+                                "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:border-blue-700 active:scale-95",
+                                isSaving && "opacity-70 cursor-not-allowed"
                             )}
                         >
-                            {isValidating ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                            연결 테스트
+                            {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                            적용하기
                         </button>
-                    )}
+                    </div>
                 </div>
 
                 <div className="relative">
