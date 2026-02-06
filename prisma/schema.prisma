@@ -188,6 +188,7 @@ enum ImageSource {
 enum AIModel {
   GPT4O
   GEMINI
+  CLAUDE
 }
 
 // 발행 로그 모델

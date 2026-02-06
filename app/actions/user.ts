@@ -122,7 +122,7 @@ export async function validateUnsplash(accessKey: string) {
         })
         return { success: true, message: 'Unsplash API 연결 성공' }
     } catch (error: any) {
-         if (error.response?.status === 403 || error.response?.status === 401) {
+        if (error.response?.status === 403 || error.response?.status === 401) {
             return { success: false, message: 'Access Key가 유효하지 않거나 한도 초과입니다.' }
         }
         return { success: false, message: error.message || '연결 실패' }
@@ -144,6 +144,20 @@ export async function validateFreepik(apiKey: string) {
             return { success: false, message: 'API 키가 유효하지 않습니다.' }
         }
         return { success: false, message: error.message || '연결 실패' }
+    }
+}
+
+/**
+ * Anthropic (Claude) API 키 검증
+ */
+export async function validateAnthropic(apiKey: string) {
+    try {
+        const { Anthropic } = await import('@anthropic-ai/sdk')
+        const anthropic = new Anthropic({ apiKey })
+        await anthropic.models.list()
+        return { success: true, message: 'Claude API 연결 성공' }
+    } catch (error: any) {
+        return { success: false, message: '유효하지 않은 API 키입니다.' }
     }
 }
 import { createClient } from '@/lib/supabase/server'

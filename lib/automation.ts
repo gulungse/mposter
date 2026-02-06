@@ -152,6 +152,106 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
 }
 
 /**
+ * Claude (Opus)를 사용하여 콘텐츠를 생성합니다.
+ */
+export async function generateClaudeContent(apiKey: string, systemPrompt: string, targetKeyword: string) {
+    // 동적 import로 SDK 로드 (서버 사이드에서만 필요)
+    const { Anthropic } = await import('@anthropic-ai/sdk');
+
+    const anthropic = new Anthropic({
+        apiKey: apiKey,
+    });
+
+    console.log(`[Claude] Starting generation for: "${targetKeyword}" with Opus`);
+
+    try {
+        const msg = await anthropic.messages.create({
+            model: "claude-3-opus-20240229",
+            max_tokens: 4096,
+            system: `${systemPrompt}\n\n반드시 다음 JSON 형식으로만 응답하세요: {"title": "...", "content": "...", "imageKeywords": ["keyword1", ...]}`,
+            messages: [
+                {
+                    role: "user",
+                    content: `'${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘.
+1. 본문은 5개 이상의 문단, 2000자 이상으로 풍부하게 작성.
+2. <h1> 태그 사용 금지. <h2>, <h3>, <h4> 만 사용.
+3. SEO에 최적화된 유용한 정보 위주로 작성.
+4. **반드시 JSON 형식만 반환**하고, 마크다운 코드 블록(\`\`\`json)이나 사족을 달지 마시오.
+5. 'imageKeywords' 필드에는 이미지 검색용 영문 키워드 5개를 배열로 포함.`
+                }
+            ]
+        });
+
+        const textBlock = msg.content[0];
+        if (textBlock.type !== 'text') {
+            throw new Error('Claude 응답이 텍스트 형식이 아닙니다.');
+        }
+
+        let text = textBlock.text;
+
+        // JSON 정제
+        text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.warn('[Claude] JSON Parse Failed, attempting partial recovery', text.substring(0, 100));
+            return { title: targetKeyword, content: convertMarkdownToHtml(text) };
+        }
+
+    } catch (error: any) {
+        console.error('Claude API Error:', error);
+        throw new Error(`Claude 콘텐츠 생성 실패: ${error.message}`);
+    }
+}
+
+/**
+ * GPT-4o를 사용하여 콘텐츠를 생성합니다.
+ */
+export async function generateGPTContent(apiKey: string, systemPrompt: string, targetKeyword: string) {
+    const openai = new OpenAI({ apiKey })
+    const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+            { role: "system", content: `당신은 SEO에 특화된 10년 경력의 전문 블로그 작가입니다. 독자가 궁금해하는 정보를 깊이 있게 분석하고, 매우 상세하고 친절한 어조로 글을 작성해야 합니다. 단순한 요약이 아닌, 독자에게 실질적인 도움이 되는 가치 있는 콘텐츠를 생산하세요. 반드시 JSON 형식으로 결과를 반환하세요. ${systemPrompt}` },
+            {
+                role: "user", content: `'${targetKeyword}' 주제로 완벽한 블로그 포스팅을 작성해줘. 다음 지침을 엄격히 준수하라:
+
+1. [필수 분량]: 공백 제외 최소 2500자 이상 작성할 것. 내용이 짧거나 피상적이면 절대 안 됨.
+2. [구성 요소]:
+   - 매력적인 제목 (클릭을 유도하는 후킹 제목)
+   - 서론: 독자의 문제 제기 및 공감, 글을 읽어야 하는 이유 (300자 이상)
+   - 본론: 최소 5개 이상의 상세 소주제(h2/h3). 각 소주제는 깊이 있는 분석과 예시, 통계, 전문가 의견 등을 포함하여 500자 이상 서술할 것.
+   - 결론: 핵심 요약 및 독자의 행동 유도 (Call to Action).
+   - FAQ: 자주 묻는 질문 3~4개와 그에 대한 명확한 답변.
+3. [형식 및 스타일]:
+   - 반드시 HTML 태그(<p>, <h3>, <ul>, <li>, <strong>, <blockquote> 등)를 사용하여 가독성을 극대화할 것.
+   - **절영코 <h1> 태그를 본문에 쓰지 말 것.** (제목과 중복됨). <h2>부터 시작할 것.
+   - 문체: 친근하고 전문적인 '해요체' 사용.
+   - 내용 중 '${targetKeyword}' 키워드를 자연스럽게 8회 이상 포함할 것.
+   - [반드시 준수할 포맷 규칙]:
+   - **반드시** 순수한 JSON만 반환할 것.
+   - **마크다운(Markdown) 문법을 절대 본문에 포함하지 마시오.** (예: ###, **, - 등 금지)
+   - 모든 제목과 강조는 오직 HTML 태그(h2, h3, strong)로만 작성해야 함. 만약 마크다운이 발견되면 시스템 오류로 처리됨.
+   - 키워드와 연관된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 포함할 것.
+
+   - 예시: {"title": "...", "content": "...", "imageKeywords": ["tax", "office", "money", "paper", "calculator"]}` }
+        ],
+        max_tokens: 4096,
+        response_format: { type: "json_object" }
+    })
+
+    let rawContent = completion.choices[0].message.content || '{}';
+    rawContent = rawContent.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
+
+    try {
+        return JSON.parse(rawContent)
+    } catch (e) {
+        return { title: targetKeyword, content: rawContent }
+    }
+}
+
+/**
  * 마크다운 문법을 HTML로 강제 변환 (Failsafe)
  */
 function convertMarkdownToHtml(text: string): string {
@@ -356,57 +456,20 @@ export async function processAutomationJob(jobId: string) {
         const aiModel = (job as any).aiModel || 'GPT4O'
         const systemPrompt = job.prompt?.content || 'SEO 블로거로서 글을 작성해줘.'
 
-        if (aiModel === 'GPT4O') {
-            const apiKey = settings.openaiApiKey
-            const openai = new OpenAI({ apiKey })
-            const completion = await openai.chat.completions.create({
-                model: "gpt-4o",
-                messages: [
-                    { role: "system", content: `당신은 SEO에 특화된 10년 경력의 전문 블로그 작가입니다. 독자가 궁금해하는 정보를 깊이 있게 분석하고, 매우 상세하고 친절한 어조로 글을 작성해야 합니다. 단순한 요약이 아닌, 독자에게 실질적인 도움이 되는 가치 있는 콘텐츠를 생산하세요. 반드시 JSON 형식으로 결과를 반환하세요. ${systemPrompt}` },
-                    {
-                        role: "user", content: `'${targetKeyword}' 주제로 완벽한 블로그 포스팅을 작성해줘. 다음 지침을 엄격히 준수하라:
-
-1. [필수 분량]: 공백 제외 최소 2500자 이상 작성할 것. 내용이 짧거나 피상적이면 절대 안 됨.
-2. [구성 요소]:
-   - 매력적인 제목 (클릭을 유도하는 후킹 제목)
-   - 서론: 독자의 문제 제기 및 공감, 글을 읽어야 하는 이유 (300자 이상)
-   - 본론: 최소 5개 이상의 상세 소주제(h2/h3). 각 소주제는 깊이 있는 분석과 예시, 통계, 전문가 의견 등을 포함하여 500자 이상 서술할 것.
-   - 결론: 핵심 요약 및 독자의 행동 유도 (Call to Action).
-   - FAQ: 자주 묻는 질문 3~4개와 그에 대한 명확한 답변.
-3. [형식 및 스타일]:
-   - 반드시 HTML 태그(<p>, <h3>, <ul>, <li>, <strong>, <blockquote> 등)를 사용하여 가독성을 극대화할 것.
-   - **절영코 <h1> 태그를 본문에 쓰지 말 것.** (제목과 중복됨). <h2>부터 시작할 것.
-   - 문체: 친근하고 전문적인 '해요체' 사용.
-   - 내용 중 '${targetKeyword}' 키워드를 자연스럽게 8회 이상 포함할 것.
-   - [반드시 준수할 포맷 규칙]:
-   - **반드시** 순수한 JSON만 반환할 것.
-   - **마크다운(Markdown) 문법을 절대 본문에 포함하지 마시오.** (예: ###, **, - 등 금지)
-   - 모든 제목과 강조는 오직 HTML 태그(h2, h3, strong)로만 작성해야 함. 만약 마크다운이 발견되면 시스템 오류로 처리됨.
-   - 키워드와 연관된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 포함할 것.
-
-   - 예시: {"title": "...", "content": "...", "imageKeywords": ["tax", "office", "money", "paper", "calculator"]}` }
-                ],
-                max_tokens: 4096,
-                response_format: { type: "json_object" }
-            })
-            let rawContent = completion.choices[0].message.content || '{}';
-            // 마크다운 코드 블록 제거
-            rawContent = rawContent.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
-
-            aiResult = JSON.parse(rawContent)
-            title = aiResult.title || aiResult.subject || targetKeyword
-            content = convertMarkdownToHtml(aiResult.content || aiResult.body || aiResult.text || targetKeyword)
-
-            if (content === targetKeyword && completion.choices[0].message.content) {
-                content = completion.choices[0].message.content;
-            }
+        if (aiModel === 'GEMINI') {
+            if (!settings.geminiApiKey) throw new Error('Gemini API 키가 설정되지 않았습니다.')
+            aiResult = await generateGeminiContent(settings.geminiApiKey, systemPrompt, targetKeyword)
+        } else if (aiModel === 'CLAUDE') {
+            if (!settings.anthropicApiKey) throw new Error('Claude API 키가 설정되지 않았습니다.')
+            aiResult = await generateClaudeContent(settings.anthropicApiKey, systemPrompt, targetKeyword)
         } else {
-            const apiKey = settings.geminiApiKey
-            if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
-            aiResult = await generateGeminiContent(apiKey, systemPrompt, targetKeyword)
-            title = aiResult.title || targetKeyword
-            content = convertMarkdownToHtml(aiResult.content || targetKeyword)
+            // Default: GPT4O
+            if (!settings.openaiApiKey) throw new Error('OpenAI API 키가 설정되지 않았습니다.')
+            aiResult = await generateGPTContent(settings.openaiApiKey, systemPrompt, targetKeyword)
         }
+
+        title = aiResult.title || targetKeyword
+        content = convertMarkdownToHtml(aiResult.content || targetKeyword)
 
         // --- 이미지 생성 및 삽입 로직 ---
         const imageSource = (job as any).imageSource || 'NONE'

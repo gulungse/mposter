@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Key, Save, AlertCircle, Info, Loader2, CheckCircle2, XCircle, Sparkles, Brain, Image as ImageIcon, Globe, ExternalLink } from 'lucide-react'
-import { updateUserSettings, getUserSettings, validateOpenAI, validateGemini, validatePiApi, validatePixabay, validatePexels, validateUnsplash, validateFreepik } from '@/app/actions/user'
+import { updateUserSettings, getUserSettings, validateOpenAI, validateGemini, validateAnthropic, validatePiApi, validatePixabay, validatePexels, validateUnsplash, validateFreepik } from '@/app/actions/user'
 import { clsx } from 'clsx'
 
 export default function ApiManagementPage() {
@@ -13,6 +13,7 @@ export default function ApiManagementPage() {
     // API Keys State
     const [keys, setKeys] = useState({
         openaiApiKey: '',
+        anthropicApiKey: '',
         geminiApiKey: '',
         piApiKey: '',
         pixabayApiKey: '',
@@ -35,6 +36,7 @@ export default function ApiManagementPage() {
             if (res.success && res.data) {
                 setKeys({
                     openaiApiKey: res.data.openaiApiKey || '',
+                    anthropicApiKey: res.data.anthropicApiKey || '',
                     geminiApiKey: res.data.geminiApiKey || '',
                     piApiKey: res.data.piApiKey || '',
                     pixabayApiKey: res.data.pixabayApiKey || '',
@@ -64,12 +66,13 @@ export default function ApiManagementPage() {
         setSaving(false)
     }
 
-    const testConnection = async (type: 'openai' | 'gemini' | 'piapi' | 'pixabay' | 'pexels' | 'unsplash' | 'freepik') => {
+    const testConnection = async (type: 'openai' | 'anthropic' | 'gemini' | 'piapi' | 'pixabay' | 'pexels' | 'unsplash' | 'freepik') => {
         setValidating(prev => ({ ...prev, [type]: true }))
         setValidationResults(prev => ({ ...prev, [type]: null }))
 
         let result;
         if (type === 'openai') result = await validateOpenAI(keys.openaiApiKey)
+        else if (type === 'anthropic') result = await validateAnthropic(keys.anthropicApiKey)
         else if (type === 'gemini') result = await validateGemini(keys.geminiApiKey)
         else if (type === 'piapi') result = await validatePiApi(keys.piApiKey)
         else if (type === 'pixabay') result = await validatePixabay(keys.pixabayApiKey)
@@ -115,7 +118,7 @@ export default function ApiManagementPage() {
 
             {/* Main Layout Grid */}
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-8 items-start">
-                
+
                 {/* Left Column: API Inputs */}
                 <div className="xl:col-span-3 space-y-8">
                     {/* Notice Card */}
@@ -144,6 +147,18 @@ export default function ApiManagementPage() {
                                 validationResult={validationResults['openai']}
                                 icon={<Brain className="h-5 w-5 text-emerald-500" />}
                                 placeholder="sk-..."
+                            />
+
+                            <ApiInputRow
+                                label="Claude 3 (Anthropic)"
+                                description="Claude 3 Opus 모델을 사용하여 고품질 텍스트 콘텐츠를 생성합니다."
+                                value={keys.anthropicApiKey}
+                                onChange={(v) => setKeys({ ...keys, anthropicApiKey: v })}
+                                onTest={() => testConnection('anthropic')}
+                                isValidating={validating['anthropic']}
+                                validationResult={validationResults['anthropic']}
+                                icon={<Sparkles className="h-5 w-5 text-orange-500" />}
+                                placeholder="sk-ant-..."
                             />
 
                             <ApiInputRow
@@ -206,12 +221,12 @@ export default function ApiManagementPage() {
                                 placeholder="Freepik API Key"
                             />
                         </div>
-                        
+
                         <div className="space-y-6">
                             <div className="w-full h-px bg-slate-100 dark:bg-slate-800" />
-                            
+
                             <div className="flex items-center gap-2">
-                                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                     <ImageIcon className="h-5 w-5 text-gray-500" />
                                     Unsplash 설정 (App ID, Access Key, Secret Key)
                                 </h3>
@@ -310,21 +325,21 @@ export default function ApiManagementPage() {
                             텍스트 생성 API
                         </h3>
                         <div className="grid grid-cols-1 gap-3">
-                            <ExternalLinkBtn 
+                            <ExternalLinkBtn
                                 href="https://openai.com/ko-KR/index/openai-api/"
                                 icon={<Brain className="h-5 w-5" />}
                                 label="OpenAI API"
                                 subLabel="유료"
                                 color="bg-[#10a37f]"
                             />
-                            <ExternalLinkBtn 
+                            <ExternalLinkBtn
                                 href="https://aistudio.google.com/app/api-keys?hl=ko"
                                 icon={<Sparkles className="h-5 w-5" />}
                                 label="Gemini API"
                                 subLabel="일정량 무료"
                                 color="bg-[#4285f4]"
                             />
-                            <ExternalLinkBtn 
+                            <ExternalLinkBtn
                                 href="https://console.cloud.google.com/welcome"
                                 icon={<Globe className="h-5 w-5" />}
                                 label="Google Cloud"
@@ -337,35 +352,35 @@ export default function ApiManagementPage() {
                             이미지 생성/검색 API
                         </h3>
                         <div className="grid grid-cols-1 gap-3">
-                            <ExternalLinkBtn 
+                            <ExternalLinkBtn
                                 href="https://piapi.ai/"
                                 icon={<ImageIcon className="h-5 w-5" />}
                                 label="PiAPI (FLUX)"
                                 subLabel="유료"
                                 color="bg-[#8e24aa]"
                             />
-                            <ExternalLinkBtn 
+                            <ExternalLinkBtn
                                 href="https://pixabay.com/service/about/api/"
                                 icon={<ImageIcon className="h-5 w-5" />}
                                 label="Pixabay"
                                 subLabel="무료"
                                 color="bg-[#02be6e]"
                             />
-                            <ExternalLinkBtn 
+                            <ExternalLinkBtn
                                 href="https://www.pexels.com/api/"
                                 icon={<ImageIcon className="h-5 w-5" />}
                                 label="Pexels"
                                 subLabel="무료"
                                 color="bg-[#05a081]"
                             />
-                            <ExternalLinkBtn 
+                            <ExternalLinkBtn
                                 href="https://unsplash.com/developers"
                                 icon={<ImageIcon className="h-5 w-5" />}
                                 label="Unsplash"
                                 subLabel="무료"
                                 color="bg-[#000000]"
                             />
-                            <ExternalLinkBtn 
+                            <ExternalLinkBtn
                                 href="https://www.freepik.com/api"
                                 icon={<ImageIcon className="h-5 w-5" />}
                                 label="Freepik"

@@ -8,6 +8,7 @@ import * as cheerio from 'cheerio'
 import {
     processAutomationJob,
     generateGeminiContent,
+    generateClaudeContent,
     generateFluxImage,
     generateThumbnail,
     uploadToWordPress,
@@ -48,7 +49,7 @@ export async function testPublishAction(data: {
     keywordGroupId?: string;
     keywords?: string[];
     promptId: string;
-    aiModel: 'GPT4O' | 'GEMINI';
+    aiModel: 'GPT4O' | 'GEMINI' | 'CLAUDE';
     imageSource: 'SCRAP' | 'DALLE' | 'FLUX' | 'NONE';
     imageCount?: number;
     wpCategoryId?: number;
@@ -132,12 +133,21 @@ export async function testPublishAction(data: {
                 if (content === '테스트 본문' && completion.choices[0].message.content) {
                     content = completion.choices[0].message.content;
                 }
-            } else {
+            } else if (data.aiModel === 'CLAUDE') { // Added CLAUDE case
+                const apiKey = settings.anthropicApiKey
+                if (!apiKey) throw new Error('Claude API 키가 설정되어 있지 않습니다.')
+                aiResult = await generateClaudeContent(apiKey, systemPrompt, targetKeyword)
+                title = aiResult.title || '테스트 제목'
+                content = convertMarkdownToHtml(aiResult.content || '테스트 본문')
+            } else if (data.aiModel === 'GEMINI') { // Explicitly handle GEMINI
                 const apiKey = settings.geminiApiKey
                 if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
                 aiResult = await generateGeminiContent(apiKey, systemPrompt, targetKeyword)
                 title = aiResult.title || '테스트 제목'
                 content = convertMarkdownToHtml(aiResult.content || '테스트 본문')
+            } else {
+                // Fallback or error for unsupported AI models if needed
+                throw new Error(`지원하지 않는 AI 모델입니다: ${data.aiModel}`);
             }
         } catch (err: any) {
             console.error('AI Generation Failed:', err)

@@ -34,11 +34,11 @@ async function validateWordPressConnection(url: string, username: string | undef
         return { success: true }
     } catch (err: any) {
         console.error('WP Connection Test Failed:', err.message)
-        
+
         if (err.response?.status === 401) {
-            return { 
-                success: false, 
-                message: '워드프레스 인증 실패 (401): 입력하신 아이디(Username) 또는 앱 비밀번호가 올바르지 않습니다. 워드프레스 사용자 목록의 아이디와 정확히 일치하는지 확인해주세요.' 
+            return {
+                success: false,
+                message: '워드프레스 인증 실패 (401): 입력하신 아이디(Username) 또는 앱 비밀번호가 올바르지 않습니다. 워드프레스 사용자 목록의 아이디와 정확히 일치하는지 확인해주세요.'
             }
         }
 
@@ -104,14 +104,11 @@ export async function createSite(data: {
 }
 
 export async function getSites() {
-    const supabase = await createClient()
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-
-    if (!authUser) return { success: false, error: '인증 필요', data: [] }
-
     try {
+        const user = await getOrCreateUser()
+
         const sites = await prisma.site.findMany({
-            where: { userId: authUser.id },
+            where: { userId: user.id },
             orderBy: { createdAt: 'desc' }
         })
         return { success: true, data: sites }

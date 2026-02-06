@@ -1,96 +1,138 @@
 'use server'
 
-import { prisma } from '@/lib/prisma'
-import { createClient } from '@/lib/supabase/server'
-import { UserRole } from '@prisma/client'
+import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
+import { getOrCreateUser } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
 /**
- * 모든 사용자 목록 조회 (관리자 전용)
+ * 특정 회원으로 접속 (Impersonate)
  */
-export async function getUsers() {
-    const supabase = await createClient()
-    const { data: { user: authUser } } = await supabase.auth.getUser()
+export async function impersonateUser(userId: string) {
+    try {
+        // 보안 검증: 현재 '실제' 접속자가 ADMIN인지 확인
+        // 주의: getOrCreateUser() 자체가 임퍼스네이션된 유저를 반환하므로,
+        // 여기서는 임퍼스네이션을 우회하여 실제 유저를 확인해야 함.
 
-    if (!authUser) return { success: false, error: '인증이 필요합니다.' }
+        // 가장 안전한 방법: Supabase Auth ID로 직접 DB 조회하여 권한 확인
+        const { createClient } = await import('@/lib/supabase/server')
+        const supabase = await createClient()
+        const { data: { user: authUser } } = await supabase.auth.getUser()
 
-    // 현재 사용자 권한 확인
-    const currentUser = await prisma.user.findUnique({ where: { id: authUser.id } })
-    if (!currentUser || currentUser.role !== 'ADMIN') {
-        return { success: false, error: '관리자 권한이 필요합니다.' }
+        if (!authUser) {
+            return { success: false, message: '로그인이 필요합니다.' }
+        }
+
+        const realUser = await prisma.user.findUnique({
+            where: { id: authUser.id }
+        })
+
+        if (!realUser || realUser.role !== 'ADMIN') {
+            return { success: false, message: '관리자 권한이 없습니다.' }
+        }
+
+        // 권한 확인 완료 -> 쿠키 설정
+        const cookieStore = await cookies()
+        cookieStore.set('x-impersonate-user-id', userId, {
+            path: '/',
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax'
+        })
+
+        revalidatePath('/')
+        return { success: true }
+    } catch (error) {
+        console.error('Impersonation failed:', error)
+        return { success: false, message: '접속 실패' }
     }
+}
+
+/**
+ * 접속 종료 (원래 계정으로 복귀)
+ */
+export async function stopImpersonating() {
+    const cookieStore = await cookies()
+    cookieStore.delete('x-impersonate-user-id')
+    revalidatePath('/')
+    return { success: true }
+}
+
+/**
+ * 현재 접속 상태 확인 (배너 표시용)
+ */
+export async function getImpersonationStatus() {
+    const cookieStore = await cookies()
+    const impersonatedId = cookieStore.get('x-impersonate-user-id')?.value
+
+    if (!impersonatedId) return { isImpersonating: false }
 
     try {
+        const targetUser = await prisma.user.findUnique({
+            where: { id: impersonatedId },
+            select: { name: true, email: true }
+        })
+
+        if (!targetUser) return { isImpersonating: false }
+
+        return {
+            isImpersonating: true,
+            targetUser
+        }
+    } catch (error) {
+        return { isImpersonating: false }
+    }
+}
+
+/**
+ * 전체 사용자 목록 조회 (관리자 전용)
+ */
+export async function getUsers() {
+    try {
+        const user = await getOrCreateUser()
+        if (user.role !== 'ADMIN') {
+            return { success: false, error: '권한이 없습니다.' }
+        }
+
         const users = await prisma.user.findMany({
             orderBy: { createdAt: 'desc' }
         })
         return { success: true, data: users }
     } catch (error) {
-        console.error('사용자 목록 조회 실패:', error)
-        return { success: false, error: '사용자 목록을 가져오는 중 오류가 발생했습니다.' }
+        return { success: false, error: '사용자 목록을 불러올 수 없습니다.' }
     }
 }
 
 /**
- * 사용자 역할(Role) 변경
- */
-export async function updateUserRole(userId: string, newRole: UserRole) {
-    const supabase = await createClient()
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-
-    if (!authUser) return { success: false, error: '인증이 필요합니다.' }
-
-    const currentUser = await prisma.user.findUnique({ where: { id: authUser.id } })
-    if (!currentUser || currentUser.role !== 'ADMIN') {
-        return { success: false, error: '관리자 권한이 필요합니다.' }
-    }
-
-    try {
-        await prisma.user.update({
-            where: { id: userId },
-            data: { role: newRole }
-        })
-        revalidatePath('/dashboard/admin/users')
-        return { success: true }
-    } catch (error) {
-        console.error('역할 업데이트 실패:', error)
-        return { success: false, error: '역할을 변경하는 중 오류가 발생했습니다.' }
-    }
-}
-
-/**
- * 사용자 토큰 잔액 수정
+ * 사용자 토큰 수동 조정 (관리자 전용)
  */
 export async function updateUserTokens(userId: string, amount: number, description: string) {
-    const supabase = await createClient()
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-
-    if (!authUser) return { success: false, error: '인증이 필요합니다.' }
-
-    const currentUser = await prisma.user.findUnique({ where: { id: authUser.id } })
-    if (!currentUser || currentUser.role !== 'ADMIN') {
-        return { success: false, error: '관리자 권한이 필요합니다.' }
-    }
-
     try {
-        await prisma.$transaction([
-            prisma.user.update({
+        const user = await getOrCreateUser()
+        if (user.role !== 'ADMIN') {
+            return { success: false, error: '권한이 없습니다.' }
+        }
+
+        await prisma.$transaction(async (tx) => {
+            await tx.user.update({
                 where: { id: userId },
                 data: { tokenBalance: { increment: amount } }
-            }),
-            prisma.transaction.create({
+            })
+
+            await tx.transaction.create({
                 data: {
                     userId,
                     amount,
-                    description,
-                    type: amount > 0 ? 'CHARGE' : 'USAGE'
+                    type: amount >= 0 ? 'BONUS' : 'USAGE', // Positive = BONUS, Negative = USAGE
+                    description
                 }
             })
-        ])
+        })
+
         revalidatePath('/dashboard/admin/users')
         return { success: true }
     } catch (error) {
-        console.error('토큰 충전 실패:', error)
-        return { success: false, error: '토큰을 조정하는 중 오류가 발생했습니다.' }
+        console.error('Token update failed:', error)
+        return { success: false, error: '토큰 조정에 실패했습니다.' }
     }
 }

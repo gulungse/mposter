@@ -1,5 +1,6 @@
 
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 
@@ -128,6 +129,27 @@ export async function getOrCreateUser() {
             }
         } catch (e) {
             console.error("Failed to apply verification bonus:", e)
+        }
+    }
+
+
+    // ----------------------------------------------------------------
+    // ADMIN IMPERSONATION CHECK
+    // ----------------------------------------------------------------
+    if (user && user.role === 'ADMIN') {
+        const cookieStore = await cookies()
+        const impersonateId = cookieStore.get('x-impersonate-user-id')?.value
+
+        if (impersonateId) {
+            // Find the target user
+            const targetUser = await prisma.user.findUnique({
+                where: { id: impersonateId }
+            })
+
+            if (targetUser) {
+                // Return the target user context
+                return targetUser
+            }
         }
     }
 

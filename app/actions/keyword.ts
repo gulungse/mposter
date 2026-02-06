@@ -58,14 +58,11 @@ export async function createKeywordGroup(name: string, keywords: string[]) {
 
 // 키워드 그룹 목록 조회
 export async function getKeywordGroups() {
-    const supabase = await createClient()
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-
-    if (!authUser) return { success: false, error: '인증 필요', data: [] }
-
     try {
+        const user = await getOrCreateUser()
+
         const groups = await prisma.keywordGroup.findMany({
-            where: { userId: authUser.id },
+            where: { userId: user.id },
             orderBy: { createdAt: 'desc' }
         })
         return { success: true, data: groups }

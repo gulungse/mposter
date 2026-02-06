@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Shield, ShieldAlert, Coins, Search, UserCheck } from 'lucide-react'
+import { Shield, ShieldAlert, Coins, Search, UserCheck, Eye } from 'lucide-react'
 import { clsx } from 'clsx'
 import { TokenAdjustmentModal } from './token-modal'
 
@@ -99,6 +99,23 @@ export function UserTable({ users }: UserTableProps) {
                                                 title="토큰 조정"
                                             >
                                                 <Coins className="h-4 w-4" />
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    if (confirm(`${user.name}님으로 접속하시겠습니까?`)) {
+                                                        const { impersonateUser } = await import('@/app/actions/admin')
+                                                        const res = await impersonateUser(user.id)
+                                                        if (res.success) {
+                                                            window.location.reload()
+                                                        } else {
+                                                            alert(res.message)
+                                                        }
+                                                    }
+                                                }}
+                                                className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                                                title="이 사용자로 접속 (View As)"
+                                            >
+                                                <Eye className="h-4 w-4" />
                                             </button>
                                         </div>
                                     </td>

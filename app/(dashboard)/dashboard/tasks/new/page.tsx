@@ -9,7 +9,8 @@ import {
     Sparkles as SparklesIcon,
     Layers as LayersIcon,
     CheckCircle2 as CheckCircle2Icon,
-    ArrowLeft as ArrowLeftIcon
+    ArrowLeft as ArrowLeftIcon,
+    Bot as BotIcon
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -340,7 +341,7 @@ function TaskForm() {
                         <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-black text-xs">3</div>
                         <h3 className="text-lg font-bold text-foreground">글쓰기 AI 선택</h3>
                     </div>
-                    <div className="pl-9 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="pl-9 grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div
                             onClick={() => setFormData({ ...formData, aiModel: 'GPT4O' })}
                             className={`cursor-pointer rounded-lg border p-4 flex items-start gap-3 transition-all ${formData.aiModel === 'GPT4O' ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-primary/50'}`}
@@ -353,6 +354,20 @@ function TaskForm() {
                                 <p className="text-xs text-muted-foreground mt-0.5">창의적이고 매력적인 콘텐츠 생성에 적합합니다.</p>
                             </div>
                             {formData.aiModel === 'GPT4O' && <CheckCircle2Icon className="ml-auto h-4 w-4 text-primary" />}
+                        </div>
+
+                        <div
+                            onClick={() => setFormData({ ...formData, aiModel: 'CLAUDE' })}
+                            className={`cursor-pointer rounded-lg border p-4 flex items-start gap-3 transition-all ${formData.aiModel === 'CLAUDE' ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-primary/50'}`}
+                        >
+                            <div className="h-8 w-8 rounded bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0">
+                                <BotIcon className="h-4 w-4" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm text-foreground">Claude 3 Opus</h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">가장 자연스럽고 인간적인 글쓰기 능력.</p>
+                            </div>
+                            {formData.aiModel === 'CLAUDE' && <CheckCircle2Icon className="ml-auto h-4 w-4 text-primary" />}
                         </div>
 
                         <div
