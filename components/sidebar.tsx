@@ -17,7 +17,8 @@ import {
     LogOut,
     ChevronsUpDown,
     ShoppingBag,
-    X
+    X,
+    ScrollText
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -29,7 +30,7 @@ import { createClient } from '@/lib/supabase/client'
 import { DeleteAccountButton } from '@/components/delete-account-button'
 
 const ICON_MAP: Record<string, any> = {
-    LayoutDashboard, Globe, Key, Terminal, Cpu, Code2, MenuIcon, Coins, ShoppingBag
+    LayoutDashboard, Globe, Key, Terminal, Cpu, Code2, MenuIcon, Coins, ShoppingBag, ScrollText
 }
 
 interface SidebarProps {
@@ -68,6 +69,7 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                 { href: '/dashboard/prompts', icon: 'Terminal', label: '프롬프트 관리' },
                 { href: '/dashboard/tasks', icon: 'Cpu', label: '자동화 작업' },
                 { href: '/dashboard/api', icon: 'Code2', label: 'API 관리' },
+                { href: '/dashboard/logs', icon: 'ScrollText', label: '활동 로그' },
                 { href: '/dashboard/shop', icon: 'Coins', label: '충전소/상점' },
             ]
 

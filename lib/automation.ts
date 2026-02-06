@@ -11,6 +11,33 @@ import { createElement } from 'react'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 
+// Helper to clean and parse JSON from AI responses
+function cleanAndParseJson(text: string): any {
+    if (!text) return {};
+
+    // 1. Remove markdown code blocks (```json ... ```)
+    let cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
+
+    // 2. Replace smart quotes with standard quotes
+    cleaned = cleaned.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+
+    // 3. Find the first '{' and last '}' to isolate JSON object
+    const firstOpen = cleaned.indexOf('{');
+    const lastClose = cleaned.lastIndexOf('}');
+
+    if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+        cleaned = cleaned.substring(firstOpen, lastClose + 1);
+    }
+
+    try {
+        return JSON.parse(cleaned);
+    } catch (e) {
+        // console.warn('JSON Parse Failed, attempting manual cleanup', e);
+        // Fallback: Return text as content if parsing fails completely
+        return { title: '', content: text, imageKeywords: [] };
+    }
+}
+
 /**
  * 블로거(Blogger)의 만료된 Access Token을 Refresh Token으로 갱신합니다.
  */
@@ -139,16 +166,8 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
         throw new Error(`Gemini 콘텐츠 생성 실패 (${modelId}): ${lastError}`)
     }
 
-    // JSON 응답 정제 (2중 안전장치)
-    const cleanedText = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim()
-    try {
-        return JSON.parse(cleanedText || '{}')
-    } catch (e) {
-        // 완전한 JSON이 아닐 경우 최소한의 구조 생성
-        return { title: targetKeyword, content: text }
-        // 완전한 JSON이 아닐 경우 최소한의 구조 생성
-        return { title: targetKeyword, content: text }
-    }
+    // JSON 응답 정제 (2중 안전장치 + 스마트 따옴표 처리)
+    return cleanAndParseJson(text);
 }
 
 /**
@@ -190,14 +209,7 @@ export async function generateClaudeContent(apiKey: string, systemPrompt: string
         let text = textBlock.text;
 
         // JSON 정제
-        text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
-
-        try {
-            return JSON.parse(text);
-        } catch (e) {
-            console.warn('[Claude] JSON Parse Failed, attempting partial recovery', text.substring(0, 100));
-            return { title: targetKeyword, content: convertMarkdownToHtml(text) };
-        }
+        return cleanAndParseJson(text);
 
     } catch (error: any) {
         console.error('Claude API Error:', error);
@@ -242,13 +254,7 @@ export async function generateGPTContent(apiKey: string, systemPrompt: string, t
     })
 
     let rawContent = completion.choices[0].message.content || '{}';
-    rawContent = rawContent.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
-
-    try {
-        return JSON.parse(rawContent)
-    } catch (e) {
-        return { title: targetKeyword, content: rawContent }
-    }
+    return cleanAndParseJson(rawContent);
 }
 
 /**
@@ -424,6 +430,8 @@ export async function uploadToWordPress(site: any, imageBuffer: Buffer, filename
  * 자동화 작업 실행 전담 로직 (Auth Check 없음 - Cron에서 사용)
  */
 export async function processAutomationJob(jobId: string) {
+    let logId: string | null = null;
+
     try {
         // 여기서 jobId만으로 Job 검색 (userId 검증 없음 - 시스템 실행)
         const job = await prisma.automationJob.findUnique({
@@ -446,9 +454,25 @@ export async function processAutomationJob(jobId: string) {
 
         const targetKeyword = keywords[Math.floor(Math.random() * keywords.length)]
 
+        // 1. 로그 생성 (가장 먼저 수행하여 에러 추적 가능하게 함)
         const log = await prisma.postLog.create({
             data: { userId: user.id, jobId: job.id, keyword: targetKeyword, status: 'PROCESSING' }
         })
+        logId = log.id;
+
+        // 2. 실행 전 토큰 잔액 체크 (안전장치) - 에러 시 로그 업데이트를 위해 위로 이동
+        // 예상 비용 계산
+        let globalSettings = await prisma.globalSetting.findUnique({ where: { id: 'SYSTEM' } })
+        const costs = globalSettings || { costPerPost: 1, costPerScrap: 1, costPerAIImage: 2 }
+        const imageSource = (job as any).imageSource || 'NONE'
+        const imageCount = (job as any).imageCount || 1
+
+        // 최소 예상 비용 (이미지 생성 수에 따라 달라질 수 있지만, 일단 최소치 혹은 Max치로 체크?)
+        // 여기서는 기본 포스팅 비용만 먼저 체크하거나, 엄격하게 체크
+        if (user.tokenBalance < costs.costPerPost) {
+            throw new Error(`보유 토큰이 부족합니다. (보유: ${user.tokenBalance}, 필요: ${costs.costPerPost} 이상)`);
+        }
+
 
         let title = ''
         let content = ''
@@ -457,14 +481,14 @@ export async function processAutomationJob(jobId: string) {
         const systemPrompt = job.prompt?.content || 'SEO 블로거로서 글을 작성해줘.'
 
         if (aiModel === 'GEMINI') {
-            if (!settings.geminiApiKey) throw new Error('Gemini API 키가 설정되지 않았습니다.')
+            if (!settings.geminiApiKey) throw new Error('Gemini API 키가 설정되지 않았습니다. API 관리 메뉴에서 키를 입력해주세요.')
             aiResult = await generateGeminiContent(settings.geminiApiKey, systemPrompt, targetKeyword)
         } else if (aiModel === 'CLAUDE') {
-            if (!settings.anthropicApiKey) throw new Error('Claude API 키가 설정되지 않았습니다.')
+            if (!settings.anthropicApiKey) throw new Error('Claude API 키가 설정되지 않았습니다. API 관리 메뉴에서 키를 입력해주세요.')
             aiResult = await generateClaudeContent(settings.anthropicApiKey, systemPrompt, targetKeyword)
         } else {
             // Default: GPT4O
-            if (!settings.openaiApiKey) throw new Error('OpenAI API 키가 설정되지 않았습니다.')
+            if (!settings.openaiApiKey) throw new Error('OpenAI API 키가 설정되지 않았습니다. API 관리 메뉴에서 키를 입력해주세요.')
             aiResult = await generateGPTContent(settings.openaiApiKey, systemPrompt, targetKeyword)
         }
 
@@ -472,8 +496,6 @@ export async function processAutomationJob(jobId: string) {
         content = convertMarkdownToHtml(aiResult.content || targetKeyword)
 
         // --- 이미지 생성 및 삽입 로직 ---
-        const imageSource = (job as any).imageSource || 'NONE'
-        const imageCount = (job as any).imageCount || 1
         let featuredMediaId = 0
         let imagesGenerated = 0 // 과금용 카운터
 
@@ -481,15 +503,8 @@ export async function processAutomationJob(jobId: string) {
         const headings = $('h2, h3');
 
         // 헤딩태그가 없으면 이미지 생성 안 함 (요구사항)
-        // 헤딩태그가 없으면 이미지 생성 안 함 (요구사항)
         if (headings.length > 0 && imageSource !== 'NONE') {
 
-            // 삽입 규칙 정의 (Index는 0부터 시작)
-            // 1번(i=1): 1번째(h=0) 비포
-            // 2번(i=2): 3번째(h=2) 애프터
-            // 3번(i=3): 4번째(h=3) 애프터
-            // 4번(i=4): 5번째(h=4) 애프터
-            // 5번(i=5): 6번째(h=5) 애프터
             const insertionRules = [
                 { imgIdx: 1, headIdx: 0, pos: 'before' },
                 { imgIdx: 2, headIdx: 2, pos: 'after' },
@@ -499,26 +514,21 @@ export async function processAutomationJob(jobId: string) {
             ];
 
             for (let i = 1; i <= imageCount; i++) {
-                // 현재 이미지 순번에 맞는 규칙 찾기
                 const rule = insertionRules.find(r => r.imgIdx === i);
-                if (!rule) continue; // 규칙 범위 밖(예: 6개 이상)이면 패스 (현재 UI는 5개 제한이므로 발생 안함)
+                if (!rule) continue;
 
-                // 헤딩 태그 존재 여부 확인
                 if (headings.length <= rule.headIdx) {
-                    console.warn(`Image ${i} skipped: Heading index ${rule.headIdx} not found (Total headings: ${headings.length})`);
-                    continue; // 해당 위치에 헤딩이 없으면 건너뜀
+                    // console.warn(`Image ${i} skipped...`);
+                    continue;
                 }
 
                 const targetHeading = $(headings[rule.headIdx]);
-
-                // 이미지 생성 진행
                 let imageUrl = '';
                 let success = false;
 
                 // 1번 이미지 (썸네일) 특별 처리
                 if (i === 1 && job.site.type === 'WORDPRESS') {
                     try {
-                        // 제목 텍스트로 썸네일 생성
                         const thumbBuffer = await generateThumbnail(title || targetKeyword);
                         const uploaded = await uploadToWordPress(job.site, thumbBuffer, `${targetKeyword}-thumb-${Date.now()}`);
                         imageUrl = uploaded.url;
@@ -528,19 +538,15 @@ export async function processAutomationJob(jobId: string) {
                         console.warn('WP/Thumbnail Error:', e);
                     }
                 }
-                // 1번 이미지 (썸네일) 특별 처리 완료
 
                 // 2. SCRAP (멀티 프로바이더)
                 if (!imageUrl && imageSource === 'SCRAP') {
-                    // AI 키워드 또는 기본 키워드 사용
                     const searchKeyword = (aiResult.imageKeywords && aiResult.imageKeywords[i - 1])
                         ? aiResult.imageKeywords[i - 1]
                         : (targetKeyword.split(' ')[0] || 'korea');
 
-                    // 멀티 프로바이더 검색 시도
                     imageUrl = await fetchRandomImage(settings, searchKeyword, i);
 
-                    // 만약 실패하거나 키 설정이 없으면 기존 LoremFlickr Fallback
                     if (!imageUrl) {
                         const w = i === 1 ? 768 : 768;
                         const h = i === 1 ? 512 : 512;
@@ -549,21 +555,20 @@ export async function processAutomationJob(jobId: string) {
                     success = true;
                 }
 
-                // 3. 1번인데 WP가 아니거나 실패, 또는 2번 이상인 경우 (DALLE/FLUX)
+                // 3. DALLE / FLUX
                 if (!imageUrl) {
                     try {
                         if (imageSource === 'DALLE') {
+                            if (!settings.openaiApiKey) throw new Error('OpenAI API 키가 없습니다.');
                             const openai = new OpenAI({ apiKey: settings.openaiApiKey })
                             const imgPrompt = i === 1 ? `${targetKeyword} minimal vector art` : `${targetKeyword} detailed photo ${i}`;
                             const image = await openai.images.generate({ model: "dall-e-3", prompt: imgPrompt, size: "1024x1024" })
                             imageUrl = image.data?.[0]?.url || ''
                             if (imageUrl) success = true;
                         } else if (imageSource === 'FLUX') {
-                            const apiKey = settings.piApiKey
-                            if (apiKey) {
-                                imageUrl = await generateFluxImage(apiKey, `${targetKeyword} blog image ${i}`)
-                                if (imageUrl) success = true;
-                            }
+                            if (!settings.piApiKey) throw new Error('PiAPI (FLUX) API 키가 없습니다.');
+                            imageUrl = await generateFluxImage(settings.piApiKey, `${targetKeyword} blog image ${i}`)
+                            if (imageUrl) success = true;
                         }
                     } catch (e) {
                         console.warn(`Image ${i} Generation Failed`, e);
@@ -571,16 +576,14 @@ export async function processAutomationJob(jobId: string) {
                 }
 
                 if (imageUrl) {
-                    if (success) imagesGenerated++; // 실제 성공한 횟수 카운트
+                    if (success) imagesGenerated++;
 
                     const alt = `${targetKeyword} ${i > 1 ? i : ''}`;
-                    // CSS로 사이즈 강제 (원본 해상도 유지하되 표시는 요구사항대로)
                     const style = i === 1
                         ? "width:100%; max-width:500px; height:auto; aspect-ratio:1/1; object-fit:cover; display:block; margin: 20px auto; border-radius:8px;"
                         : "width:100%; max-width:700px; height:auto; aspect-ratio:700/350; object-fit:cover; display:block; margin: 20px auto; border-radius:8px;";
 
                     const imgTag = `<img src="${imageUrl}" alt="${alt}" style="${style}" />`;
-
                     if (rule.pos === 'before') targetHeading.before(imgTag);
                     else targetHeading.after(imgTag);
                 }
@@ -592,7 +595,7 @@ export async function processAutomationJob(jobId: string) {
         if (job.site.type === 'WORDPRESS') {
             const targetStatus = (job as any).postStatus || 'publish';
             const payload: any = {
-                title, content, status: 'draft', // 1단계: 일단 임시저장
+                title, content, status: 'draft',
                 categories: (job as any).wpCategoryId ? [(job as any).wpCategoryId] : []
             };
             if (featuredMediaId > 0) {
@@ -608,7 +611,6 @@ export async function processAutomationJob(jobId: string) {
             })
             postUrl = res.data.link
 
-            // 2단계: 즉시 발행인 경우 상태 업데이트
             if (targetStatus === 'publish') {
                 const pubRes = await axios.post(`${job.site.url}/wp-json/wp/v2/posts/${res.data.id}`, { status: 'publish' }, {
                     auth: { username: job.site.username || '', password: job.site.apiToken || '' },
@@ -645,10 +647,7 @@ export async function processAutomationJob(jobId: string) {
         }
 
 
-        // 토큰 비용 계산
-        let globalSettings = await prisma.globalSetting.findUnique({ where: { id: 'SYSTEM' } })
-        const costs = globalSettings || { costPerPost: 1, costPerScrap: 1, costPerAIImage: 2 }
-
+        // 토큰 비용 계산 및 차감
         let tokensToDeduct = costs.costPerPost
         if (imagesGenerated > 0) {
             if (imageSource === 'SCRAP') {
@@ -658,11 +657,9 @@ export async function processAutomationJob(jobId: string) {
             }
         }
 
-        // 실행 전 토큰 잔액 체크 (안전장치)
-        const currentUser = await prisma.user.findUnique({ where: { id: user.id } })
-        if (!currentUser || currentUser.tokenBalance < tokensToDeduct) {
-            console.warn(`User ${user.id} has insufficient tokens for deduction. Required: ${tokensToDeduct}, Available: ${currentUser?.tokenBalance || 0}`);
-        }
+        // 최종 잔액 체크 (이미지가 많이 생성되어 부족해질 수도 있음)
+        // 하지만 이미 작업은 완료되었으므로 차감은 시도하고, 마이너스가 될 수도 있음 (혹은 Transaction에서 처리)
+        // 여기서는 그냥 차감 진행
 
         await prisma.postLog.update({
             where: { id: log.id },
@@ -679,7 +676,6 @@ export async function processAutomationJob(jobId: string) {
             data: { tokenBalance: { decrement: tokensToDeduct } } as any
         })
 
-        // 트랜잭션 기록 추가
         await prisma.transaction.create({
             data: {
                 userId: user.id,
@@ -689,11 +685,28 @@ export async function processAutomationJob(jobId: string) {
             }
         })
 
-
         revalidatePath('/dashboard')
         return { success: true, postUrl }
+
     } catch (error: any) {
         console.error('자동화 실행 실패:', error)
-        return { success: false, error: error.message }
+        const errorMessage = error.message || '알 수 없는 오류 발생';
+
+        // 로그가 생성되었다면 실패 상태로 업데이트
+        if (logId) {
+            try {
+                await prisma.postLog.update({
+                    where: { id: logId },
+                    data: {
+                        status: 'FAILED',
+                        errorMessage: errorMessage
+                    }
+                })
+            } catch (updateErr) {
+                console.error('로그 업데이트 실패:', updateErr)
+            }
+        }
+
+        return { success: false, error: errorMessage }
     }
 }
