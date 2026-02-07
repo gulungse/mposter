@@ -9,10 +9,12 @@ import {
     processAutomationJob,
     generateGeminiContent,
     generateClaudeContent,
+    generateGPTContent,
     generateFluxImage,
     generateThumbnail,
     uploadToWordPress,
-    refreshBloggerToken
+    refreshBloggerToken,
+    getSafeThumbnailText
 } from '@/lib/automation'
 import { fetchRandomImage } from '@/lib/image_providers'
 import axios from 'axios'
@@ -93,46 +95,9 @@ export async function testPublishAction(data: {
             if (data.aiModel === 'GPT4O') {
                 const apiKey = settings.openaiApiKey
                 if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
-                const openai = new OpenAI({ apiKey })
-                const completion = await openai.chat.completions.create({
-                    model: "gpt-4o",
-                    messages: [
-                        { role: "system", content: `당신은 SEO에 특화된 10년 경력의 전문 블로그 작가입니다. 독자가 궁금해하는 정보를 깊이 있게 분석하고, 매우 상세하고 친절한 어조로 글을 작성해야 합니다. 단순한 요약이 아닌, 독자에게 실질적인 도움이 되는 가치 있는 콘텐츠를 생산하세요. 반드시 JSON 형식으로 결과를 반환하세요. ${systemPrompt}` },
-                        {
-                            role: "user", content: `'${targetKeyword}' 주제로 완벽한 블로그 포스팅을 작성해줘. 다음 지침을 엄격히 준수하라:
-
-1. [필수 분량]: 공백 제외 최소 2500자 이상 작성할 것. 내용이 짧거나 피상적이면 절대 안 됨.
-2. [구성 요소]:
-   - 매력적인 제목 (클릭을 유도하는 후킹 제목)
-   - 서론: 독자의 문제 제기 및 공감, 글을 읽어야 하는 이유 (300자 이상)
-   - 본론: 최소 5개 이상의 상세 소주제(h2/h3). 각 소주제는 깊이 있는 분석과 예시, 통계, 전문가 의견 등을 포함하여 500자 이상 서술할 것.
-   - 결론: 핵심 요약 및 독자의 행동 유도 (Call to Action).
-   - FAQ: 자주 묻는 질문 3~4개와 그에 대한 명확한 답변.
-3. [형식 및 스타일]:
-   - 반드시 HTML 태그(<p>, <h3>, <ul>, <li>, <strong>, <blockquote> 등)를 사용하여 가독성을 극대화할 것.
-   - **절영코 <h1> 태그를 본문에 쓰지 말 것.** (제목과 중복됨). <h2>부터 시작할 것.
-   - 문체: 친근하고 전문적인 '해요체' 사용.
-   - 내용 중 '${targetKeyword}' 키워드를 자연스럽게 8회 이상 포함할 것.
-   - [반드시 준수할 포맷 규칙]:
-   - **반드시** 순수한 JSON만 반환할 것.
-   - **마크다운(Markdown) 문법을 절대 본문에 포함하지 마시오.** (예: ###, **, - 등 금지)
-   - 모든 제목과 강조는 오직 HTML 태그(h2, h3, strong)로만 작성해야 함. 만약 마크다운이 발견되면 시스템 오류로 처리됨.
-   - 키워드와 연관된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 포함할 것.
-   - 예시: {"title": "...", "content": "...", "imageKeywords": ["tax", "office", "money", "paper", "calculator"]}` }
-                    ],
-                    max_tokens: 4096,
-                    response_format: { type: "json_object" }
-                })
-                let rawContent = completion.choices[0].message.content || '{}';
-                rawContent = rawContent.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
-
-                aiResult = JSON.parse(rawContent)
-                title = aiResult.title || aiResult.subject || aiResult.header || '테스트 제목'
-                content = convertMarkdownToHtml(aiResult.content || aiResult.body || aiResult.text || aiResult.article || '테스트 본문')
-
-                if (content === '테스트 본문' && completion.choices[0].message.content) {
-                    content = completion.choices[0].message.content;
-                }
+                aiResult = await generateGPTContent(apiKey, systemPrompt, targetKeyword)
+                title = aiResult.title || '테스트 제목'
+                content = convertMarkdownToHtml(aiResult.content || '테스트 본문')
             } else if (data.aiModel === 'CLAUDE') { // Added CLAUDE case
                 const apiKey = settings.anthropicApiKey
                 if (!apiKey) throw new Error('Claude API 키가 설정되어 있지 않습니다.')
@@ -186,7 +151,10 @@ export async function testPublishAction(data: {
 
                 if (i === 1 && site.type === 'WORDPRESS') {
                     try {
-                        const thumbBuffer = await generateThumbnail(title || targetKeyword);
+                        // 썸네일 텍스트 결정 (Strict Mode)
+                        const safeThumbText = getSafeThumbnailText(aiResult.thumbnailText, title, targetKeyword);
+
+                        const thumbBuffer = await generateThumbnail(safeThumbText);
                         const uploaded = await uploadToWordPress(site, thumbBuffer, `${targetKeyword}-thumb-${Date.now()}`);
                         imageUrl = uploaded.url;
                         featuredMediaId = uploaded.id;

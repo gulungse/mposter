@@ -39,6 +39,45 @@ function cleanAndParseJson(text: string): any {
 }
 
 /**
+ * 썸네일 텍스트를 안전하게 정제합니다. (최대 12자)
+ */
+/**
+ * 썸네일 텍스트를 안전하게 정제합니다. (최대 12자)
+ */
+export function getSafeThumbnailText(aiThumbText: string | undefined, title: string, keyword: string): string {
+    let candidate = aiThumbText;
+
+    // 1. 기본 정제
+    if (candidate) {
+        candidate = candidate.replace(/['"]/g, '').trim();
+        if (candidate.endsWith('.')) candidate = candidate.slice(0, -1);
+        // "제목: ..." 같은 접두어 제거
+        candidate = candidate.replace(/^(제목|썸네일|요약):\s*/, '');
+    }
+
+    // 2. 유효성 검사 (매우 엄격하게 12자 제한)
+    // 썸네일은 시각적 임팩트가 중요하므로 짧아야 함
+    const isTooLong = !candidate || candidate.length > 13;
+    const isSameAsTitle = candidate && title && (candidate === title || title.includes(candidate));
+
+    if (candidate && !isTooLong && !isSameAsTitle) {
+        return candidate;
+    }
+
+    // 3. Fallback Strategies (제목 사용 금지)
+
+    // 전략 A: 키워드가 짧으면 키워드 사용 (가장 깔끔)
+    if (keyword.length <= 10) return keyword;
+
+    // 전략 B: 키워드도 길면, 키워드의 첫 어절만 사용
+    const firstKeyword = keyword.split(' ')[0];
+    if (firstKeyword.length <= 10) return firstKeyword;
+
+    // 최후의 수단: 그냥 키워드를 10자에서 자름 (제목 절대 사용 안 함)
+    return keyword.substring(0, 10);
+}
+
+/**
  * 블로거(Blogger)의 만료된 Access Token을 Refresh Token으로 갱신합니다.
  */
 export async function refreshBloggerToken(site: any, clientId?: string, clientSecret?: string) {
@@ -140,7 +179,8 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
 본문은 반드시 5개 이상의 문단으로 구성하고, 독자에게 유용하고 상세한 정보를 제공하는 SEO 최적화된 글이어야 해. 분량은 가급적 1000자 이상으로 풍부하게 작성해줘.
 절대로 <h1> 태그를 사용하지 마. 제목은 이미 글 상단에 있으므로 본문에는 <h2>, <h3>, <h4> 태그만 사용해야 해.
 또한, 이 글과 관련된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 배열로 제공해줘. (LoremFlickr 검색용)
-반드시 JSON 형식 {"title": "...", "content": "...", "imageKeywords": ["keyword1", "keyword2", ...]}으로만 답변하고, JSON 외의 텍스트는 절대 포함하지 마.`
+마지막으로, 썸네일 이미지에 들어갈 **10자 이내의 클릭을 부르는 자극적인 문구**를 'thumbnailText' 필드에 제공해줘. \n**주의: 절대 제목을 그대로 쓰지 마.** 독자가 클릭하고 싶게 만드는 "낚시성 멘트"나 "충격적인 질문" 형태로 짧게(단어 위주). (예: "저속노화의 충격 진실", "절대 먹지 마세요")
+반드시 JSON 형식 {"title": "...", "content": "...", "imageKeywords": ["..."], "thumbnailText": "..."}으로만 답변하고, JSON 외의 텍스트는 절대 포함하지 마.`
                 }]
             }]
         }, {
@@ -187,7 +227,7 @@ export async function generateClaudeContent(apiKey: string, systemPrompt: string
         const msg = await anthropic.messages.create({
             model: "claude-3-opus-20240229",
             max_tokens: 4096,
-            system: `${systemPrompt}\n\n반드시 다음 JSON 형식으로만 응답하세요: {"title": "...", "content": "...", "imageKeywords": ["keyword1", ...]}`,
+            system: `${systemPrompt}\n\n반드시 다음 JSON 형식으로만 응답하세요: {"title": "...", "content": "...", "imageKeywords": ["keyword1", ...], "thumbnailText": "..."}`,
             messages: [
                 {
                     role: "user",
@@ -196,7 +236,8 @@ export async function generateClaudeContent(apiKey: string, systemPrompt: string
 2. <h1> 태그 사용 금지. <h2>, <h3>, <h4> 만 사용.
 3. SEO에 최적화된 유용한 정보 위주로 작성.
 4. **반드시 JSON 형식만 반환**하고, 마크다운 코드 블록(\`\`\`json)이나 사족을 달지 마시오.
-5. 'imageKeywords' 필드에는 이미지 검색용 영문 키워드 5개를 배열로 포함.`
+5. 'imageKeywords' 필드에는 이미지 검색용 영문 키워드 5개를 배열로 포함.
+6. 'thumbnailText' 필드에는 썸네일용 10자 이내의 **클릭을 부르는 자극적인 문구** 포함. (**절대 제목과 같으면 안 됨**. 예: "이것만 알면 끝", "충격적인 결말")`
                 }
             ]
         });
@@ -246,8 +287,9 @@ export async function generateGPTContent(apiKey: string, systemPrompt: string, t
    - **마크다운(Markdown) 문법을 절대 본문에 포함하지 마시오.** (예: ###, **, - 등 금지)
    - 모든 제목과 강조는 오직 HTML 태그(h2, h3, strong)로만 작성해야 함. 만약 마크다운이 발견되면 시스템 오류로 처리됨.
    - 키워드와 연관된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 포함할 것.
-
-   - 예시: {"title": "...", "content": "...", "imageKeywords": ["tax", "office", "money", "paper", "calculator"]}` }
+   - 썸네일 이미지에 들어갈 **10자 이내의, 클릭을 부르는 자극적인 문구**를 'thumbnailText' 필드에 포함할 것. (**제목 절대 금지**. 질문형이나 감탄형 사용. 예: "비밀이 밝혀졌다!", "아직도 모른다고?")
+- 예시: { "title": "...", "content": "...", "imageKeywords": ["..."], "thumbnailText": "세금 절약 꿀팁 5가지" }`
+            }
         ],
         max_tokens: 4096,
         response_format: { type: "json_object" }
@@ -327,64 +369,135 @@ export async function generateFluxImage(apiKey: string, prompt: string) {
 }
 
 /**
- * 텍스트 기반 썸네일(500x500)을 생성합니다. (단색 배경 + 한글 제목 + 테두리)
+ * 텍스트 기반 썸네일(500x500)을 생성합니다. (다양한 템플릿 및 컬러 팔레트 적용)
+ */
+/**
+ * 텍스트 기반 썸네일(500x500)을 생성합니다. (다양한 템플릿 및 컬러 팔레트 적용)
  */
 export async function generateThumbnail(text: string): Promise<Buffer> {
     const width = 500;
     const height = 500;
 
-    // 랜덤 파스텔 배경 & 대비되는 진한 테두리 색상
-    const hue = Math.floor(Math.random() * 360);
-    const bgColor = `hsl(${hue}, 70%, 85%)`;
-    const borderColor = `hsl(${hue}, 80%, 30%)`;
+    // 1. Curated Color Palettes (Background, Text, Accent/Border)
+    const palettes = [
+        { bg: '#f0f9ff', text: '#0369a1', accent: '#0ea5e9' }, // Sky Blue
+        { bg: '#fff7ed', text: '#c2410c', accent: '#f97316' }, // Orange
+        { bg: '#fdf4ff', text: '#86198f', accent: '#d946ef' }, // Fuchsia
+        { bg: '#f0fdf4', text: '#15803d', accent: '#22c55e' }, // Green
+        // { bg: '#18181b', text: '#f4f4f5', accent: '#3b82f6' }, // Dark & Blue (REMOVED due to contrast issues)
+        { bg: '#fff1f2', text: '#be123c', accent: '#f43f5e' }, // Rose
+        { bg: '#fefce8', text: '#854d0e', accent: '#eab308' }, // Yellow
+        { bg: '#f5f3ff', text: '#5b21b6', accent: '#8b5cf6' }, // Violet
+    ];
+
+    const palette = palettes[Math.floor(Math.random() * palettes.length)];
+    const templateIdx = Math.floor(Math.random() * 4); // 0, 1, 2, 3
 
     // Font loading
     const fontPath = join(process.cwd(), 'public', 'fonts', 'NanumGothic-Bold.ttf');
     const fontData = readFileSync(fontPath);
 
-    const element = createElement('div', {
-        style: {
-            display: 'flex',
-            width: '100%',
-            height: '100%',
-            backgroundColor: bgColor,
-            alignItems: 'center',
-            justifyContent: 'center',
-            position: 'relative',
-        }
-    }, [
-        // Border Container
-        createElement('div', {
-            style: {
-                position: 'absolute',
-                top: 15,
-                left: 15,
-                right: 15,
-                bottom: 15,
-                border: `15px solid ${borderColor}`,
-                borderRadius: 20,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-            }
+    let element;
+
+    // Template 1: Classic Border (기존 스타일 개선)
+    if (templateIdx === 0) {
+        element = createElement('div', {
+            style: { display: 'flex', width: '100%', height: '100%', backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', position: 'relative' }
         }, [
-            // Text
             createElement('div', {
                 style: {
-                    color: borderColor,
-                    fontSize: 45,
-                    fontWeight: 900,
-                    textAlign: 'center',
-                    wordBreak: 'keep-all',
-                    lineHeight: 1.3,
-                    padding: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    position: 'absolute', top: 20, left: 20, right: 20, bottom: 20,
+                    border: `12px solid ${palette.accent}`, borderRadius: 30,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
                 }
-            }, text)
-        ])
-    ]);
+            }, [
+                createElement('div', {
+                    style: {
+                        color: palette.text, fontSize: 50, fontWeight: 900, textAlign: 'center',
+                        wordBreak: 'keep-all', padding: '20px', lineHeight: 1.2
+                    }
+                }, text)
+            ])
+        ]);
+    }
+    // Template 2: Double Layer (겹친 박스 효과)
+    else if (templateIdx === 1) {
+        element = createElement('div', {
+            style: { display: 'flex', width: '100%', height: '100%', backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', position: 'relative' }
+        }, [
+            // Background Shape
+            createElement('div', {
+                style: {
+                    position: 'absolute', top: 40, left: 40, width: '420px', height: '420px',
+                    backgroundColor: palette.accent, borderRadius: 20, opacity: 0.3
+                }
+            }),
+            // Foreground Box
+            createElement('div', {
+                style: {
+                    position: 'relative', width: '400px', height: '400px',
+                    backgroundColor: '#ffffff', borderRadius: 20,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.1)', border: `4px solid ${palette.accent}`
+                }
+            }, [
+                createElement('div', {
+                    style: {
+                        color: palette.text, fontSize: 48, fontWeight: 900, textAlign: 'center',
+                        wordBreak: 'keep-all', padding: '15px', lineHeight: 1.2
+                    }
+                }, text)
+            ])
+        ]);
+    }
+    // Template 3: Circle Focus (원형 포인트)
+    else if (templateIdx === 2) {
+        element = createElement('div', {
+            style: { display: 'flex', width: '100%', height: '100%', backgroundColor: palette.bg, alignItems: 'center', justifyContent: 'center', position: 'relative' }
+        }, [
+            createElement('div', {
+                style: {
+                    position: 'absolute', width: '450px', height: '450px', borderRadius: '50%',
+                    border: `2px dashed ${palette.accent}`, opacity: 0.5
+                }
+            }),
+            createElement('div', {
+                style: {
+                    width: '380px', height: '380px', borderRadius: '50%',
+                    backgroundColor: palette.accent,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+                }
+            }, [
+                createElement('div', {
+                    style: {
+                        color: '#ffffff', fontSize: 45, fontWeight: 900, textAlign: 'center',
+                        wordBreak: 'keep-all', padding: '20px', lineHeight: 1.2
+                    }
+                }, text)
+            ])
+        ]);
+    }
+    // Template 4: Modern Minimal (심플 & 볼드)
+    else {
+        element = createElement('div', {
+            style: { display: 'flex', width: '100%', height: '100%', backgroundColor: palette.text, alignItems: 'center', justifyContent: 'center', padding: '40px' }
+        }, [
+            createElement('div', {
+                style: { display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }
+            }, [
+                createElement('div', {
+                    style: { height: '10px', width: '60px', backgroundColor: palette.accent, marginBottom: '20px', borderRadius: '5px' }
+                }),
+                createElement('div', {
+                    style: {
+                        color: '#ffffff', fontSize: 55, fontWeight: 900, textAlign: 'left',
+                        wordBreak: 'keep-all', lineHeight: 1.1
+                    }
+                }, text)
+            ])
+        ]);
+    }
 
     const svg = await satori(element, {
         width,
@@ -529,11 +642,16 @@ export async function processAutomationJob(jobId: string) {
                 // 1번 이미지 (썸네일) 특별 처리
                 if (i === 1 && job.site.type === 'WORDPRESS') {
                     try {
-                        const thumbBuffer = await generateThumbnail(title || targetKeyword);
+                        // 썸네일 텍스트 결정 (Strict Mode)
+                        const safeThumbText = getSafeThumbnailText(aiResult.thumbnailText, title, targetKeyword);
+
+                        // 디버깅용 로그 (서버 콘솔 확인 가능 시)
+                        console.log(`[Thumbnail] Final Text: "${safeThumbText}" (Original: "${aiResult.thumbnailText}", Title: "${title}")`);
+
+                        const thumbBuffer = await generateThumbnail(safeThumbText);
                         const uploaded = await uploadToWordPress(job.site, thumbBuffer, `${targetKeyword}-thumb-${Date.now()}`);
                         imageUrl = uploaded.url;
                         featuredMediaId = uploaded.id;
-                        success = true;
                     } catch (e) {
                         console.warn('WP/Thumbnail Error:', e);
                     }
