@@ -189,6 +189,7 @@ enum AIModel {
   GPT4O
   GEMINI
   CLAUDE
+  GPT5
 }
 
 // 발행 로그 모델
@@ -203,6 +204,7 @@ model PostLog {
   postUrl         String?    // Published URL
   tokensUsed      Int        @default(0)
   errorMessage    String?
+  seed            Int?       // AI Generation Seed
   
   createdAt       DateTime @default(now())
 

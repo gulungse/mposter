@@ -42,7 +42,7 @@ function TaskForm() {
         keywordGroupId: '',
         promptId: '',
         scheduleCron: '0 * * * *',
-        aiModel: 'GPT4O',
+        aiModel: 'GPT5',
         imageSource: 'DALLE',
         imageCount: 1,
         wpCategoryId: undefined as number | undefined,
@@ -378,10 +378,24 @@ function TaskForm() {
                                 <ZapIcon className="h-4 w-4" />
                             </div>
                             <div>
-                                <h4 className="font-bold text-sm text-foreground">Gemini 1.5 Flash</h4>
+                                <h4 className="font-bold text-sm text-foreground">Gemini 2.5 Flash</h4>
                                 <p className="text-xs text-muted-foreground mt-0.5">빠르고 효율적이며 무료 티어 한도가 넉넉합니다.</p>
                             </div>
                             {formData.aiModel === 'GEMINI' && <CheckCircle2Icon className="ml-auto h-4 w-4 text-primary" />}
+                        </div>
+
+                        <div
+                            onClick={() => setFormData({ ...formData, aiModel: 'GPT5' })}
+                            className={`cursor-pointer rounded-lg border p-4 flex items-start gap-3 transition-all ${formData.aiModel === 'GPT5' ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-primary/50'}`}
+                        >
+                            <div className="h-8 w-8 rounded bg-teal-500/10 flex items-center justify-center text-teal-500 shrink-0">
+                                <SparklesIcon className="h-4 w-4" />
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm text-foreground">GPT-5 mini</h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">GPT-5의 경량화 모델. 빠르고 효율적인 성능.</p>
+                            </div>
+                            {formData.aiModel === 'GPT5' && <CheckCircle2Icon className="ml-auto h-4 w-4 text-primary" />}
                         </div>
                     </div>
 

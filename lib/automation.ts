@@ -286,41 +286,100 @@ export async function generateClaudeContent(apiKey: string, systemPrompt: string
 /**
  * GPT-4o를 사용하여 콘텐츠를 생성합니다.
  */
-export async function generateGPTContent(apiKey: string, systemPrompt: string, targetKeyword: string) {
+export async function generateGPTContent(apiKey: string, systemPrompt: string, targetKeyword: string, model: string = "gpt-5-mini") {
     const openai = new OpenAI({ apiKey })
-    const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-            { role: "system", content: `당신은 SEO에 특화된 10년 경력의 전문 블로그 작가입니다. 독자가 궁금해하는 정보를 깊이 있게 분석하고, 매우 상세하고 친절한 어조로 글을 작성해야 합니다. 단순한 요약이 아닌, 독자에게 실질적인 도움이 되는 가치 있는 콘텐츠를 생산하세요. 반드시 JSON 형식으로 결과를 반환하세요. ${systemPrompt}` },
-            {
-                role: "user", content: `'${targetKeyword}' 주제로 완벽한 블로그 포스팅을 작성해줘. 다음 지침을 엄격히 준수하라:
+    const isNewModel = model.includes('gpt-5') || model.startsWith('o1') || model.startsWith('o3');
 
-1. [필수 분량]: 공백 제외 최소 2500자 이상 작성할 것. 내용이 짧거나 피상적이면 절대 안 됨.
-2. [구성 요소]:
-   - 매력적인 제목 (클릭을 유도하는 후킹 제목)
-   - 서론: 독자의 문제 제기 및 공감, 글을 읽어야 하는 이유 (300자 이상)
-   - 본론: 최소 5개 이상의 상세 소주제(h2/h3). 각 소주제는 깊이 있는 분석과 예시, 통계, 전문가 의견 등을 포함하여 500자 이상 서술할 것.
-   - 결론: 핵심 요약 및 독자의 행동 유도 (Call to Action).
-   - FAQ: 자주 묻는 질문 3~4개와 그에 대한 명확한 답변.
-3. [형식 및 스타일]:
-   - 반드시 HTML 태그(<p>, <h3>, <ul>, <li>, <strong>, <blockquote> 등)를 사용하여 가독성을 극대화할 것.
-   - **절영코 <h1>, <html>, <head>, <body> 태그를 쓰지 말 것.** 오직 본문 내용만 작성.
-   - 문체: 친근하고 전문적인 '해요체' 사용.
-   - 내용 중 '${targetKeyword}' 키워드를 자연스럽게 8회 이상 포함할 것.
-   - [반드시 준수할 포맷 규칙]:
-   - **반드시** 순수한 JSON만 반환할 것.
-   - **마크다운(Markdown) 문법을 절대 본문에 포함하지 마시오.** (예: ###, **, - 등 금지)
-   - 모든 제목과 강조는 오직 HTML 태그(h2, h3, strong)로만 작성해야 함. 만약 마크다운이 발견되면 시스템 오류로 처리됨.
-   - 키워드와 연관된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 포함할 것.
-   - 썸네일 이미지에 들어갈 **10자 이내의, 클릭을 부르는 자극적인 문구**를 'thumbnailText' 필드에 포함할 것. (**제목 절대 금지**. 질문형이나 감탄형 사용. 예: "비밀이 밝혀졌다!", "아직도 모른다고?")
-- 예시: { "title": "...", "content": "...", "imageKeywords": ["..."], "thumbnailText": "세금 절약 꿀팁 5가지" }`
+    const params: any = {
+        model: model,
+        messages: [
+            {
+                role: "system", content: `당신은 블로그 글을 생성하는 AI입니다. 사용자의 요청에 따라 자유롭게 글을 작성하되, 시스템 연동을 위해 다음 **기술적 제약사항**만 반드시 지켜주세요.
+
+[기술적 필수 제약사항]:
+1. **형식**: 반드시 JSON 형식으로만 응답해야 합니다. (JSON 파싱 실패 시 시스템 오류 발생)
+2. **태그 제한**: <h1>, <html>, <head>, <body> 태그는 사용 금지입니다. (<h2>, <h3>, <p> 등 사용 권장)
+3. **필수 필드**:
+   - title: 글 제목
+   - content: 글 본문 (HTML 태그 포함)
+   - imageKeywords: 이미지 검색용 영어 키워드 5개 (배열)
+   - thumbnailText: 썸네일용 텍스트 (10자 이내)
+
+그 외의 **글의 스타일, 어조, 길이, 구성** 등은 오직 아래 **사용자(User)의 요청**을 최우선으로 따르세요. 시스템이 강제하는 문체나 형식은 없습니다.`
+            },
+            {
+                role: "user", content: `'${targetKeyword}' 주제로 블로그 포스팅을 작성해줘.
+
+[사용자 요청 사항]:
+${systemPrompt || '별도의 추가 지침 없음. 자유롭게 작성.'}
+
+[필수 포맷 가이드]:
+- **반드시** 순수한 JSON만 반환할 것.
+- **마크다운(Markdown) 문법을 절대 본문에 포함하지 마시오.** (예: ###, **, - 금지)
+- 키워드와 연관된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 포함할 것.
+- 썸네일 이미지에 들어갈 **10자 이내의 문구**를 'thumbnailText' 필드에 포함할 것.
+- 예시: { "title": "...", "content": "...", "imageKeywords": ["..."], "thumbnailText": "..." }`
             }
         ],
-        max_tokens: 4096,
-        response_format: { type: "json_object" }
-    })
+    };
 
-    let rawContent = completion.choices[0].message.content || '{}';
+    if (isNewModel) {
+        // GPT-5/o1 models use 'reasoning_tokens' which consume the token budget. 
+        // Increasing to max possible (60,000) to ensure thorough reasoning and adherence to complex instructions.
+        params.max_completion_tokens = 60000;
+        // params.response_format = { type: "json_object" }; // Keep disabled for new reasoning models (often unsupported or redundant)
+    } else {
+        params.max_tokens = 4096;
+        params.response_format = { type: "json_object" };
+    }
+
+    let completion: any;
+    try {
+        console.log(`Sending request to OpenAI with model: ${model}`);
+        completion = await openai.chat.completions.create(params)
+        console.log(`OpenAI Response for ${model}: `, JSON.stringify(completion, null, 2)); // FULL DEBUG LOG
+    } catch (e: any) {
+        // gpt-5 failed (e.g. 400 Bad Request if params invalid). Fallback to gpt-4o immediately if it was gpt-5
+        if (isNewModel) {
+            console.warn(`GPT - 5 generation failed with error: ${e.message}. Falling back to GPT - 4o - mini.`);
+            try {
+                // Try GPT-4o-mini first as a fast fallback
+                return await generateGPTContent(apiKey, systemPrompt, targetKeyword, 'gpt-4o-mini');
+            } catch (innerE: any) {
+                console.warn(`GPT - 4o - mini fallback failed: ${innerE.message}. Trying GPT - 4o.`);
+                return await generateGPTContent(apiKey, systemPrompt, targetKeyword, 'gpt-4o');
+            }
+        }
+        // If it's not a new model (e.g. gpt-4o failing), return the error as content so user sees it
+        console.error(`GPT Content Generation Error(${model}): `, e);
+        return {
+            title: `Error(${model})`,
+            content: `< h3 > AI 생성 오류 발생 < /h3><p>모델: ${model}</p > <p>에러 메시지: ${e.message || JSON.stringify(e)} </p>`,
+            imageKeywords: [],
+            thumbnailText: 'Error'
+        };
+    }
+
+    let rawContent = completion.choices[0]?.message?.content || '';
+    const finishReason = completion.choices[0]?.finish_reason;
+    console.log(`Raw content from ${model}:`, rawContent);
+    console.log(`Finish reason from ${model}:`, finishReason);
+
+    // If GPT-5 returned empty content (filtered or error), fallback to GPT-4o-mini
+    if (isNewModel && (!rawContent || rawContent.length < 50)) {
+        console.warn(`GPT-5 returned empty or too short content (${rawContent.length} chars). Falling back to GPT-4o-mini.`);
+        return await generateGPTContent(apiKey, systemPrompt, targetKeyword, 'gpt-4o-mini');
+    }
+
+    if (!rawContent) {
+        return {
+            title: `Empty Content (${model})`,
+            content: `<h3>AI 응답이 비어있습니다.</h3><p>모델: ${model}</p>`,
+            imageKeywords: [],
+            thumbnailText: 'Empty'
+        };
+    }
+
     return cleanAndParseJson(rawContent);
 }
 
@@ -624,10 +683,13 @@ export async function processAutomationJob(jobId: string) {
         } else if (aiModel === 'CLAUDE') {
             if (!settings.anthropicApiKey) throw new Error('Claude API 키가 설정되지 않았습니다. API 관리 메뉴에서 키를 입력해주세요.')
             aiResult = await generateClaudeContent(settings.anthropicApiKey, systemPrompt, targetKeyword)
+        } else if (aiModel === 'GPT5') {
+            if (!settings.openaiApiKey) throw new Error('OpenAI API 키가 설정되지 않았습니다. API 관리 메뉴에서 키를 입력해주세요.')
+            aiResult = await generateGPTContent(settings.openaiApiKey, systemPrompt, targetKeyword, 'gpt-5-mini')
         } else {
             // Default: GPT4O
             if (!settings.openaiApiKey) throw new Error('OpenAI API 키가 설정되지 않았습니다. API 관리 메뉴에서 키를 입력해주세요.')
-            aiResult = await generateGPTContent(settings.openaiApiKey, systemPrompt, targetKeyword)
+            aiResult = await generateGPTContent(settings.openaiApiKey, systemPrompt, targetKeyword, 'gpt-4o')
         }
 
         title = aiResult.title || targetKeyword
