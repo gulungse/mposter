@@ -30,11 +30,33 @@ function cleanAndParseJson(text: string): any {
     }
 
     try {
-        return JSON.parse(cleaned);
+        const parsed = JSON.parse(cleaned);
+        // HTML 태그 정제 (<html>, <head>, <body> 제거)
+        if (parsed.content) {
+            parsed.content = parsed.content
+                .replace(/<!DOCTYPE[^>]*>/ig, '')
+                .replace(/<html[^>]*>/ig, '')
+                .replace(/<\/html>/ig, '')
+                .replace(/<head>[\s\S]*?<\/head>/ig, '')
+                .replace(/<body[^>]*>/ig, '')
+                .replace(/<\/body>/ig, '')
+                .trim();
+        }
+        return parsed;
     } catch (e) {
         // console.warn('JSON Parse Failed, attempting manual cleanup', e);
         // Fallback: Return text as content if parsing fails completely
-        return { title: '', content: text, imageKeywords: [] };
+        let content = text;
+        content = content
+            .replace(/<!DOCTYPE[^>]*>/ig, '')
+            .replace(/<html[^>]*>/ig, '')
+            .replace(/<\/html>/ig, '')
+            .replace(/<head>[\s\S]*?<\/head>/ig, '')
+            .replace(/<body[^>]*>/ig, '')
+            .replace(/<\/body>/ig, '')
+            .trim();
+
+        return { title: '', content: content, imageKeywords: [] };
     }
 }
 
@@ -177,7 +199,9 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
                 parts: [{
                     text: `${systemPrompt}\n\n위 지침을 따라 '${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘. 
 본문은 반드시 5개 이상의 문단으로 구성하고, 독자에게 유용하고 상세한 정보를 제공하는 SEO 최적화된 글이어야 해. 분량은 가급적 1000자 이상으로 풍부하게 작성해줘.
-절대로 <h1> 태그를 사용하지 마. 제목은 이미 글 상단에 있으므로 본문에는 <h2>, <h3>, <h4> 태그만 사용해야 해.
+본문은 반드시 5개 이상의 문단으로 구성하고, 독자에게 유용하고 상세한 정보를 제공하는 SEO 최적화된 글이어야 해. 분량은 가급적 1000자 이상으로 풍부하게 작성해줘.
+절대로 <h1>, <html>, <head>, <body>, <!DOCTYPE> 태그를 사용하지 마. 오직 본문 내용(<p>, <h2> 등)만 반환해야 해.
+제목은 이미 글 상단에 있으므로 본문에는 <h2>, <h3>, <h4> 태그만 사용해야 해.
 또한, 이 글과 관련된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 배열로 제공해줘. (LoremFlickr 검색용)
 마지막으로, 썸네일 이미지에 들어갈 **10자 이내의 클릭을 부르는 자극적인 문구**를 'thumbnailText' 필드에 제공해줘. \n**주의: 절대 제목을 그대로 쓰지 마.** 독자가 클릭하고 싶게 만드는 "낚시성 멘트"나 "충격적인 질문" 형태로 짧게(단어 위주). (예: "저속노화의 충격 진실", "절대 먹지 마세요")
 반드시 JSON 형식 {"title": "...", "content": "...", "imageKeywords": ["..."], "thumbnailText": "..."}으로만 답변하고, JSON 외의 텍스트는 절대 포함하지 마.`
@@ -233,7 +257,8 @@ export async function generateClaudeContent(apiKey: string, systemPrompt: string
                     role: "user",
                     content: `'${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘.
 1. 본문은 5개 이상의 문단, 2000자 이상으로 풍부하게 작성.
-2. <h1> 태그 사용 금지. <h2>, <h3>, <h4> 만 사용.
+1. 본문은 5개 이상의 문단, 2000자 이상으로 풍부하게 작성.
+2. <h1>, <html>, <head>, <body> 태그 사용 금지. 오직 본문 태그(<h2>, <p> 등)만 사용.
 3. SEO에 최적화된 유용한 정보 위주로 작성.
 4. **반드시 JSON 형식만 반환**하고, 마크다운 코드 블록(\`\`\`json)이나 사족을 달지 마시오.
 5. 'imageKeywords' 필드에는 이미지 검색용 영문 키워드 5개를 배열로 포함.
@@ -279,7 +304,7 @@ export async function generateGPTContent(apiKey: string, systemPrompt: string, t
    - FAQ: 자주 묻는 질문 3~4개와 그에 대한 명확한 답변.
 3. [형식 및 스타일]:
    - 반드시 HTML 태그(<p>, <h3>, <ul>, <li>, <strong>, <blockquote> 등)를 사용하여 가독성을 극대화할 것.
-   - **절영코 <h1> 태그를 본문에 쓰지 말 것.** (제목과 중복됨). <h2>부터 시작할 것.
+   - **절영코 <h1>, <html>, <head>, <body> 태그를 쓰지 말 것.** 오직 본문 내용만 작성.
    - 문체: 친근하고 전문적인 '해요체' 사용.
    - 내용 중 '${targetKeyword}' 키워드를 자연스럽게 8회 이상 포함할 것.
    - [반드시 준수할 포맷 규칙]:
