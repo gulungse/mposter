@@ -1,13 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  /* config options here */
   serverExternalPackages: ["@prisma/client"],
-
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: '*.googleusercontent.com',
+        protocol: "https",
+        hostname: "*.googleusercontent.com",
       },
     ],
   },
