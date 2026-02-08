@@ -4,6 +4,8 @@ import { Plus as PlusIcon, Search as SearchIcon, TrendingUp as TrendingUpIcon, Z
 import Link from 'next/link'
 import { getUserWithPlan } from '@/app/actions/plan'
 
+export const dynamic = 'force-dynamic'
+
 export default async function KeywordPage() {
     const [{ data: groups = [] }, trending, planRes] = await Promise.all([
         getKeywordGroups(),

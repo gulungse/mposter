@@ -4,6 +4,8 @@ import { formatInKST } from '@/lib/date'
 import { Terminal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+export const dynamic = 'force-dynamic'
+
 export default async function LogsPage() {
     const user = await getOrCreateUser()
 

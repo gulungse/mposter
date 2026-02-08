@@ -4,6 +4,9 @@ import { cookies } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/lib/supabase/server'
 
+// Module-level cache for global settings to reduce DB load
+let cachedSettings: { signupBonus: number, verificationBonus: number } | null = null;
+
 /**
  * Supabase Auth 사용자와 Prisma DB 사용자를 동기화하고 반환합니다.
  * DB에 사용자가 없으면 생성합니다. (첫 가입자는 관리자로 등록)
@@ -16,18 +19,22 @@ export async function getOrCreateUser() {
         redirect('/login')
     }
 
-    // Global Settings 조회 (Raw Query to avoid stale client issues)
-    let signupBonus = 10
-    let verificationBonus = 20
-    try {
-        const settingsRaw = await prisma.$queryRawUnsafe<any[]>(`SELECT "signupBonus", "verificationBonus" FROM "global_settings" WHERE "id" = 'SYSTEM' LIMIT 1`)
-        if (Array.isArray(settingsRaw) && settingsRaw.length > 0) {
-            signupBonus = settingsRaw[0]?.signupBonus ?? 10
-            verificationBonus = settingsRaw[0]?.verificationBonus ?? 20
+    // Global Settings 조회 (Global cache check)
+    if (!cachedSettings) {
+        try {
+            const settingsRaw = await prisma.$queryRawUnsafe<any[]>(`SELECT "signupBonus", "verificationBonus" FROM "global_settings" WHERE "id" = 'SYSTEM' LIMIT 1`)
+            if (Array.isArray(settingsRaw) && settingsRaw.length > 0) {
+                cachedSettings = {
+                    signupBonus: settingsRaw[0]?.signupBonus ?? 10,
+                    verificationBonus: settingsRaw[0]?.verificationBonus ?? 20
+                }
+            }
+        } catch (e) {
+            console.warn("Failed to fetch global settings, using defaults:", e)
         }
-    } catch (e) {
-        console.warn("Failed to fetch global settings, using defaults:", e)
     }
+
+    const { signupBonus = 10, verificationBonus = 20 } = cachedSettings || {};
 
     let user = await prisma.user.findUnique({
         where: { id: authUser.id }

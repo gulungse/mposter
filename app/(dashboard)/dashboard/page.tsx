@@ -4,6 +4,8 @@ import { getOrCreateUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getUserLimits } from '@/lib/limits'
 import { formatInKST, toKSTString } from '@/lib/date'
+
+export const dynamic = 'force-dynamic'
 import {
     Search,
     Bell,
