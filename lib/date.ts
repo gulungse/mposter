@@ -1,46 +1,35 @@
 export function formatInKST(date: Date | string | number, formatStr: string = 'MM/dd HH:mm:ss'): string {
     const d = new Date(date);
     
-    // Vercel server time is usually UTC. 
-    // We use Intl.DateTimeFormat with Asia/Seoul to get the correct parts.
-    try {
-        const formatter = new Intl.DateTimeFormat('en-US', {
-            timeZone: 'Asia/Seoul',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false,
-        });
+    // Vercel server might ignore 'TZ' or have limited ICU data.
+    // To be 100% sure, we calculate the KST date by adding 9 hours to the UTC time.
+    const utc = d.getTime() + (d.getTimezoneOffset() * 60 * 1000); // Back to UTC
+    const kstDate = new Date(utc + (9 * 60 * 60 * 1000)); // Add 9 hours
 
-        const parts = formatter.formatToParts(d);
-        const p: Record<string, string> = {};
-        parts.forEach(part => { p[part.type] = part.value; });
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    
+    const year = kstDate.getFullYear().toString();
+    const month = pad(kstDate.getMonth() + 1);
+    const day = pad(kstDate.getDate());
+    const hour = pad(kstDate.getHours());
+    const minute = pad(kstDate.getMinutes());
+    const second = pad(kstDate.getSeconds());
 
-        return formatStr
-            .replace('yyyy', p.year)
-            .replace('MM', p.month)
-            .replace('dd', p.day)
-            .replace('HH', p.hour)
-            .replace('mm', p.minute)
-            .replace('ss', p.second);
-    } catch (e) {
-        // Fallback: manually add 9 hours if Intl fails (though unlikely in modern Node.js)
-        const kstDate = new Date(d.getTime() + (9 * 60 * 60 * 1000));
-        return kstDate.toISOString().replace('T', ' ').substring(5, 19);
-    }
+    return formatStr
+        .replace('yyyy', year)
+        .replace('MM', month)
+        .replace('dd', day)
+        .replace('HH', hour)
+        .replace('mm', minute)
+        .replace('ss', second);
 }
 
 export function toKSTString(date: Date | string | number): string {
-    return new Date(date).toLocaleString('ko-KR', {
-        timeZone: 'Asia/Seoul',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-    });
+    const d = new Date(date);
+    const utc = d.getTime() + (d.getTimezoneOffset() * 60 * 1000);
+    const kstDate = new Date(utc + (9 * 60 * 60 * 1000));
+    
+    return `${kstDate.getFullYear()}년 ${kstDate.getMonth() + 1}월 ${kstDate.getDate()}일 ${pad2(kstDate.getHours())}:${pad2(kstDate.getMinutes())}`;
 }
+
+function pad2(n: number) { return n.toString().padStart(2, '0'); }
