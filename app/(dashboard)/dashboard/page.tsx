@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { getOrCreateUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { getUserLimits } from '@/lib/limits'
+import { formatInKST, toKSTString } from '@/lib/date'
 import {
     Search,
     Bell,
@@ -138,7 +139,7 @@ export default async function DashboardPage() {
                                     가입 날짜
                                 </span>
                                 <span className="text-foreground">
-                                    {new Date(user.createdAt).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                    {toKSTString(user.createdAt)}
                                 </span>
                             </div>
                             <div className="mt-2 pt-2 border-t border-border/50 w-full flex justify-start">
@@ -219,7 +220,7 @@ export default async function DashboardPage() {
                                                     <StatusBadge status={log.status} />
                                                 </td>
                                                 <td className="py-3 text-muted-foreground">
-                                                    {new Date(log.createdAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                    {formatInKST(log.createdAt, 'MM/dd HH:mm')}
                                                 </td>
                                                 <td className="py-3 text-right pr-2 font-medium">
                                                     - {log.tokensUsed}

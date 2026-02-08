@@ -1,6 +1,6 @@
 import { getOrCreateUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { format } from 'date-fns'
+import { formatInKST } from '@/lib/date'
 import { Terminal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -26,7 +26,7 @@ export default async function LogsPage() {
                         SYSTEM_LOGS
                     </h2>
                     <p className="text-xs text-slate-500 font-mono">
-                        Showing last 100 entries • real-time monitor
+                        Showing last {logs.length} entries • real-time monitor
                     </p>
                 </div>
             </div>
@@ -47,7 +47,7 @@ export default async function LogsPage() {
                 {/* Logs Content */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-1 custom-scrollbar">
                     {logs.map((log) => {
-                        const time = format(new Date(log.createdAt), 'MM/dd HH:mm:ss')
+                        const time = formatInKST(log.createdAt, 'MM/dd HH:mm:ss')
                         const isError = log.status === 'FAILED'
                         const isSuccess = log.status === 'SUCCESS'
 
