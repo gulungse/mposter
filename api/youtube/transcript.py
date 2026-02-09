@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 from youtube_transcript_api import YouTubeTranscriptApi
 import json
+import io
 from urllib.parse import urlparse, parse_qs
 
 class handler(BaseHTTPRequestHandler):
@@ -16,8 +17,13 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            # Try to fetch in Korean first, then English
-            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            # Instantiate the API (Instance methods are required in some versions)
+            api = YouTubeTranscriptApi()
+            
+            # Get transcripts list using instance method
+            transcript_list = api.list(video_id)
+            
+            # Try to find Korean, then English
             try:
                 transcript = transcript_list.find_transcript(['ko'])
             except:
@@ -28,7 +34,18 @@ class handler(BaseHTTPRequestHandler):
                     transcript = next(iter(transcript_list))
             
             data = transcript.fetch()
-            full_text = " ".join([item['text'] for item in data])
+            
+            # Handle FetchedTranscriptSnippet objects or dictionaries
+            texts = []
+            for item in data:
+                if hasattr(item, 'text'):
+                    texts.append(item.text)
+                elif isinstance(item, dict) and 'text' in item:
+                    texts.append(item['text'])
+                else:
+                    texts.append(str(item))
+                    
+            full_text = " ".join(texts)
             
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -41,7 +58,7 @@ class handler(BaseHTTPRequestHandler):
             }, ensure_ascii=False).encode('utf-8'))
             
         except Exception as e:
-            self.send_response(200) # Still 200 but success: false to handle gracefully
+            self.send_response(200) # Still 200 but success: false
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({
