@@ -4,6 +4,7 @@ import { YoutubeTranscript } from 'youtube-transcript';
 import { exec } from 'child_process';
 import path from 'path';
 import { promisify } from 'util';
+import { headers } from 'next/headers';
 
 const execPromise = promisify(exec);
 
@@ -48,19 +49,32 @@ export async function getYoutubeTranscriptAction(url: string) {
         if (!transcriptText) {
             console.log(`Attempting Python API transcript fetch for videoId: ${videoId}`);
             
-            // Get base URL for the API call
-            const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
-            const host = process.env.VERCEL_URL || process.env.NEXT_PUBLIC_SITE_URL?.replace(/^https?:\/\//, '') || 'localhost:3000';
+            // Get data from current headers to construct internal URL and maintain session
+            const headersList = await headers();
+            const host = headersList.get('host') || process.env.VERCEL_URL || 'localhost:3000';
+            const protocol = (host.includes('localhost') || host.includes('127.0.0.1')) ? 'http' : 'https';
             const baseUrl = `${protocol}://${host}`;
             
             const apiUrl = `${baseUrl}/api/youtube/transcript?v=${videoId}`;
             console.log(`Fetching from API: ${apiUrl}`);
 
             try {
-                const response = await fetch(apiUrl);
+                // IMPORTANT: We must pass current headers (cookies, vercel-auth) to bypass middleware or deployment protection
+                const incomingHeaders = Object.fromEntries(headersList.entries());
+                
+                const response = await fetch(apiUrl, {
+                    headers: {
+                        ...incomingHeaders,
+                        'x-internal-request': 'true' // Optional: for debugging
+                    }
+                });
+
                 if (!response.ok) {
-                    throw new Error(`API response error: ${response.status}`);
+                    const errorBody = await response.text().catch(() => 'no response body');
+                    console.error(`API Error Response (${response.status}):`, errorBody);
+                    throw new Error(`API response error: ${response.status}. ${errorBody.substring(0, 100)}`);
                 }
+
                 const result = await response.json();
                 if (result.success) {
                     transcriptText = result.transcript;
@@ -70,16 +84,20 @@ export async function getYoutubeTranscriptAction(url: string) {
             } catch (apiError: any) {
                 console.error('Python API fetch failed:', apiError);
                 
-                // Fallback for local development if Vercel CLI is not running
+                // Fallback for local development if Vercel CLI is not running or API failed
                 if (process.env.NODE_ENV === 'development') {
                     console.log('Attempting local Python fallback...');
                     const pythonScriptPath = path.join(process.cwd(), 'lib/youtube/extract_transcript.py');
-                    const { stdout } = await execPromise(`python "${pythonScriptPath}" ${videoId}`, { encoding: 'utf8' });
-                    const localResult = JSON.parse(stdout);
-                    if (localResult.success) {
-                        transcriptText = localResult.transcript;
-                    } else {
-                        throw new Error(localResult.error || '로컬 파이썬 실행 실패');
+                    try {
+                        const { stdout } = await execPromise(`python "${pythonScriptPath}" ${videoId}`, { encoding: 'utf8' });
+                        const localResult = JSON.parse(stdout);
+                        if (localResult.success) {
+                            transcriptText = localResult.transcript;
+                        } else {
+                            throw new Error(localResult.error || '로컬 파이썬 실행 실패');
+                        }
+                    } catch (execError: any) {
+                         throw new Error(`로컬 파이썬 실행 오류: ${execError.message}`);
                     }
                 } else {
                     throw new Error(`자막 추출 API 호출 실패: ${apiError.message}`);
