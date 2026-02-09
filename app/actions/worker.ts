@@ -50,7 +50,8 @@ export async function testPublishAction(data: {
     siteId: string;
     keywordGroupId?: string;
     keywords?: string[];
-    promptId: string;
+    promptId?: string;
+    customPrompt?: string;
     aiModel: 'GPT4O' | 'GEMINI' | 'CLAUDE' | 'GPT5';
     imageSource: 'SCRAP' | 'DALLE' | 'FLUX' | 'NONE';
     imageCount?: number;
@@ -65,10 +66,10 @@ export async function testPublishAction(data: {
 
         const settings = (user as any).settings || {}
 
-        const [site, keywordGroup, prompt] = await Promise.all([
+        const [site, keywordGroup, promptByDb] = await Promise.all([
             prisma.site.findUnique({ where: { id: data.siteId, userId: user.id } }),
             data.keywordGroupId ? prisma.keywordGroup.findUnique({ where: { id: data.keywordGroupId, userId: user.id } }) : Promise.resolve(null),
-            prisma.prompt.findFirst({
+            data.promptId ? prisma.prompt.findFirst({
                 where: {
                     id: data.promptId,
                     OR: [
@@ -76,10 +77,14 @@ export async function testPublishAction(data: {
                         { type: 'SYSTEM' }
                     ]
                 }
-            })
+            }) : Promise.resolve(null)
         ])
 
-        if (!site || (!keywordGroup && !data.keywords?.length) || !prompt) throw new Error('대상 사이트, 키워드, 또는 프롬프트 데이터를 찾을 수 없습니다.')
+        if (!site) throw new Error('대상 사이트를 찾을 수 없습니다.')
+        if (!keywordGroup && !data.keywords?.length) throw new Error('키워드 데이터를 찾을 수 없습니다.')
+
+        const finalPromptContent = data.customPrompt || promptByDb?.content
+        if (!finalPromptContent) throw new Error('프롬프트 내용이 없습니다.')
 
         const keywords = (data.keywords && data.keywords.length > 0) ? data.keywords : (keywordGroup?.keywords as string[] || [])
         if (keywords.length === 0) throw new Error('사용 가능한 키워드가 없습니다.')
@@ -89,7 +94,7 @@ export async function testPublishAction(data: {
         let title = ''
         let content = ''
         let aiResult: any = {};
-        const systemPrompt = prompt.content
+        const systemPrompt = finalPromptContent
 
         try {
             if (data.aiModel === 'GPT4O') {

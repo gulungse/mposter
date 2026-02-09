@@ -67,6 +67,7 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                 { href: '/dashboard/sites', icon: 'Globe', label: '사이트 관리' },
                 { href: '/dashboard/keywords', icon: 'Key', label: '키워드 관리' },
                 { href: '/dashboard/prompts', icon: 'Terminal', label: '프롬프트 관리' },
+                { href: '/dashboard/prompts/test', icon: 'Sparkles', label: '프롬프트 테스트' },
                 { href: '/dashboard/tasks', icon: 'Cpu', label: '자동화 작업' },
                 { href: '/dashboard/api', icon: 'Code2', label: 'API 관리' },
                 { href: '/dashboard/logs', icon: 'ScrollText', label: '활동 로그' },
