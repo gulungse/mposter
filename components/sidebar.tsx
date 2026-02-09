@@ -69,6 +69,7 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                 { href: '/dashboard/prompts', icon: 'Terminal', label: '프롬프트 관리' },
                 { href: '/dashboard/prompts/test', icon: 'Sparkles', label: '프롬프트 테스트' },
                 { href: '/dashboard/tasks', icon: 'Cpu', label: '자동화 작업' },
+                { href: '/dashboard/tasks/youtube', icon: 'Youtube', label: '유튜브 → 블로그' },
                 { href: '/dashboard/api', icon: 'Code2', label: 'API 관리' },
                 { href: '/dashboard/logs', icon: 'ScrollText', label: '활동 로그' },
                 { href: '/dashboard/shop', icon: 'Coins', label: '충전소/상점' },

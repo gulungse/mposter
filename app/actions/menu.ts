@@ -127,8 +127,9 @@ export async function seedDefaultMenus() {
             { label: '키워드 관리', href: '/dashboard/keywords', icon: 'Key', order: 3 },
             { label: '프롬프트 관리', href: '/dashboard/prompts', icon: 'Terminal', order: 4 },
             { label: '프롬프트 테스트', href: '/dashboard/prompts/test', icon: 'Sparkles', order: 5 },
-            { label: '자동화 작업', href: '/dashboard/tasks', icon: 'Cpu', order: 6 },
-            { label: 'API 관리', href: '/dashboard/api', icon: 'Code2', order: 7 },
+            { label: '유튜브 → 블로그', href: '/dashboard/tasks/youtube', icon: 'Youtube', order: 6 },
+            { label: '자동화 작업', href: '/dashboard/tasks', icon: 'Cpu', order: 7 },
+            { label: 'API 관리', href: '/dashboard/api', icon: 'Code2', order: 8 },
         ]
 
         const now = new Date().toISOString()

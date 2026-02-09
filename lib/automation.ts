@@ -161,7 +161,7 @@ export async function getAvailableGeminiModels(apiKey: string) {
     }
 }
 
-export async function generateGeminiContent(apiKey: string, systemPrompt: string, targetKeyword: string) {
+export async function generateGeminiContent(apiKey: string, systemPrompt: string, targetKeyword: string, transcript?: string) {
     const trimmedKey = apiKey.trim()
 
     // 1. 사용 가능한 모델 목록 조회 (스마트 감지)
@@ -199,7 +199,7 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
         const response = await axios.post(url, {
             contents: [{
                 parts: [{
-                    text: `${systemPrompt}\n\n위 지침을 따라 '${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘. 
+                    text: `${systemPrompt}\n\n${transcript ? `[참고 데이터 - 유튜브 스크립트]:\n${transcript}\n\n위 스크립트 내용을 바탕으로 블로그 글을 작성해줘. ` : ''}위 지침을 따라 '${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘. 
 본문은 반드시 5개 이상의 문단으로 구성하고, 독자에게 유용하고 상세한 정보를 제공하는 SEO 최적화된 글이어야 해. 분량은 가급적 1000자 이상으로 풍부하게 작성해줘.
 절대로 <h1>, <html>, <head>, <body>, <!DOCTYPE>, <style>, <script> 태그를 사용하지 마. 본문에는 오직 문서 내용(<p>, <h2>, <ul>, <li> 등)만 포함해야 하며, 내부 CSS나 인라인 스타일도 금지야.
 제목은 이미 글 상단에 있으므로 본문에는 <h2>, <h3>, <h4> 태그만 사용해야 해.
@@ -238,7 +238,7 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
 /**
  * Claude (Opus)를 사용하여 콘텐츠를 생성합니다.
  */
-export async function generateClaudeContent(apiKey: string, systemPrompt: string, targetKeyword: string) {
+export async function generateClaudeContent(apiKey: string, systemPrompt: string, targetKeyword: string, transcript?: string) {
     // 동적 import로 SDK 로드 (서버 사이드에서만 필요)
     const { Anthropic } = await import('@anthropic-ai/sdk');
 
@@ -256,7 +256,7 @@ export async function generateClaudeContent(apiKey: string, systemPrompt: string
             messages: [
                 {
                     role: "user",
-                    content: `'${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘.
+                    content: `${transcript ? `[참고 데이터 - 유튜브 스크립트]:\n${transcript}\n\n위 스크립트 내용을 바탕으로 블로그 글을 작성해줘. ` : ''}'${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘.
 1. 본문은 5개 이상의 문단, 2000자 이상으로 풍부하게 작성.
 2. <h1>, <html>, <head>, <body>, <style>, <script> 태그 사용 금지. 또한 인라인 스타일(style="...")도 금지. 오직 순수한 본문 태그(<h2>, <p>, <ul> 등)만 사용.
 3. SEO에 최적화된 유용한 정보 위주로 작성.
@@ -286,7 +286,7 @@ export async function generateClaudeContent(apiKey: string, systemPrompt: string
 /**
  * GPT-4o를 사용하여 콘텐츠를 생성합니다.
  */
-export async function generateGPTContent(apiKey: string, systemPrompt: string, targetKeyword: string, model: string = "gpt-5-mini") {
+export async function generateGPTContent(apiKey: string, systemPrompt: string, targetKeyword: string, model: string = "gpt-5-mini", transcript?: string) {
     const openai = new OpenAI({ apiKey })
     const isNewModel = model.includes('gpt-5') || model.startsWith('o1') || model.startsWith('o3');
 
@@ -308,7 +308,7 @@ export async function generateGPTContent(apiKey: string, systemPrompt: string, t
 그 외의 **글의 스타일, 어조, 길이, 구성** 등은 오직 아래 **사용자(User)의 요청**을 최우선으로 따르세요. 시스템이 강제하는 문체나 형식은 없습니다.`
             },
             {
-                role: "user", content: `'${targetKeyword}' 주제로 블로그 포스팅을 작성해줘.
+                role: "user", content: `${transcript ? `[참고 데이터 - 유튜브 스크립트]:\n${transcript}\n\n위 스크립트 내용을 바탕으로 블로그 글을 작성해줘. ` : ''}'${targetKeyword}' 주제로 블로그 포스팅을 작성해줘.
 
 [사용자 요청 사항]:
 ${systemPrompt || '별도의 추가 지침 없음. 자유롭게 작성.'}
