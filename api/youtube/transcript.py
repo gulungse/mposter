@@ -18,12 +18,13 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            # Look for cookies file in common locations
-            # Vercel's root or the lib folder
+            # Look for cookies file relative to this script
+            script_dir = os.path.dirname(os.path.abspath(__file__))
             cookie_file = None
             possible_paths = [
-                os.path.join(os.getcwd(), 'youtube_cookies.txt'),
-                os.path.join(os.getcwd(), 'lib/youtube/youtube_cookies.txt')
+                os.path.join(script_dir, '../../youtube_cookies.txt'),
+                os.path.join(script_dir, 'youtube_cookies.txt'),
+                os.path.join(os.getcwd(), 'youtube_cookies.txt')
             ]
             
             for p in possible_paths:
