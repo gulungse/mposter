@@ -31,7 +31,7 @@ function cleanAndParseJson(text: string): any {
 
     try {
         const parsed = JSON.parse(cleaned);
-        // HTML 태그 정제 (<html>, <head>, <body> 제거)
+        // HTML 태그 정제 (<html>, <head>, <body>, <style>, <script> 제거)
         if (parsed.content) {
             parsed.content = parsed.content
                 .replace(/<!DOCTYPE[^>]*>/ig, '')
@@ -40,6 +40,8 @@ function cleanAndParseJson(text: string): any {
                 .replace(/<head>[\s\S]*?<\/head>/ig, '')
                 .replace(/<body[^>]*>/ig, '')
                 .replace(/<\/body>/ig, '')
+                .replace(/<style[\s\S]*?<\/style>/ig, '')
+                .replace(/<script[\s\S]*?<\/script>/ig, '')
                 .trim();
         }
         return parsed;
@@ -199,8 +201,7 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
                 parts: [{
                     text: `${systemPrompt}\n\n위 지침을 따라 '${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘. 
 본문은 반드시 5개 이상의 문단으로 구성하고, 독자에게 유용하고 상세한 정보를 제공하는 SEO 최적화된 글이어야 해. 분량은 가급적 1000자 이상으로 풍부하게 작성해줘.
-본문은 반드시 5개 이상의 문단으로 구성하고, 독자에게 유용하고 상세한 정보를 제공하는 SEO 최적화된 글이어야 해. 분량은 가급적 1000자 이상으로 풍부하게 작성해줘.
-절대로 <h1>, <html>, <head>, <body>, <!DOCTYPE> 태그를 사용하지 마. 오직 본문 내용(<p>, <h2> 등)만 반환해야 해.
+절대로 <h1>, <html>, <head>, <body>, <!DOCTYPE>, <style>, <script> 태그를 사용하지 마. 본문에는 오직 문서 내용(<p>, <h2>, <ul>, <li> 등)만 포함해야 하며, 내부 CSS나 인라인 스타일도 금지야.
 제목은 이미 글 상단에 있으므로 본문에는 <h2>, <h3>, <h4> 태그만 사용해야 해.
 또한, 이 글과 관련된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 배열로 제공해줘. (LoremFlickr 검색용)
 마지막으로, 썸네일 이미지에 들어갈 **10자 이내의 클릭을 부르는 자극적인 문구**를 'thumbnailText' 필드에 제공해줘. \n**주의: 절대 제목을 그대로 쓰지 마.** 독자가 클릭하고 싶게 만드는 "낚시성 멘트"나 "충격적인 질문" 형태로 짧게(단어 위주). (예: "저속노화의 충격 진실", "절대 먹지 마세요")
@@ -257,8 +258,7 @@ export async function generateClaudeContent(apiKey: string, systemPrompt: string
                     role: "user",
                     content: `'${targetKeyword}' 키워드로 블로그 제목과 본문을 작성해줘.
 1. 본문은 5개 이상의 문단, 2000자 이상으로 풍부하게 작성.
-1. 본문은 5개 이상의 문단, 2000자 이상으로 풍부하게 작성.
-2. <h1>, <html>, <head>, <body> 태그 사용 금지. 오직 본문 태그(<h2>, <p> 등)만 사용.
+2. <h1>, <html>, <head>, <body>, <style>, <script> 태그 사용 금지. 또한 인라인 스타일(style="...")도 금지. 오직 순수한 본문 태그(<h2>, <p>, <ul> 등)만 사용.
 3. SEO에 최적화된 유용한 정보 위주로 작성.
 4. **반드시 JSON 형식만 반환**하고, 마크다운 코드 블록(\`\`\`json)이나 사족을 달지 마시오.
 5. 'imageKeywords' 필드에는 이미지 검색용 영문 키워드 5개를 배열로 포함.
@@ -298,7 +298,7 @@ export async function generateGPTContent(apiKey: string, systemPrompt: string, t
 
 [기술적 필수 제약사항]:
 1. **형식**: 반드시 JSON 형식으로만 응답해야 합니다. (JSON 파싱 실패 시 시스템 오류 발생)
-2. **태그 제한**: <h1>, <html>, <head>, <body> 태그는 사용 금지입니다. (<h2>, <h3>, <p> 등 사용 권장)
+2. **태그 제한**: <h1>, <html>, <head>, <body>, <style>, <script> 태그 및 인라인 스타일은 절대 금지입니다. (<h2>, <h3>, <p>, <ul> 등 사용 권장)
 3. **필수 필드**:
    - title: 글 제목
    - content: 글 본문 (HTML 태그 포함)
