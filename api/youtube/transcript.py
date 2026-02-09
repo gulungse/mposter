@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler
 from youtube_transcript_api import YouTubeTranscriptApi
 import json
 import io
+import os
 from urllib.parse import urlparse, parse_qs
 
 class handler(BaseHTTPRequestHandler):
@@ -17,11 +18,29 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            # Instantiate the API (Instance methods are required in some versions)
+            # Look for cookies file in common locations
+            # Vercel's root or the lib folder
+            cookie_file = None
+            possible_paths = [
+                os.path.join(os.getcwd(), 'youtube_cookies.txt'),
+                os.path.join(os.getcwd(), 'lib/youtube/youtube_cookies.txt')
+            ]
+            
+            for p in possible_paths:
+                if os.path.exists(p):
+                    cookie_file = p
+                    break
+
+            # Instantiate the API
             api = YouTubeTranscriptApi()
             
-            # Get transcripts list using instance method
-            transcript_list = api.list(video_id)
+            # Fetch using cookies if available
+            # Note: We use the static method with cookie_path if available for robustness
+            if cookie_file:
+                print(f"Using cookie file: {cookie_file}")
+                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, cookies=cookie_file)
+            else:
+                transcript_list = api.list(video_id)
             
             # Try to find Korean, then English
             try:
@@ -58,10 +77,15 @@ class handler(BaseHTTPRequestHandler):
             }, ensure_ascii=False).encode('utf-8'))
             
         except Exception as e:
+            error_msg = str(e)
+            # Add helpful tips for common YouTube blocks
+            if "blocked" in error_msg.lower() or "too many requests" in error_msg.lower():
+                error_msg += " (YouTube is blocking the server IP. Please provide 'youtube_cookies.txt' in the root directory.)"
+                
             self.send_response(200) # Still 200 but success: false
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({
                 "success": False, 
-                "error": str(e)
+                "error": error_msg
             }).encode('utf-8'))
