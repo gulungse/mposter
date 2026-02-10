@@ -32,7 +32,8 @@ export async function getAllPlansAdmin() {
             SELECT * FROM "plans" ORDER BY "price" ASC
         `)
         return { success: true, data: plans }
-    } catch (error) {
+    } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         return { success: false, error: '플랜 목록을 가져오지 못했습니다.' }
     }
 }
@@ -171,7 +172,8 @@ export async function getUserWithPlan() {
                 purchases
             }
         }
-    } catch (error) {
+    } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         return { success: false, error: '프로필을 가져오지 못했습니다.' }
     }
 }
@@ -283,6 +285,7 @@ export async function assignPlanToUser(userId: string, planId: string) {
         revalidatePath('/dashboard/admin/users')
         return { success: true, message: `${plan.name}으로 변경 및 ${monthlyTokens} 토큰이 지급되었습니다.` }
     } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         console.error('Plan assignment failed:', error)
         return { success: false, error: error.message }
     }

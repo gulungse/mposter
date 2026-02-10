@@ -377,6 +377,7 @@ export async function testPublishAction(data: {
         revalidatePath('/dashboard')
         return { success: true, message: '테스트 발행 성공! (1토큰 사용됨)' }
     } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         console.error('Final Catch in testPublishAction:', error)
         return { success: false, error: error.message }
     }
@@ -401,6 +402,7 @@ export async function runAutomationTask(jobId: string) {
         return await processAutomationJob(jobId)
 
     } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         console.error('자동화 실행 요청 실패:', error)
         return { success: false, error: error.message }
     }

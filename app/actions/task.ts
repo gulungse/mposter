@@ -78,6 +78,7 @@ export async function createAutomationTask(data: {
         revalidatePath('/dashboard/tasks')
         return { success: true, data: task }
     } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         console.error('자동화 작업 생성 실패:', error)
         return {
             success: false,
@@ -158,6 +159,7 @@ export async function updateAutomationTask(id: string, data: {
         revalidatePath('/dashboard/tasks')
         return { success: true }
     } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         console.error('자동화 작업 수정 실패:', error)
         return {
             success: false,
@@ -186,7 +188,8 @@ export async function getAutomationTasks() {
         })
 
         return { success: true, data: tasks }
-    } catch (error) {
+    } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         console.error('자동화 작업 조회 실패:', error)
         return { success: false, error: '자동화 작업 목록을 가져오는 중 오류가 발생했습니다.' }
     }
@@ -229,7 +232,8 @@ export async function getAutomationTask(id: string) {
             }
         })
         return { success: true, data: task }
-    } catch (error) {
+    } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         return { success: false, error: '작업 조회 중 오류가 발생했습니다.' }
     }
 }
@@ -245,7 +249,8 @@ export async function deleteAutomationTask(id: string) {
         })
         revalidatePath('/dashboard/tasks')
         return { success: true }
-    } catch (error) {
+    } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         return { success: false, error: '작업 삭제 중 오류가 발생했습니다.' }
     }
 }

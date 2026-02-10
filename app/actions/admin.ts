@@ -97,7 +97,8 @@ export async function getUsers() {
         // Raw SQL to bypass stale Prisma client/EPERM issues
         const users = await prisma.$queryRawUnsafe(`SELECT * FROM "users" ORDER BY "createdAt" DESC`) as any[]
         return { success: true, data: users }
-    } catch (error) {
+    } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         return { success: false, error: '사용자 목록을 불러올 수 없습니다.' }
     }
 }
@@ -130,7 +131,8 @@ export async function updateUserTokens(userId: string, amount: number, descripti
 
         revalidatePath('/dashboard/admin/users')
         return { success: true }
-    } catch (error) {
+    } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         console.error('Token update failed:', error)
         return { success: false, error: '토큰 조정에 실패했습니다.' }
     }
