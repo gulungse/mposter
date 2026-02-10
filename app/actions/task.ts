@@ -23,6 +23,12 @@ export async function createAutomationTask(data: {
     wpCategoryId?: number;
     postStatus?: string;
     runImmediately?: boolean;
+    // 고급 이미지 권한 전용
+    advThumbnailLines?: string[];
+    advContentPhraseA?: string;
+    advContentPhraseB?: string;
+    advImageMode?: string;
+    advCustomImages?: string[];
 }) {
     try {
         const user = await getOrCreateUser()
@@ -48,6 +54,12 @@ export async function createAutomationTask(data: {
                 wpCategoryId: data.wpCategoryId,
                 postStatus: data.postStatus || 'publish', // Default default
                 isActive: true,
+                advThumbnailLines: data.advThumbnailLines,
+                advContentPhraseA: data.advContentPhraseA,
+                advContentPhraseB: data.advContentPhraseB,
+                advImageMode: data.advImageMode || 'STANDARD',
+                advCustomImages: data.advCustomImages || [],
+                advNextImageIdx: 0,
                 // 스케줄에 따른 첫 실행 시간 설정 (등록 직후 실행 방지, 지정된 간격 후 실행)
                 nextRunAt: calculateNextRun(data.scheduleCron)
             }
@@ -89,6 +101,11 @@ export async function updateAutomationTask(id: string, data: {
     imageCount?: number;
     wpCategoryId?: number;
     postStatus?: string;
+    advThumbnailLines?: string[];
+    advContentPhraseA?: string;
+    advContentPhraseB?: string;
+    advImageMode?: string;
+    advCustomImages?: string[];
 }) {
     try {
         const user = await getOrCreateUser()
@@ -129,6 +146,11 @@ export async function updateAutomationTask(id: string, data: {
                 imageCount: data.imageCount,
                 wpCategoryId: data.wpCategoryId,
                 postStatus: data.postStatus,
+                advThumbnailLines: data.advThumbnailLines,
+                advContentPhraseA: data.advContentPhraseA,
+                advContentPhraseB: data.advContentPhraseB,
+                advImageMode: data.advImageMode,
+                advCustomImages: data.advCustomImages,
                 ...(nextRunAt ? { nextRunAt } : {})
             }
         })

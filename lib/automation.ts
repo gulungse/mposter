@@ -10,6 +10,7 @@ import satori from 'satori'
 import { createElement } from 'react'
 import { readFileSync } from 'fs'
 import { join } from 'path'
+import { calculateNextRun } from '@/lib/cron'
 
 // Helper to clean and parse JSON from AI responses
 function cleanAndParseJson(text: string): any {
@@ -600,6 +601,160 @@ export async function generateThumbnail(text: string): Promise<Buffer> {
 }
 
 /**
+ * [고급 권한] 업로드된 이미지 배경 + 4줄 텍스트 썸네일 (600x600) 생성
+ */
+export async function generateAdvancedThumbnail(backgroundUrl: string, lines: string[]): Promise<Buffer> {
+    const width = 600;
+    const height = 600;
+
+    // Font loading
+    const fontPath = join(process.cwd(), 'public', 'fonts', 'NanumGothic-Bold.ttf');
+    const fontData = readFileSync(fontPath);
+
+    // Fetch background image
+    let base64Bg = '';
+    try {
+        const bgResponse = await axios.get(backgroundUrl, { 
+            responseType: 'arraybuffer',
+            timeout: 10000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        const contentType = bgResponse.headers['content-type'] || 'image/png';
+        const bgBuffer = Buffer.from(bgResponse.data);
+        base64Bg = `data:${contentType};base64,${bgBuffer.toString('base64')}`;
+    } catch (e) {
+        console.error('Failed to fetch background image:', e);
+        // Fallback or handle error (for now we proceed with empty string which will show nothing)
+    }
+
+    const element = createElement('div', {
+        style: {
+            display: 'flex', width: '100%', height: '100%',
+            backgroundColor: '#000000', // Fallback color
+            alignItems: 'center', justifyContent: 'center', position: 'relative',
+            overflow: 'hidden'
+        }
+    }, [
+        // Background Image (Bottom Layer)
+        base64Bg && createElement('img', {
+            src: base64Bg,
+            style: {
+                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                objectFit: 'cover'
+            }
+        }),
+        // Dark Overlay (Middle Layer) - Using solid color + opacity for better Satori compatibility
+        createElement('div', {
+            style: {
+                position: 'absolute', inset: 0,
+                backgroundColor: '#000000', opacity: 0.8
+            }
+        }),
+        // Text Container (Top Layer)
+        createElement('div', {
+            style: {
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                justifyContent: 'center', padding: '40px', textAlign: 'center'
+            }
+        }, [
+            // Line 1: Keyword (Yellow Box)
+            createElement('div', {
+                style: {
+                    backgroundColor: '#fbbf24', color: '#000000', padding: '10px 28px',
+                    fontSize: 56, fontWeight: 900, borderRadius: '8px', marginBottom: '20px'
+                }
+            }, lines[0]),
+            // Line 2 & 3: White Text
+            createElement('div', {
+                style: { color: '#ffffff', fontSize: 60, fontWeight: 900, marginBottom: '10px', textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }
+            }, lines[1]),
+            createElement('div', {
+                style: { color: '#ffffff', fontSize: 48, fontWeight: 900, marginBottom: '30px', textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }
+            }, lines[2]),
+            // Line 4: Contact (Red Box)
+            createElement('div', {
+                style: {
+                    backgroundColor: '#ef4444', color: '#ffffff', padding: '10px 30px',
+                    fontSize: 44, fontWeight: 900, borderRadius: '50px', letterSpacing: '1px'
+                }
+            }, lines[3])
+        ])
+    ]);
+
+    const svg = await satori(element, {
+        width, height,
+        fonts: [{ name: 'NanumGothic', data: fontData, weight: 700, style: 'normal' }]
+    });
+
+    return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+/**
+ * [고급 권한] 본문 중간 이미지 (700x300) 생성
+ * 문구A + 키워드 + 문구B
+ */
+export async function generateAdvancedContentImage(backgroundUrl: string, keyword: string, phraseA: string, phraseB: string): Promise<Buffer> {
+    const width = 700;
+    const height = 200;
+
+    const fontPath = join(process.cwd(), 'public', 'fonts', 'NanumGothic-Bold.ttf');
+    const fontData = readFileSync(fontPath);
+
+    let base64Bg = '';
+    try {
+        const bgResponse = await axios.get(backgroundUrl, { 
+            responseType: 'arraybuffer',
+            timeout: 10000,
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        const contentType = bgResponse.headers['content-type'] || 'image/png';
+        const bgBuffer = Buffer.from(bgResponse.data);
+        base64Bg = `data:${contentType};base64,${bgBuffer.toString('base64')}`;
+    } catch (e) {
+        console.error('Failed to fetch content background image:', e);
+    }
+
+    const element = createElement('div', {
+        style: {
+            display: 'flex', width: '100%', height: '100%',
+            backgroundColor: '#000000',
+            alignItems: 'center', justifyContent: 'center', position: 'relative',
+            overflow: 'hidden'
+        }
+    }, [
+        base64Bg && createElement('img', {
+            src: base64Bg,
+            style: {
+                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                objectFit: 'cover'
+            }
+        }),
+        createElement('div', {
+            style: { position: 'absolute', inset: 0, backgroundColor: '#000000', opacity: 0.8 }
+        }),
+        createElement('div', {
+            style: {
+                display: 'flex', flexDirection: 'column', alignItems: 'center',
+                padding: '15px', textAlign: 'center', gap: '4px'
+            }
+        }, [
+            createElement('div', { style: { color: '#ffffff', fontSize: 28, fontWeight: 900 } }, phraseA),
+            createElement('div', {
+                style: { color: '#fbbf24', fontSize: 42, fontWeight: 900, padding: '4px 16px', border: '3px solid #fbbf24', borderRadius: '4px' }
+            }, keyword),
+            createElement('div', { style: { color: '#ffffff', fontSize: 28, fontWeight: 900 } }, phraseB),
+        ])
+    ]);
+
+    const svg = await satori(element, {
+        width, height,
+        fonts: [{ name: 'NanumGothic', data: fontData, weight: 700, style: 'normal' }]
+    });
+
+    return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+/**
  * 워드프레스 미디어 라이브러리에 이미지를 업로드합니다.
  */
 export async function uploadToWordPress(site: any, imageBuffer: Buffer, filename: string): Promise<{ id: number, url: string }> {
@@ -640,7 +795,14 @@ export async function processAutomationJob(jobId: string) {
         if (!job.user) return { success: false, error: '작업 소유자를 찾을 수 없습니다.' }
 
         const user = job.user;
-        // User Settings는 별도 필드가 아닌 user.settings (JSON)에 있음
+        
+        // Raw SQL check for hasImageGenRights (Prisma Client might be stale)
+        const rightsRes = await prisma.$queryRawUnsafe<any[]>(
+            'SELECT "hasImageGenRights" FROM "users" WHERE id = $1',
+            user.id
+        )
+        const hasRights = rightsRes?.[0]?.hasImageGenRights || false
+
         const settings = (user as any).settings || {}
 
         const keywords = ((job as any).keywords && (job as any).keywords.length > 0)
@@ -648,6 +810,20 @@ export async function processAutomationJob(jobId: string) {
             : (job.keywordGroup?.keywords as string[] || [])
 
         if (!keywords || keywords.length === 0) return { success: false, error: '사용 가능한 키워드가 없습니다.' }
+
+        // 고급 이미지용 배경 이미지 로테이션 준비
+        let currentImageIdx = (job as any).advNextImageIdx || 0;
+        const customImages = (job as any).advCustomImages || [];
+        let imagesUsedCount = 0;
+
+        const getNextBgUrl = (searchKeyword: string) => {
+            if ((job as any).advImageMode === 'PREMIUM' && customImages.length > 0) {
+                // 랜덤하게 이미지 선택
+                const randomIdx = Math.floor(Math.random() * customImages.length);
+                return customImages[randomIdx];
+            }
+            return null; // 일반 모드
+        };
 
         const targetKeyword = keywords[Math.floor(Math.random() * keywords.length)]
 
@@ -729,23 +905,42 @@ export async function processAutomationJob(jobId: string) {
                 // 1번 이미지 (썸네일) 특별 처리
                 if (i === 1 && job.site.type === 'WORDPRESS') {
                     try {
-                        // 썸네일 텍스트 결정 (Strict Mode)
-                        const safeThumbText = getSafeThumbnailText(aiResult.thumbnailText, title, targetKeyword);
-
-                        // 디버깅용 로그 (서버 콘솔 확인 가능 시)
-                        console.log(`[Thumbnail] Final Text: "${safeThumbText}" (Original: "${aiResult.thumbnailText}", Title: "${title}")`);
-
-                        const thumbBuffer = await generateThumbnail(safeThumbText);
-                        const uploaded = await uploadToWordPress(job.site, thumbBuffer, `${targetKeyword}-thumb-${Date.now()}`);
-                        imageUrl = uploaded.url;
-                        featuredMediaId = uploaded.id;
+                        if (hasRights && (job as any).advThumbnailLines?.length === 4) {
+                            // 고급 권한: 4줄 텍스트 + 배경 (커스텀 갤러리 또는 키워드 검색)
+                            const searchKeyword = targetKeyword.split(' ')[0] || 'business';
+                            let bgUrl = getNextBgUrl(searchKeyword);
+                            
+                            if (!bgUrl) {
+                                // 일반 모드인 경우 기존처럼 랜덤 검색
+                                const searchedBg = await fetchRandomImage(settings, searchKeyword, 1);
+                                bgUrl = searchedBg || `https://loremflickr.com/600/600/${encodeURIComponent(searchKeyword)}`;
+                            }
+                            
+                            // 1번 라인은 항상 현재 키워드로 고정
+                            const finalLines = [...(job as any).advThumbnailLines];
+                            finalLines[0] = targetKeyword;
+                            
+                            const thumbBuffer = await generateAdvancedThumbnail(bgUrl, finalLines);
+                            const uploaded = await uploadToWordPress(job.site, thumbBuffer, `${targetKeyword}-adv-thumb-${Date.now()}`);
+                            imageUrl = uploaded.url;
+                            featuredMediaId = uploaded.id;
+                        } else {
+                            // 일반 권한: 기존 텍스트 썸네일
+                            const safeThumbText = getSafeThumbnailText(aiResult.thumbnailText, title, targetKeyword);
+                            const thumbBuffer = await generateThumbnail(safeThumbText);
+                            const uploaded = await uploadToWordPress(job.site, thumbBuffer, `${targetKeyword}-thumb-${Date.now()}`);
+                            imageUrl = uploaded.url;
+                            featuredMediaId = uploaded.id;
+                        }
+                        success = true;
                     } catch (e) {
                         console.warn('WP/Thumbnail Error:', e);
                     }
                 }
 
                 // 2. SCRAP (멀티 프로바이더)
-                if (!imageUrl && imageSource === 'SCRAP') {
+                const isPremium = (job as any).advImageMode === 'PREMIUM';
+                if (!imageUrl && imageSource === 'SCRAP' && !isPremium) {
                     const searchKeyword = (aiResult.imageKeywords && aiResult.imageKeywords[i - 1])
                         ? aiResult.imageKeywords[i - 1]
                         : (targetKeyword.split(' ')[0] || 'korea');
@@ -761,7 +956,7 @@ export async function processAutomationJob(jobId: string) {
                 }
 
                 // 3. DALLE / FLUX
-                if (!imageUrl) {
+                if (!imageUrl && !isPremium) {
                     try {
                         if (imageSource === 'DALLE') {
                             if (!settings.openaiApiKey) throw new Error('OpenAI API 키가 없습니다.');
@@ -777,6 +972,30 @@ export async function processAutomationJob(jobId: string) {
                         }
                     } catch (e) {
                         console.warn(`Image ${i} Generation Failed`, e);
+                    }
+                }
+
+                // 고급 권한: 본문 이미지 특수 처리 (나머지 이미지들)
+                if (hasRights && i > 1 && (job as any).advContentPhraseA && (job as any).advContentPhraseB) {
+                    try {
+                        // 프리미엄 모드인 경우 배경 이미지를 갤러리에서 가져옴
+                        const searchKeyword = targetKeyword.split(' ')[0] || 'korea';
+                        let bgUrl = imageUrl; // 이미 생성된 이미지(DALLE 등)가 있으면 그것을 배경으로 사용
+
+                        if ((job as any).advImageMode === 'PREMIUM' && customImages.length > 0) {
+                            bgUrl = getNextBgUrl(searchKeyword);
+                        }
+
+                        if (bgUrl) {
+                            const advancedImgBuffer = await generateAdvancedContentImage(bgUrl, targetKeyword, (job as any).advContentPhraseA, (job as any).advContentPhraseB);
+                            if (job.site.type === 'WORDPRESS') {
+                                const uploaded = await uploadToWordPress(job.site, advancedImgBuffer, `${targetKeyword}-adv-img-${i}-${Date.now()}`);
+                                imageUrl = uploaded.url;
+                            }
+                            success = true;
+                        }
+                    } catch (e) {
+                        console.warn(`Advanced Content Image ${i} generation failed:`, e);
                     }
                 }
 
@@ -891,6 +1110,17 @@ export async function processAutomationJob(jobId: string) {
         })
 
         revalidatePath('/dashboard')
+
+        // 성공 시 다음 실행 시간 및 이미지 인덱스 업데이트
+        await (prisma.automationJob as any).update({
+            where: { id: jobId },
+            data: {
+                lastRunAt: new Date(),
+                nextRunAt: calculateNextRun(job.scheduleCron!),
+                advNextImageIdx: customImages.length > 0 ? (currentImageIdx + imagesUsedCount) % customImages.length : 0
+            }
+        });
+
         return { success: true, postUrl }
 
     } catch (error: any) {

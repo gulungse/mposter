@@ -220,13 +220,21 @@ export async function withdrawUser() {
 export async function getUserProfile() {
     try {
         const user = await getOrCreateUser()
+
+        // Use simple string interpolation for ID to be safer with UUID types in Raw SQL
+        const rightsRes = await (prisma as any).$queryRawUnsafe(`SELECT "hasImageGenRights" FROM "users" WHERE "id" = '${user.id}'`)
+        const hasRights = rightsRes?.[0]?.hasImageGenRights === true
+        
+        console.log(`[AUTH_CHECK] User: ${user.email}, ID: ${user.id}, hasRights: ${hasRights}`)
+
         return {
             success: true,
             data: {
                 name: user.name,
                 email: user.email,
                 image: user.image,
-                role: user.role
+                role: user.role,
+                hasImageGenRights: hasRights
             }
         }
     } catch (error) {

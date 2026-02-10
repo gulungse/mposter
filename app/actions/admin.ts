@@ -94,9 +94,8 @@ export async function getUsers() {
             return { success: false, error: '권한이 없습니다.' }
         }
 
-        const users = await prisma.user.findMany({
-            orderBy: { createdAt: 'desc' }
-        })
+        // Raw SQL to bypass stale Prisma client/EPERM issues
+        const users = await prisma.$queryRawUnsafe(`SELECT * FROM "users" ORDER BY "createdAt" DESC`)
         return { success: true, data: users }
     } catch (error) {
         return { success: false, error: '사용자 목록을 불러올 수 없습니다.' }
@@ -134,5 +133,30 @@ export async function updateUserTokens(userId: string, amount: number, descripti
     } catch (error) {
         console.error('Token update failed:', error)
         return { success: false, error: '토큰 조정에 실패했습니다.' }
+    }
+}
+
+/**
+ * 사용자 이미지 생성 권한 설정 (관리자 전용)
+ */
+export async function updateUserImageRights(userId: string, hasRights: boolean) {
+    try {
+        const user = await getOrCreateUser()
+        if (user.role !== 'ADMIN') {
+            return { success: false, error: '권한이 없습니다.' }
+        }
+
+        // Raw SQL update to bypass Prisma Client stale state / EPERM issues
+        await prisma.$executeRawUnsafe(
+            `UPDATE "users" SET "hasImageGenRights" = $1 WHERE "id" = $2`,
+            hasRights,
+            userId
+        )
+
+        revalidatePath('/dashboard/admin/users')
+        return { success: true }
+    } catch (error) {
+        console.error('Failed to update image rights:', error)
+        return { success: false, error: '이미지 권한 업데이트에 실패했습니다.' }
     }
 }

@@ -14,7 +14,9 @@ import {
     generateThumbnail,
     uploadToWordPress,
     refreshBloggerToken,
-    getSafeThumbnailText
+    getSafeThumbnailText,
+    generateAdvancedThumbnail,
+    generateAdvancedContentImage
 } from '@/lib/automation'
 import { fetchRandomImage } from '@/lib/image_providers'
 import axios from 'axios'
@@ -58,9 +60,20 @@ export async function testPublishAction(data: {
     imageCount?: number;
     wpCategoryId?: number;
     postStatus?: string;
+    // 고급 권한 전용
+    advThumbnailLines?: string[];
+    advContentPhraseA?: string;
+    advContentPhraseB?: string;
+    advImageMode?: string;
+    advCustomImages?: string[];
 }) {
     try {
         const user = await getOrCreateUser()
+        
+        // Raw SQL check for hasImageGenRights (Prisma Client might be stale)
+        const rightsRes = await (prisma as any).$queryRawUnsafe(`SELECT "hasImageGenRights" FROM "users" WHERE id = '${user.id}'`)
+        const hasRights = rightsRes?.[0]?.hasImageGenRights || false
+
         if (user.tokenBalance <= 0) {
             throw new Error('보유 토큰이 부족합니다. 테스트 발행을 위해서는 최소 1토큰이 필요합니다.')
         }
@@ -163,20 +176,44 @@ export async function testPublishAction(data: {
 
                 if (i === 1 && site.type === 'WORDPRESS') {
                     try {
-                        // 썸네일 텍스트 결정 (Strict Mode)
-                        const safeThumbText = getSafeThumbnailText(aiResult.thumbnailText, title, targetKeyword);
+                        if (hasRights && data.advThumbnailLines?.length === 4) {
+                            // 고급 권한: 4줄 텍스트 + 배경 (커스텀 갤러리 또는 키워드 검색)
+                            const searchKeyword = targetKeyword.split(' ')[0] || 'business';
+                            
+                            // 프리미엄 모드이고 커스텀 이미지가 있으면 랜덤하게 선택 (테스트용)
+                            let bgUrl = (data.advImageMode === 'PREMIUM' && data.advCustomImages?.length) 
+                                ? data.advCustomImages[Math.floor(Math.random() * data.advCustomImages.length)] 
+                                : null;
 
-                        const thumbBuffer = await generateThumbnail(safeThumbText);
-                        const uploaded = await uploadToWordPress(site, thumbBuffer, `${targetKeyword}-thumb-${Date.now()}`);
-                        imageUrl = uploaded.url;
-                        featuredMediaId = uploaded.id;
+                            if (!bgUrl) {
+                                const searchedBg = await fetchRandomImage(settings, searchKeyword, 1);
+                                bgUrl = searchedBg || `https://loremflickr.com/600/600/${encodeURIComponent(searchKeyword)}`;
+                            }
+                            
+                            // 1번 라인은 항상 현재 키워드로 고정
+                            const finalLines = [...data.advThumbnailLines];
+                            finalLines[0] = targetKeyword;
+                            
+                            const thumbBuffer = await generateAdvancedThumbnail(bgUrl, finalLines);
+                            const uploaded = await uploadToWordPress(site, thumbBuffer, `${targetKeyword}-adv-thumb-${Date.now()}`);
+                            imageUrl = uploaded.url;
+                            featuredMediaId = uploaded.id;
+                        } else {
+                            // 일반 권한: 기존 텍스트 썸네일
+                            const safeThumbText = getSafeThumbnailText(aiResult.thumbnailText, title, targetKeyword);
+                            const thumbBuffer = await generateThumbnail(safeThumbText);
+                            const uploaded = await uploadToWordPress(site, thumbBuffer, `${targetKeyword}-thumb-${Date.now()}`);
+                            imageUrl = uploaded.url;
+                            featuredMediaId = uploaded.id;
+                        }
                         success = true;
                     } catch (e) {
                         console.warn('WP/Thumbnail Error:', e);
                     }
                 }
 
-                if (!imageUrl) {
+                const isPremium = data.advImageMode === 'PREMIUM';
+                if (!imageUrl && !isPremium) {
                     try {
                         if (imageSource === 'DALLE') {
                             const apiKey = settings.openaiApiKey
@@ -212,6 +249,29 @@ export async function testPublishAction(data: {
                         }
                     } catch (e) {
                         console.warn(`Image ${i} Generation Failed`, e);
+                    }
+                }
+
+                // 고급 권한: 본문 이미지 특수 처리 (나머지 이미지들)
+                if (hasRights && i > 1 && data.advContentPhraseA && data.advContentPhraseB) {
+                    try {
+                        let bgUrl = imageUrl;
+                        
+                        // 프리미엄 모드이고 커스텀 이미지가 있으면 랜덤하게 이미지 사용 (테스트용)
+                        if (data.advImageMode === 'PREMIUM' && data.advCustomImages?.length) {
+                             bgUrl = data.advCustomImages[Math.floor(Math.random() * data.advCustomImages.length)];
+                        }
+ 
+                        if (bgUrl) {
+                            const advancedImgBuffer = await generateAdvancedContentImage(bgUrl, targetKeyword, data.advContentPhraseA, data.advContentPhraseB);
+                            if (site.type === 'WORDPRESS') {
+                                 const uploaded = await uploadToWordPress(site, advancedImgBuffer, `${targetKeyword}-adv-img-${i}-${Date.now()}`);
+                                 imageUrl = uploaded.url;
+                            }
+                            success = true;
+                        }
+                    } catch (e) {
+                        console.warn(`Advanced Content Image ${i} generation failed:`, e);
                     }
                 }
 

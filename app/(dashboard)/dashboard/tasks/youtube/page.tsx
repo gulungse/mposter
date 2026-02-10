@@ -25,6 +25,7 @@ import { getSites, getWordPressCategories } from '@/app/actions/site'
 import { getPrompts } from '@/app/actions/prompt'
 import { testPublishAction } from '@/app/actions/worker'
 import { getYoutubeTranscriptAction } from '@/app/actions/youtube'
+import { getUserProfile } from '@/app/actions/user'
 
 // --- Types ---
 type WorkflowStatus = 'IDLE' | 'SETTINGS_CHECK' | 'URL_CHECK' | 'TRANSCRIPT_FETCH' | 'BLOG_GENERATE' | 'COMPLETE' | 'ERROR';
@@ -356,6 +357,7 @@ function YoutubeToBlogForm() {
                                     </div>
                                 </div>
                             </div>
+
 
                             {/* Prompt Configuration */}
                             <div className="mt-12 bg-slate-50/50 dark:bg-[#161e2d] rounded-3xl p-8 border border-slate-100 dark:border-[#324467]">

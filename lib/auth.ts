@@ -36,9 +36,9 @@ export async function getOrCreateUser() {
 
     const { signupBonus = 10, verificationBonus = 20 } = cachedSettings || {};
 
-    let user = await prisma.user.findUnique({
-        where: { id: authUser.id }
-    })
+    // Raw SQL check for user (Prisma Client might be stale)
+    const users = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "users" WHERE "id" = $1 LIMIT 1`, authUser.id)
+    let user = users?.[0] || null
 
     if (!user) {
         // 현재 DB에 사용자가 한 명도 없으면 첫 사용자를 ADMIN으로 생성
@@ -148,14 +148,13 @@ export async function getOrCreateUser() {
         const impersonateId = cookieStore.get('x-impersonate-user-id')?.value
 
         if (impersonateId) {
-            // Find the target user
-            const targetUser = await prisma.user.findUnique({
-                where: { id: impersonateId }
-            })
+            // Raw SQL check for targetUser (Prisma Client might be stale)
+            const targetUsers = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "users" WHERE "id" = $1 LIMIT 1`, impersonateId)
+            const targetUser = targetUsers?.[0]
 
             if (targetUser) {
-                // Return the target user context
-                return targetUser
+                // Ensure field naming consistency even with raw SQL
+                return targetUser as any
             }
         }
     }

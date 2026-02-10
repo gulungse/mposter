@@ -10,7 +10,11 @@ import {
     Layers as LayersIcon,
     CheckCircle2 as CheckCircle2Icon,
     ArrowLeft as ArrowLeftIcon,
-    Bot as BotIcon
+    Bot as BotIcon,
+    Image as ImageIcon,
+    Plus,
+    X,
+    Images
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -19,6 +23,8 @@ import { getKeywordGroups } from '@/app/actions/keyword'
 import { getPrompts } from '@/app/actions/prompt'
 import { createAutomationTask, getAutomationTask, updateAutomationTask } from '@/app/actions/task'
 import { testPublishAction } from '@/app/actions/worker'
+import { getUserProfile } from '@/app/actions/user'
+import { clsx } from 'clsx'
 
 function TaskForm() {
     const router = useRouter()
@@ -35,6 +41,7 @@ function TaskForm() {
     const [keywordGroups, setKeywordGroups] = useState<any[]>([])
     const [prompts, setPrompts] = useState<any[]>([])
     const [categories, setCategories] = useState<{ id: number, name: string }[]>([])
+    const [hasAdvancedRights, setHasAdvancedRights] = useState(false)
 
     const [formData, setFormData] = useState({
         name: '',
@@ -46,7 +53,12 @@ function TaskForm() {
         imageSource: 'DALLE',
         imageCount: 1,
         wpCategoryId: undefined as number | undefined,
-        postStatus: 'publish'
+        postStatus: 'publish',
+        advThumbnailLines: ['', '', '', ''],
+        advContentPhraseA: '',
+        advContentPhraseB: '',
+        advImageMode: 'STANDARD',
+        advCustomImages: [] as string[]
     })
 
     const [keywordMode, setKeywordMode] = useState<'GROUP' | 'MANUAL'>('GROUP')
@@ -62,14 +74,16 @@ function TaskForm() {
 
     useEffect(() => {
         const loadInitialData = async () => {
-            const [sitesRes, keywordsRes, promptsRes] = await Promise.all([
+            const [sitesRes, keywordsRes, promptsRes, profileRes] = await Promise.all([
                 getSites(),
                 getKeywordGroups(),
-                getPrompts()
+                getPrompts(),
+                getUserProfile()
             ])
             if (sitesRes.success) setSites(sitesRes.data || [])
             if (keywordsRes.success) setKeywordGroups(keywordsRes.data || [])
             if (promptsRes.success) setPrompts(promptsRes.data || [])
+            if (profileRes.success) setHasAdvancedRights(profileRes.data?.hasImageGenRights || false)
 
             // If editing, load task data
             if (editTaskId) {
@@ -97,7 +111,12 @@ function TaskForm() {
                         imageSource: (t as any).imageSource || 'DALLE',
                         imageCount: (t as any).imageCount || 1,
                         wpCategoryId: (t as any).wpCategoryId,
-                        postStatus: (t as any).postStatus || 'publish'
+                        postStatus: (t as any).postStatus || 'publish',
+                        advThumbnailLines: (t as any).advThumbnailLines || ['', '', '', ''],
+                        advContentPhraseA: (t as any).advContentPhraseA || '',
+                        advContentPhraseB: (t as any).advContentPhraseB || '',
+                        advImageMode: (t as any).advImageMode || 'STANDARD',
+                        advCustomImages: (t as any).advCustomImages || []
                     })
                 } else {
                     alert('작업 정보를 불러올 수 없습니다.')
@@ -157,7 +176,12 @@ function TaskForm() {
             imageSource: formData.imageSource as any,
             imageCount: formData.imageCount,
             wpCategoryId: formData.wpCategoryId,
-            postStatus: formData.postStatus
+            postStatus: formData.postStatus,
+            advThumbnailLines: formData.advThumbnailLines,
+            advContentPhraseA: formData.advContentPhraseA,
+            advContentPhraseB: formData.advContentPhraseB,
+            advImageMode: formData.advImageMode,
+            advCustomImages: formData.advCustomImages
         })
         if (result.success) {
             alert('테스트 발행 성공! 실제 사이트에서 확인해 보세요.')
@@ -460,12 +484,25 @@ function TaskForm() {
                                 <option value="0 0 */2 * *">📅 48시간마다 (이틀에 한번)</option>
                             </select>
                         </div>
-                        <div className="space-y-1.5">
+                    <div className="pl-9 grid grid-cols-1 md:grid-cols-2 gap-4 relative">
+                        {formData.advImageMode === 'PREMIUM' && (
+                            <div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-[1px] flex items-center justify-center rounded-xl border-2 border-dashed border-orange-500/30">
+                                <div className="flex flex-col items-center gap-1">
+                                    <div className="flex items-center gap-1.5 px-3 py-1 bg-orange-600 text-white rounded-full text-[10px] font-black shadow-lg shadow-orange-500/30 animate-pulse">
+                                        <SparklesIcon className="h-3 w-3" />
+                                        PREMIUM MODE ACTIVE
+                                    </div>
+                                    <p className="text-[9px] text-orange-700 font-bold">하단 프리미엄 설정이 적용 중입니다.</p>
+                                </div>
+                            </div>
+                        )}
+                        <div className={clsx("space-y-1.5", formData.advImageMode === 'PREMIUM' && "opacity-40 grayscale")}>
                             <label className="text-xs font-medium text-muted-foreground">이미지 입력 방법</label>
                             <select
                                 value={formData.imageSource}
                                 onChange={e => setFormData({ ...formData, imageSource: e.target.value as any })}
-                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer"
+                                disabled={formData.advImageMode === 'PREMIUM'}
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer disabled:cursor-not-allowed"
                             >
                                 <option value="DALLE">DALL-E 3</option>
                                 <option value="FLUX">FLUX Pro</option>
@@ -473,13 +510,13 @@ function TaskForm() {
                                 <option value="NONE">이미지 없음</option>
                             </select>
                         </div>
-                        <div className="space-y-1.5">
+                        <div className={clsx("space-y-1.5", formData.advImageMode === 'PREMIUM' && "opacity-40 grayscale")}>
                             <label className="text-xs font-medium text-muted-foreground">이미지 개수 (1~5)</label>
                             <select
                                 value={formData.imageCount}
                                 onChange={e => setFormData({ ...formData, imageCount: Number(e.target.value) })}
-                                disabled={formData.imageSource === 'NONE'}
-                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer disabled:opacity-50"
+                                disabled={formData.imageSource === 'NONE' || formData.advImageMode === 'PREMIUM'}
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <option value={1}>1개</option>
                                 <option value={2}>2개</option>
@@ -489,7 +526,196 @@ function TaskForm() {
                             </select>
                         </div>
                     </div>
+                    </div>
 
+                    {/* 고급 이미지 생성 옵션 (권한 보유자 전용) */}
+                    {hasAdvancedRights && (
+                        <div className="pl-9 mt-8 pt-8 border-t border-border space-y-8">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                                        <SparklesIcon className="h-4 w-4 text-orange-600" />
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-black text-foreground uppercase tracking-tight">프리미엄 채널 모드 설정</h4>
+                                        <p className="text-[10px] text-muted-foreground font-medium tracking-tight">이미지 생성 권한 전용: 브랜드화된 전용 레이아웃과 커스텀 배경을 사용합니다.</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border border-border">
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, advImageMode: 'STANDARD' })}
+                                        className={clsx(
+                                            "px-3 py-1.5 rounded-md text-[10px] font-black transition-all",
+                                            formData.advImageMode === 'STANDARD' ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        일반 모드
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormData({ ...formData, advImageMode: 'PREMIUM' })}
+                                        className={clsx(
+                                            "px-3 py-1.5 rounded-md text-[10px] font-black transition-all",
+                                            formData.advImageMode === 'PREMIUM' ? "bg-orange-600 text-white shadow-lg shadow-orange-500/20" : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        프리미엄 채널 모드
+                                    </button>
+                                </div>
+                            </div>
+
+                            {formData.advImageMode === 'PREMIUM' && (
+                                <div className="space-y-8 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    {/* Background Image Gallery */}
+                                    <div className="space-y-4">
+                                        <div className="flex items-center justify-between px-1">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest block">배경 이미지 갤러리 (최대 10개 - 순차적 사용)</label>
+                                                <p className="text-[9px] text-muted-foreground font-medium">자동화 실행 시 갤러리에 등록한 이미지를 하나씩 순서대로 배경으로 사용합니다.</p>
+                                            </div>
+                                            <span className="text-[10px] font-bold text-orange-600">{formData.advCustomImages.length} / 10</span>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                                            {formData.advCustomImages.map((url, idx) => (
+                                                <div key={idx} className="group relative aspect-square rounded-xl border-2 border-border overflow-hidden bg-muted hover:border-orange-500/50 transition-all">
+                                                    <img src={url} alt={`BG ${idx + 1}`} className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const newImgs = formData.advCustomImages.filter((_, i) => i !== idx);
+                                                                setFormData({ ...formData, advCustomImages: newImgs });
+                                                            }}
+                                                            className="p-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                    <div className="absolute bottom-1 left-1 px-1.5 py-0.5 bg-black/60 text-white text-[8px] font-black rounded-md">
+                                                        #{idx + 1}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            
+                                            {formData.advCustomImages.length < 10 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        const url = prompt('이미지 URL을 입력해주세요. (향후 직접 업로드 기능 지원 예정)');
+                                                        if (url && url.trim()) {
+                                                            setFormData({ ...formData, advCustomImages: [...formData.advCustomImages, url.trim()] });
+                                                        }
+                                                    }}
+                                                    className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-2 hover:bg-muted hover:border-orange-500/30 transition-all text-muted-foreground hover:text-orange-600"
+                                                >
+                                                    <Plus className="h-6 w-6" />
+                                                    <span className="text-[10px] font-black uppercase tracking-tight">이미지 추가</span>
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {/* Image Count per Post (Premium Mode) */}
+                                        <div className="pt-2 px-1">
+                                            <div className="flex items-center gap-4 bg-orange-50 dark:bg-orange-950/20 p-4 rounded-xl border border-orange-100 dark:border-orange-900/40">
+                                                <div className="space-y-1 flex-1">
+                                                    <label className="text-[10px] font-black text-orange-800 dark:text-orange-300 uppercase tracking-widest">포스팅당 생성 이미지 개수</label>
+                                                    <p className="text-[9px] text-orange-700/70 dark:text-orange-400/70 font-bold">하나의 게시물에 몇 개의 프리미엄 이미지를 넣을지 선택하세요 (썸네일 포함)</p>
+                                                </div>
+                                                <select
+                                                    value={formData.imageCount}
+                                                    onChange={e => setFormData({ ...formData, imageCount: parseInt(e.target.value) })}
+                                                    className="h-10 w-24 bg-card border border-orange-200 dark:border-orange-800 rounded-lg px-3 text-xs font-black text-orange-600 outline-none focus:ring-2 focus:ring-orange-500/20 appearance-none text-center cursor-pointer"
+                                                >
+                                                    {[1, 2, 3, 4, 5].map(v => (
+                                                        <option key={v} value={v}>{v}개</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
+                                        {/* Thumbnail Lines */}
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">전용 썸네일 문구 설정</label>
+                                            <div className="space-y-2">
+                                                <div className="relative opacity-60 grayscale-[0.8]">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-orange-600">1</span>
+                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-orange-600 uppercase">자동 키워드</span>
+                                                    <input
+                                                        type="text"
+                                                        readOnly
+                                                        value="[ 포스팅 키워드 자동 삽입 ]"
+                                                        className="w-full h-10 bg-orange-50 shadow-inner border border-orange-100 rounded-lg pl-8 pr-20 text-[10px] font-black text-orange-800 outline-none cursor-not-allowed"
+                                                    />
+                                                </div>
+                                                {[1, 2, 3].map(i => (
+                                                    <div key={i} className="relative">
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">{i + 1}</span>
+                                                        <input
+                                                            type="text"
+                                                            placeholder={i === 3 ? '연락처 또는 브랜드명' : `문구 ${i + 1}`}
+                                                            value={formData.advThumbnailLines[i]}
+                                                            onChange={e => {
+                                                                const newLines = [...formData.advThumbnailLines];
+                                                                newLines[i] = e.target.value;
+                                                                setFormData({ ...formData, advThumbnailLines: newLines });
+                                                            }}
+                                                            className="w-full h-10 bg-card border border-border rounded-lg pl-8 pr-3 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Content Image Phrases */}
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">본문 이미지 텍스트 레이아웃</label>
+                                            <div className="space-y-4">
+                                                <div className="space-y-2">
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="relative">
+                                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted-foreground uppercase">상단</span>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="상단 커스텀 문구 (A)"
+                                                                value={formData.advContentPhraseA}
+                                                                onChange={e => setFormData({ ...formData, advContentPhraseA: e.target.value })}
+                                                                className="w-full h-10 bg-card border border-border rounded-lg px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                                                            />
+                                                        </div>
+                                                        
+                                                        <div className="h-10 border-2 border-dashed border-border rounded-lg flex items-center justify-center bg-muted/30">
+                                                            <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">[ 키워드 한글 타이포그래피 ]</span>
+                                                        </div>
+
+                                                        <div className="relative">
+                                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-muted-foreground uppercase">하단</span>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="하단 커스텀 문구 (B)"
+                                                                value={formData.advContentPhraseB}
+                                                                onChange={e => setFormData({ ...formData, advContentPhraseB: e.target.value })}
+                                                                className="w-full h-10 bg-card border border-border rounded-lg px-3 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/20"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="p-3 bg-muted/50 rounded-xl border border-border">
+                                                    <p className="text-[9px] text-muted-foreground font-bold leading-relaxed flex items-center gap-2">
+                                                        <Images className="h-3 w-3" />
+                                                        갤러리에 등록한 {formData.advCustomImages.length > 0 ? `${formData.advCustomImages.length}개의` : '이미지를'} 순차적으로 사용하여 배경으로 활용합니다.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </section>
             </div>
 

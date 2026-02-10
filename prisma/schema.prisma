@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,40 +8,262 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// 사용자 모델 (Supabase Auth와 연동)
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  name          String?
-  image         String?
-  role          UserRole  @default(USER)
-  tokenBalance  Int       @default(0)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  // 플랜 및 구독 정보
-  planId        String?
-  plan          Plan?     @relation(fields: [planId], references: [id])
-  subscriptionEnd DateTime? // 구독 종료일
-  
-  emailVerifiedAt        DateTime? // 이메일 인증 완료 일시
-  verificationBonusClaimed Boolean   @default(false) // 이메일 인증 보너스 지급 여부
-
-  // 설정 및 API 키 정보 (JSON으로 안전하게 관리)
-  limits        Json?     // { siteLimit: 3, keywordGroupLimit: 5, ... } -> DEPRECATED (Use Plan)
-  settings      Json?     // { openaiApiKey: '...', ... }
-
-  // 관계 설정
-  sites         Site[]
-  keywordGroups KeywordGroup[]
-  prompts       Prompt[]
-  automationJobs AutomationJob[]
-  postLogs      PostLog[]
-  transactions  Transaction[]
-  purchases     UserPurchase[]
-  payments      Payment[]
+  id                       String          @id @default(uuid())
+  email                    String          @unique
+  name                     String?
+  image                    String?
+  role                     UserRole        @default(USER)
+  tokenBalance             Int             @default(0)
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
+  planId                   String?
+  subscriptionEnd          DateTime?
+  emailVerifiedAt          DateTime?
+  verificationBonusClaimed Boolean         @default(false)
+  limits                   Json?
+  settings                 Json?
+  hasImageGenRights        Boolean         @default(false)
+  automationJobs           AutomationJob[]
+  keywordGroups            KeywordGroup[]
+  payments                 Payment[]
+  postLogs                 PostLog[]
+  prompts                  Prompt[]
+  sites                    Site[]
+  transactions             Transaction[]
+  purchases                UserPurchase[]
+  plan                     Plan?           @relation(fields: [planId], references: [id])
 
   @@map("users")
+}
+
+model WithdrawnUser {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  withdrawnAt DateTime @default(now())
+  availableAt DateTime
+
+  @@map("withdrawn_users")
+}
+
+model Plan {
+  id                String   @id @default(uuid())
+  name              String
+  price             Int      @default(0)
+  siteLimit         Int      @default(2)
+  keywordGroupLimit Int      @default(3)
+  promptLimit       Int      @default(2)
+  taskLimit         Int      @default(2)
+  description       String?
+  monthlyTokens     Int      @default(0)
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  users             User[]
+
+  @@map("plans")
+}
+
+model Site {
+  id           String          @id @default(uuid())
+  userId       String
+  type         SiteType
+  name         String
+  url          String
+  username     String?
+  apiToken     String?
+  refreshToken String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  jobs         AutomationJob[]
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sites")
+}
+
+model KeywordGroup {
+  id        String          @id @default(uuid())
+  userId    String
+  name      String
+  keywords  String[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  jobs      AutomationJob[]
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("keyword_groups")
+}
+
+model Prompt {
+  id        String          @id @default(uuid())
+  userId    String?
+  type      PromptType      @default(USER)
+  title     String
+  content   String
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  jobs      AutomationJob[]
+  user      User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("prompts")
+}
+
+model AutomationJob {
+  id                String        @id @default(uuid())
+  userId            String
+  name              String
+  siteId            String
+  keywordGroupId    String?
+  keywords          String[]
+  promptId          String?
+  scheduleCron      String?
+  aiModel           AIModel       @default(GPT4O)
+  imageSource       ImageSource   @default(DALLE)
+  imageCount        Int           @default(1)
+  isActive          Boolean       @default(true)
+  wpCategoryId      Int?
+  wpCategoryName    String?
+  postStatus        String        @default("publish")
+  lastRunAt         DateTime?
+  nextRunAt         DateTime?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  advContentPhraseA String?
+  advContentPhraseB String?
+  advThumbnailLines String[]
+  advImageMode      String?   @default("STANDARD")
+  advCustomImages   String[]
+  advNextImageIdx   Int       @default(0)
+  keywordGroup      KeywordGroup? @relation(fields: [keywordGroupId], references: [id], onDelete: Cascade)
+  prompt            Prompt?       @relation(fields: [promptId], references: [id])
+  site              Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logs              PostLog[]
+
+  @@map("automation_jobs")
+}
+
+model PostLog {
+  id           String         @id @default(uuid())
+  userId       String
+  jobId        String?
+  keyword      String
+  title        String?
+  status       PostStatus     @default(PENDING)
+  postUrl      String?
+  tokensUsed   Int            @default(0)
+  errorMessage String?
+  createdAt    DateTime       @default(now())
+  seed         Int?
+  job          AutomationJob? @relation(fields: [jobId], references: [id])
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("post_logs")
+}
+
+model Transaction {
+  id          String          @id @default(uuid())
+  userId      String
+  amount      Int
+  description String
+  type        TransactionType
+  createdAt   DateTime        @default(now())
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("transactions")
+}
+
+model SidebarMenu {
+  id        String   @id @default(uuid())
+  label     String
+  href      String
+  icon      String   @default("LayoutDashboard")
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("sidebar_menus")
+}
+
+model GlobalSetting {
+  id                 String   @id @default("SYSTEM")
+  costPerPost        Int      @default(1)
+  costPerScrap       Int      @default(1)
+  costPerAIImage     Int      @default(2)
+  signupBonus        Int      @default(10)
+  verificationBonus  Int      @default(20)
+  isUpgradeEnabled   Boolean  @default(false)
+  googleClientId     String?
+  googleClientSecret String?
+  updatedAt          DateTime @updatedAt
+
+  @@map("global_settings")
+}
+
+model ShopItem {
+  id           String         @id @default(uuid())
+  name         String
+  description  String?
+  type         ItemType
+  amount       Int
+  price        Int
+  durationDays Int            @default(30)
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  purchases    UserPurchase[]
+
+  @@map("shop_items")
+}
+
+model UserPurchase {
+  id         String   @id @default(uuid())
+  userId     String
+  itemId     String
+  type       ItemType
+  slotAmount Int
+  price      Int
+  startDate  DateTime @default(now())
+  endDate    DateTime
+  createdAt  DateTime @default(now())
+  item       ShopItem @relation(fields: [itemId], references: [id])
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, endDate])
+  @@map("user_purchases")
+}
+
+model TokenPackage {
+  id          String    @id @default(uuid())
+  name        String
+  tokenAmount Int
+  price       Int
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  payments    Payment[]
+
+  @@map("token_packages")
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  userId      String
+  packageId   String?
+  impUid      String        @unique
+  merchantUid String        @unique
+  amount      Int
+  status      PaymentStatus @default(READY)
+  paidAt      DateTime?
+  failedAt    DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  package     TokenPackage? @relation(fields: [packageId], references: [id])
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
 }
 
 enum UserRole {
@@ -52,130 +271,14 @@ enum UserRole {
   ADMIN
 }
 
-// 탈퇴한 사용자 기록 (재가입 제한용)
-model WithdrawnUser {
-  id          String   @id @default(uuid())
-  email       String   @unique
-  withdrawnAt DateTime @default(now())
-  availableAt DateTime // 재가입 가능일 (탈퇴일 + 1년)
-
-  @@map("withdrawn_users")
-}
-
-// 요금제 플랜 모델
-model Plan {
-  id                String   @id @default(uuid())
-  name              String   // Free, Basic, Pro 등
-  price             Int      @default(0) // 월 정액 가격 (KRW)
-  siteLimit         Int      @default(2)
-  keywordGroupLimit Int      @default(3)
-  promptLimit       Int      @default(2)
-  taskLimit         Int      @default(2)
-  description       String?
-  monthlyTokens     Int      @default(0) // 매월 제공되는 토큰
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  users             User[]
-
-  @@map("plans")
-}
-
-// 사이트 모델 (WordPress, Blogspot)
-model Site {
-  id          String   @id @default(uuid())
-  userId      String
-  type        SiteType
-  name        String
-  url         String
-  username    String?
-  apiToken    String?  // App Password or OAuth Token (Encrypted ideally)
-  refreshToken String? // OAuth Refresh Token for Blogspot
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobs        AutomationJob[]
-
-  @@map("sites")
-}
-
 enum SiteType {
   WORDPRESS
   BLOGSPOT
 }
 
-// 키워드 그룹 모델
-model KeywordGroup {
-  id          String   @id @default(uuid())
-  userId      String
-  name        String
-  keywords    String[] // PostgreSQL array support
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobs        AutomationJob[]
-
-  @@map("keyword_groups")
-}
-
-// 프롬프트 모델
-model Prompt {
-  id          String   @id @default(uuid())
-  userId      String?  // Null means System Prompt
-  type        PromptType @default(USER)
-  title       String
-  content     String   @db.Text
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  jobs        AutomationJob[]
-
-  @@map("prompts")
-}
-
 enum PromptType {
   SYSTEM
   USER
-}
-
-// 자동화 작업 모델
-model AutomationJob {
-  id              String   @id @default(uuid())
-  userId          String
-  name            String
-  siteId          String
-  keywordGroupId  String?
-  keywords        String[] // Manual keywords if no group
-  promptId        String?
-  
-  // 설정값
-  scheduleCron    String?  // Cron expression e.g., "0 9 * * *"
-  aiModel         AIModel      @default(GPT4O)
-  imageSource     ImageSource  @default(DALLE)
-  imageCount      Int          @default(1)
-  isActive        Boolean  @default(true)
-  
-  // 워드프레스 전용
-  wpCategoryId    Int?
-  wpCategoryName  String?
-  postStatus      String       @default("publish") // "publish" or "draft"
-  
-  lastRunAt       DateTime?
-  nextRunAt       DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  site            Site         @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  keywordGroup    KeywordGroup? @relation(fields: [keywordGroupId], references: [id], onDelete: Cascade)
-  prompt          Prompt?      @relation(fields: [promptId], references: [id])
-  logs            PostLog[]
-
-  @@map("automation_jobs")
 }
 
 enum ImageSource {
@@ -192,48 +295,11 @@ enum AIModel {
   GPT5
 }
 
-// 발행 로그 모델
-model PostLog {
-  id              String   @id @default(uuid())
-  userId          String
-  jobId           String?
-  
-  keyword         String
-  title           String?
-  status          PostStatus @default(PENDING)
-  postUrl         String?    // Published URL
-  tokensUsed      Int        @default(0)
-  errorMessage    String?
-  seed            Int?       // AI Generation Seed
-  
-  createdAt       DateTime @default(now())
-
-  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  job             AutomationJob? @relation(fields: [jobId], references: [id])
-
-  @@map("post_logs")
-}
-
 enum PostStatus {
   PENDING
   PROCESSING
   SUCCESS
   FAILED
-}
-
-// 토큰 트랜잭션 기록
-model Transaction {
-  id          String   @id @default(uuid())
-  userId      String
-  amount      Int      // Positive for credit, negative for debit
-  description String
-  type        TransactionType
-  createdAt   DateTime @default(now())
-
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("transactions")
 }
 
 enum TransactionType {
@@ -244,123 +310,11 @@ enum TransactionType {
   PURCHASE
 }
 
-// 사이드바 메뉴 모델 (관리자 전용 설정)
-model SidebarMenu {
-  id        String   @id @default(uuid())
-  label     String
-  href      String
-  icon      String   @default("LayoutDashboard")
-  order     Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-
-  @@map("sidebar_menus")
-}
-
-// 전역 시스템 설정 (토큰 비용 등)
-model GlobalSetting {
-  id        String   @id @default("SYSTEM") // 단일 레코드 (ID: SYSTEM)
-  
-  costPerPost      Int @default(1)
-  costPerScrap     Int @default(1)
-  costPerAIImage   Int @default(2) // DALLE or FLUX
-  signupBonus      Int @default(10) // 회원가입 시 제공되는 무료 토큰
-  verificationBonus Int @default(20) // 이메일 인증 시 제공되는 보너스 토큰
-  isUpgradeEnabled Boolean @default(false) // 사이드바 업그레이드 버튼 표시 여부
-  
-  // Google OAuth 설정 (Deprecated: User Settings로 이동)
-  googleClientId     String?
-  googleClientSecret String?
-  
-  updatedAt        DateTime @updatedAt
-
-  @@map("global_settings")
-}
-
-// 상점 아이템 모델 (토큰 상점)
-model ShopItem {
-  id          String   @id @default(uuid())
-  name        String   // 상품명 (예: 사이트 슬롯 1개 추가)
-  description String?
-  type        ItemType // SITE_SLOT, KEYWORD_SLOT, PROMPT_SLOT, TASK_SLOT
-  amount      Int      // 추가되는 슬롯 수량
-  price       Int      // 가격 (토큰)
-  durationDays Int     @default(30) // 유효 기간 (일)
-  isActive    Boolean  @default(true) // 상품 판매 중 여부
-
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  purchases   UserPurchase[]
-
-  @@map("shop_items")
-}
-
-// 사용자 구매/구독 내역
-model UserPurchase {
-  id          String   @id @default(uuid())
-  userId      String
-  itemId      String
-  type        ItemType // 쿼리 편의성을 위해 중복 저장
-  slotAmount  Int      // 구매 시점의 추가 수량
-  price       Int      // 구매 시점의 가격
-  
-  startDate   DateTime @default(now())
-  endDate     DateTime // 만료일
-
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  item        ShopItem @relation(fields: [itemId], references: [id])
-
-  createdAt   DateTime @default(now())
-  
-  @@index([userId, endDate])
-  @@map("user_purchases")
-}
-
 enum ItemType {
   SITE_SLOT
   KEYWORD_SLOT
   PROMPT_SLOT
   TASK_SLOT
-}
-
-// 토큰 충전 상품 모델 (포트원 결제용)
-model TokenPackage {
-  id          String   @id @default(uuid())
-  name        String   // 상품명 (예: 100 토큰)
-  tokenAmount Int      // 지급되는 토큰 수량
-  price       Int      // 가격 (KRW)
-  isActive    Boolean  @default(true) // 판매 중 여부
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  payments    Payment[]
-
-  @@map("token_packages")
-}
-
-// 결제 내역 모델 (포트원 연동)
-model Payment {
-  id          String   @id @default(uuid())
-  userId      String
-  packageId   String?
-  
-  impUid      String   @unique // 포트원 결제 고유 번호
-  merchantUid String   @unique // 가맹점 주문 번호
-  amount      Int      // 결제 금액
-  status      PaymentStatus @default(READY)
-  
-  paidAt      DateTime? // 결제 완료 일시
-  failedAt    DateTime? // 결제 실패 일시
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  package     TokenPackage? @relation(fields: [packageId], references: [id])
-
-  @@map("payments")
 }
 
 enum PaymentStatus {
