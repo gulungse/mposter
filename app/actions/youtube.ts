@@ -26,12 +26,20 @@ export async function getYoutubeTranscriptAction(url: string) {
 
         console.log(`Fetching transcript via Supadata for videoId: ${videoId}`);
         
-        // Supadata.ai API allows passing the YouTube URL directly
-        const response = await fetch(`https://api.supadata.ai/v1/youtube/transcript?url=https://www.youtube.com/watch?v=${videoId}`, {
-            headers: {
-                'x-api-key': apiKey
-            }
+        // Try fetching Korean transcript first
+        let transcriptUrl = `https://api.supadata.ai/v1/youtube/transcript?url=https://www.youtube.com/watch?v=${videoId}&lang=ko`;
+        let response = await fetch(transcriptUrl, {
+            headers: { 'x-api-key': apiKey }
         });
+
+        // If Korean fails or not found, try without language constraint to get whatever is available
+        if (!response.ok) {
+            console.log(`Korean transcript not found, retrying without language constraint...`);
+            transcriptUrl = `https://api.supadata.ai/v1/youtube/transcript?url=https://www.youtube.com/watch?v=${videoId}`;
+            response = await fetch(transcriptUrl, {
+                headers: { 'x-api-key': apiKey }
+            });
+        }
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
