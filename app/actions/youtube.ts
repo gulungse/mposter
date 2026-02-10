@@ -26,15 +26,15 @@ export async function getYoutubeTranscriptAction(url: string) {
 
         console.log(`Fetching transcript via Supadata for videoId: ${videoId}`);
         
-        // Try fetching Korean transcript first
+        // 1. Try fetching Korean transcript first
         let transcriptUrl = `https://api.supadata.ai/v1/youtube/transcript?url=https://www.youtube.com/watch?v=${videoId}&lang=ko`;
         let response = await fetch(transcriptUrl, {
             headers: { 'x-api-key': apiKey }
         });
 
-        // If Korean fails or not found, try without language constraint to get whatever is available
+        // 2. If Korean specifically fails, try without language constraint to get whatever is default
         if (!response.ok) {
-            console.log(`Korean transcript not found, retrying without language constraint...`);
+            console.log(`Korean transcript (ko) not found, retrying without language constraint...`);
             transcriptUrl = `https://api.supadata.ai/v1/youtube/transcript?url=https://www.youtube.com/watch?v=${videoId}`;
             response = await fetch(transcriptUrl, {
                 headers: { 'x-api-key': apiKey }
@@ -49,16 +49,21 @@ export async function getYoutubeTranscriptAction(url: string) {
         const result = await response.json();
         
         let transcriptText = '';
-        if (Array.isArray(result.content)) {
-            // If it's an array of objects [ { text: '...', start: 0 }, ... ]
-            transcriptText = result.content.map((item: any) => item.text || '').join(' ');
-        } else if (typeof result.content === 'string') {
-            // If it's already a string
-            transcriptText = result.content;
+        
+        // --- Robust Parsing Logic ---
+        // Supadata sometimes returns a raw array, sometimes an object with 'content'
+        if (Array.isArray(result)) {
+            transcriptText = result.map((item: any) => item.text || '').join(' ').trim();
+        } else if (result && Array.isArray(result.content)) {
+            transcriptText = result.content.map((item: any) => item.text || '').join(' ').trim();
+        } else if (result && typeof result.content === 'string') {
+            transcriptText = result.content.trim();
+        } else if (typeof result === 'string') {
+            transcriptText = result.trim();
         }
 
         if (!transcriptText) {
-            throw new Error('자막을 불러올 수 없습니다. 자막이 비활성화된 영상이거나 지원하지 않는 포맷일 수 있습니다.');
+            throw new Error('자막 내용을 찾을 수 없습니다. 자막이 없는 영상이거나 다른 언어를 선택해 주세요.');
         }
 
         return {
