@@ -95,7 +95,7 @@ export async function getUsers() {
         }
 
         // Raw SQL to bypass stale Prisma client/EPERM issues
-        const users = await prisma.$queryRawUnsafe(`SELECT * FROM "users" ORDER BY "createdAt" DESC`)
+        const users = await prisma.$queryRawUnsafe(`SELECT * FROM "users" ORDER BY "createdAt" DESC`) as any[]
         return { success: true, data: users }
     } catch (error) {
         return { success: false, error: '사용자 목록을 불러올 수 없습니다.' }
