@@ -51,7 +51,6 @@ export async function getYoutubeTranscriptAction(url: string) {
         let transcriptText = '';
         
         // --- Robust Parsing Logic ---
-        // Supadata sometimes returns a raw array, sometimes an object with 'content'
         if (Array.isArray(result)) {
             transcriptText = result.map((item: any) => item.text || '').join(' ').trim();
         } else if (result && Array.isArray(result.content)) {
