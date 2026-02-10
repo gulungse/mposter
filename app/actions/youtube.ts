@@ -40,8 +40,16 @@ export async function getYoutubeTranscriptAction(url: string) {
 
         const result = await response.json();
         
-        // Supadata returns the transcript in the 'content' field
-        if (!result.content) {
+        let transcriptText = '';
+        if (Array.isArray(result.content)) {
+            // If it's an array of objects [ { text: '...', start: 0 }, ... ]
+            transcriptText = result.content.map((item: any) => item.text || '').join(' ');
+        } else if (typeof result.content === 'string') {
+            // If it's already a string
+            transcriptText = result.content;
+        }
+
+        if (!transcriptText) {
             throw new Error('자막을 불러올 수 없습니다. 자막이 비활성화된 영상이거나 지원하지 않는 포맷일 수 있습니다.');
         }
 
@@ -49,7 +57,7 @@ export async function getYoutubeTranscriptAction(url: string) {
             success: true,
             data: {
                 videoId,
-                transcript: result.content
+                transcript: transcriptText
             }
         };
     } catch (error: any) {
