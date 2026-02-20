@@ -384,6 +384,89 @@ export async function testPublishAction(data: {
 }
 
 /**
+ * 사용자가 입력한 제목/내용을 바탕으로 AI가 새 글을 생성합니다.
+ */
+export async function generateManualContentAction(data: {
+    originalTitle: string;
+    originalContent: string;
+    promptId?: string;
+    customPrompt?: string;
+    aiModel: 'GPT4O' | 'GEMINI' | 'CLAUDE' | 'GPT5';
+}) {
+    try {
+        const user = await getOrCreateUser()
+        
+        if (user.tokenBalance <= 0) {
+            throw new Error('보유 토큰이 부족합니다.')
+        }
+
+        const settings = (user as any).settings || {}
+
+        // 프롬프트 가져오기
+        let promptContent = data.customPrompt
+        if (data.promptId) {
+            const p = await prisma.prompt.findFirst({
+                where: {
+                    id: data.promptId,
+                    OR: [
+                        { userId: user.id },
+                        { type: 'SYSTEM' }
+                    ]
+                }
+            })
+            if (p) promptContent = p.content
+        }
+
+        if (!promptContent) throw new Error('사용할 프롬프트가 없습니다.')
+
+        // AI 생성 요청에 원본 데이터 포함
+        const targetKeyword = data.originalTitle || '제공된 제목'
+        const inputContext = `[원본 제목]: ${data.originalTitle}\n\n[원본 내용]:\n${data.originalContent}`;
+        
+        let aiResult: any = {};
+        
+        if (data.aiModel === 'GPT4O') {
+            const apiKey = settings.openaiApiKey
+            if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
+            aiResult = await generateGPTContent(apiKey, promptContent, targetKeyword, 'gpt-4o', inputContext)
+        } else if (data.aiModel === 'CLAUDE') {
+            const apiKey = settings.anthropicApiKey
+            if (!apiKey) throw new Error('Claude API 키가 설정되어 있지 않습니다.')
+            aiResult = await generateClaudeContent(apiKey, promptContent, targetKeyword, inputContext)
+        } else if (data.aiModel === 'GEMINI') {
+            const apiKey = settings.geminiApiKey
+            if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
+            aiResult = await generateGeminiContent(apiKey, promptContent, targetKeyword, inputContext)
+        } else if (data.aiModel === 'GPT5') {
+            const apiKey = settings.openaiApiKey
+            if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
+            aiResult = await generateGPTContent(apiKey, promptContent, targetKeyword, 'gpt-5-mini', inputContext)
+        } else {
+            throw new Error(`지원하지 않는 모델입니다: ${data.aiModel}`)
+        }
+
+        // 토큰 차감 (-1)
+        await (prisma as any).$executeRawUnsafe(
+            'UPDATE "users" SET "tokenBalance" = "tokenBalance" - 1 WHERE "id" = $1',
+            user.id
+        )
+
+        return { 
+            success: true, 
+            data: {
+                title: aiResult.title,
+                content: aiResult.content
+            },
+            message: '새 글 생성이 완료되었습니다. (1토큰 사용됨)' 
+        }
+
+    } catch (error: any) {
+        console.error('Manual Content Generation Failed:', error)
+        return { success: false, error: error.message }
+    }
+}
+
+/**
  * 자동화 작업 실행 (Server Action) - UI 호출용 (Auth 권한 체크)
  * 실제 실행 로직은 processAutomationJob(lib)으로 위임
  */
