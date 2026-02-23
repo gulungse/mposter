@@ -129,16 +129,25 @@ export default function ApiManagementPage() {
     }
 
     return (
-        <div className="p-8 space-y-8 max-w-5xl relative">
+        <div className="p-8 space-y-8 max-w-[1400px] mx-auto relative">
             {/* Header */}
-            <div>
-                <h1 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
-                    <Key className="h-8 w-8 text-blue-600" />
-                    API 관리
-                </h1>
-                <p className="text-slate-500 dark:text-[#92a4c9] text-base mt-2">
-                    콘텐츠 생성 및 이미지 제작을 위한 외부 서비스 API 키를 설정하고 테스트하세요.
-                </p>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-black tracking-tight text-white flex items-center gap-3">
+                        <Key className="h-8 w-8 text-blue-600" />
+                        API 관리
+                    </h1>
+                    <p className="text-slate-500 dark:text-[#92a4c9] text-base mt-2">
+                        콘텐츠 생성 및 이미지 제작을 위한 외부 서비스 API 키를 설정하고 테스트하세요.
+                    </p>
+                </div>
+                            {/* Notice Badge/Card Simplified */}
+                <div className="bg-blue-500/10 border border-blue-500/20 px-4 py-3 rounded-2xl flex gap-3 lg:max-w-md">
+                    <Info className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
+                    <p className="text-xs text-blue-300 leading-relaxed">
+                        API 키는 암호화되어 보관됩니다. <strong>연결 테스트</strong> 통과 후에 <strong>적용</strong>해주시기 바랍니다.
+                    </p>
+                </div>
             </div>
 
             {/* Toast Notification */}
@@ -161,296 +170,150 @@ export default function ApiManagementPage() {
                 </div>
             )}
 
-            {/* Main Layout Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-8 items-start">
+            {/* Row 1: GPT, Gemini, Claude, Google OAuth (Align with Row 2 by using 5 cols) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                <ApiInputRow
+                    label="CHATGPT (OPENAI)"
+                    description="GPT-4o, GPT-4o-mini 모델 텍스트 생성"
+                    value={keys.openaiApiKey}
+                    onChange={(v) => handleChange('openaiApiKey', 'openai', v)}
+                    onTest={() => testConnection('openai')}
+                    onSave={() => handleSaveSingle('openai', 'ChatGPT', validationResults['openai'])}
+                    isSaving={savingKey === 'openai'}
+                    isValidating={validating['openai']}
+                    validationResult={validationResults['openai']}
+                    icon={<Brain className="h-5 w-5 text-emerald-500" />}
+                    placeholder="sk-..."
+                    issueURL="https://openai.com/ko-KR/index/openai-api/"
+                />
 
-                {/* Left Column: API Inputs */}
-                <div className="xl:col-span-3 space-y-8">
-                    {/* Notice Card */}
-                    <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/20 p-5 rounded-2xl flex gap-4 items-start">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-xl text-blue-600">
-                            <Info className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <h4 className="text-sm font-bold text-blue-900 dark:text-blue-300">API 보안 안내</h4>
-                            <p className="text-xs text-blue-700/80 dark:text-blue-400 mt-1 leading-relaxed">
-                                입력하신 API 키는 암호화되어 안전하게 보관됩니다. 각 서비스의 유효성 테스트 버튼을 눌러 연결 상태를 즉시 확인할 수 있습니다.
-                            </p>
-                        </div>
-                    </div>
+                <ApiInputRow
+                    label="GEMINI (GOOGLE)"
+                    description="Google 최신 LLM 텍스트/이미지 생성"
+                    value={keys.geminiApiKey}
+                    onChange={(v) => handleChange('geminiApiKey', 'gemini', v)}
+                    onTest={() => testConnection('gemini')}
+                    onSave={() => handleSaveSingle('gemini', 'Gemini', validationResults['gemini'])}
+                    isSaving={savingKey === 'gemini'}
+                    isValidating={validating['gemini']}
+                    validationResult={validationResults['gemini']}
+                    icon={<Sparkles className="h-5 w-5 text-blue-500" />}
+                    placeholder="AIza..."
+                    issueURL="https://aistudio.google.com/app/api-keys?hl=ko"
+                />
 
-                    {/* API Key Sections */}
-                    <div className="space-y-8">
-                        <div className="grid grid-cols-1 gap-6">
-                            <ApiInputRow
-                                label="ChatGPT (OpenAI)"
-                                description="GPT-4o, GPT-4o-mini 모델을 사용하여 텍스트 콘텐츠를 생성합니다."
-                                value={keys.openaiApiKey}
-                                onChange={(v) => handleChange('openaiApiKey', 'openai', v)}
-                                onTest={() => testConnection('openai')}
-                                onSave={() => handleSaveSingle('openai', 'ChatGPT', validationResults['openai'])}
-                                isSaving={savingKey === 'openai'}
-                                isValidating={validating['openai']}
-                                validationResult={validationResults['openai']}
-                                icon={<Brain className="h-5 w-5 text-emerald-500" />}
-                                placeholder="sk-..."
-                            />
+                <ApiInputRow
+                    label="CLAUDE 3 (ANTHROPIC)"
+                    description="Claude 3 Opus 등 고품질 텍스트 생성"
+                    value={keys.anthropicApiKey}
+                    onChange={(v) => handleChange('anthropicApiKey', 'anthropic', v)}
+                    onTest={() => testConnection('anthropic')}
+                    onSave={() => handleSaveSingle('anthropic', 'Claude 3', validationResults['anthropic'])}
+                    isSaving={savingKey === 'anthropic'}
+                    isValidating={validating['anthropic']}
+                    validationResult={validationResults['anthropic']}
+                    icon={<Sparkles className="h-5 w-5 text-orange-500" />}
+                    placeholder="sk-ant-..."
+                    issueURL="https://console.anthropic.com/"
+                />
 
-                            <ApiInputRow
-                                label="Claude 3 (Anthropic)"
-                                description="Claude 3 Opus 모델을 사용하여 고품질 텍스트 콘텐츠를 생성합니다."
-                                value={keys.anthropicApiKey}
-                                onChange={(v) => handleChange('anthropicApiKey', 'anthropic', v)}
-                                onTest={() => testConnection('anthropic')}
-                                onSave={() => handleSaveSingle('anthropic', 'Claude 3', validationResults['anthropic'])}
-                                isSaving={savingKey === 'anthropic'}
-                                isValidating={validating['anthropic']}
-                                validationResult={validationResults['anthropic']}
-                                icon={<Sparkles className="h-5 w-5 text-orange-500" />}
-                                placeholder="sk-ant-..."
-                            />
+                {/* Consolidated Google OAuth Card */}
+                <ApiInputRowGroup
+                    label="GOOGLE OAUTH"
+                    description={"블로그스팟 사용 필수연결"}
+                    icon={<Globe className="h-5 w-5 text-amber-500" />}
+                    issueURL="https://console.cloud.google.com/welcome"
+                    inputs={[
+                        { label: 'CLIENT ID', value: keys.googleClientId || '', placeholder: 'Client ID', onChange: (v) => handleChange('googleClientId', 'google', v) },
+                        { label: 'CLIENT SECRET', value: keys.googleClientSecret || '', placeholder: 'Secret Key', onChange: (v) => handleChange('googleClientSecret', 'google', v) }
+                    ]}
+                    onSave={() => handleSaveSingle('google', 'Google OAuth', null, true)}
+                    isSaving={savingKey === 'google'}
+                    isValidating={false}
+                    validationResult={null}
+                    color="amber"
+                />
+            </div>
 
-                            <ApiInputRow
-                                label="Gemini (Google)"
-                                description="Google의 최신 LLM을 사용하여 텍스트 및 멀티모달 콘텐츠를 생성합니다."
-                                value={keys.geminiApiKey}
-                                onChange={(v) => handleChange('geminiApiKey', 'gemini', v)}
-                                onTest={() => testConnection('gemini')}
-                                onSave={() => handleSaveSingle('gemini', 'Gemini', validationResults['gemini'])}
-                                isSaving={savingKey === 'gemini'}
-                                isValidating={validating['gemini']}
-                                validationResult={validationResults['gemini']}
-                                icon={<Sparkles className="h-5 w-5 text-blue-500" />}
-                                placeholder="AIza..."
-                            />
+            {/* Row 2: piAPI, Pixabay, Pexels, Freepik, Unsplash (5 Columns) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
+                <ApiInputRow
+                    label="PIAPI (FLUX)"
+                    description="FLUX 모델 고퀄리티 블로그 이미지 생성"
+                    value={keys.piApiKey}
+                    onChange={(v) => handleChange('piApiKey', 'piapi', v)}
+                    onTest={() => testConnection('piapi')}
+                    onSave={() => handleSaveSingle('piapi', 'piAPI', validationResults['piapi'])}
+                    isSaving={savingKey === 'piapi'}
+                    isValidating={validating['piapi']}
+                    validationResult={validationResults['piapi']}
+                    icon={<ImageIcon className="h-5 w-5 text-purple-500" />}
+                    placeholder="piapi.ai API Key"
+                    issueURL="https://piapi.ai/"
+                />
 
-                            <ApiInputRow
-                                label="piAPI (FLUX)"
-                                description="FLUX 모델을 사용하여 고품질의 블로그 이미지를 생성합니다."
-                                value={keys.piApiKey}
-                                onChange={(v) => handleChange('piApiKey', 'piapi', v)}
-                                onTest={() => testConnection('piapi')}
-                                onSave={() => handleSaveSingle('piapi', 'piAPI', validationResults['piapi'])}
-                                isSaving={savingKey === 'piapi'}
-                                isValidating={validating['piapi']}
-                                validationResult={validationResults['piapi']}
-                                icon={<ImageIcon className="h-5 w-5 text-purple-500" />}
-                                placeholder="API Key from piapi.ai"
-                            />
+                <ApiInputRow
+                    label="PIXABAY"
+                    description="방대한 무료 이미지 라이브러리"
+                    value={keys.pixabayApiKey}
+                    onChange={(v) => handleChange('pixabayApiKey', 'pixabay', v)}
+                    onTest={() => testConnection('pixabay')}
+                    onSave={() => handleSaveSingle('pixabay', 'Pixabay', validationResults['pixabay'])}
+                    isSaving={savingKey === 'pixabay'}
+                    isValidating={validating['pixabay']}
+                    validationResult={validationResults['pixabay']}
+                    icon={<ImageIcon className="h-5 w-5 text-green-500" />}
+                    placeholder="Pixabay Key"
+                    issueURL="https://pixabay.com/service/about/api/"
+                />
 
-                            <ApiInputRow
-                                label="Pixabay (무료 이미지)"
-                                description="Pixabay의 방대한 무료 이미지 라이브러리를 사용합니다."
-                                value={keys.pixabayApiKey}
-                                onChange={(v) => handleChange('pixabayApiKey', 'pixabay', v)}
-                                onTest={() => testConnection('pixabay')}
-                                onSave={() => handleSaveSingle('pixabay', 'Pixabay', validationResults['pixabay'])}
-                                isSaving={savingKey === 'pixabay'}
-                                isValidating={validating['pixabay']}
-                                validationResult={validationResults['pixabay']}
-                                icon={<ImageIcon className="h-5 w-5 text-green-500" />}
-                                placeholder="Pixabay API Key"
-                            />
+                <ApiInputRow
+                    label="PEXELS"
+                    description="감각적인 고퀄리티 무료 이미지"
+                    value={keys.pexelsApiKey}
+                    onChange={(v) => handleChange('pexelsApiKey', 'pexels', v)}
+                    onTest={() => testConnection('pexels')}
+                    onSave={() => handleSaveSingle('pexels', 'Pexels', validationResults['pexels'])}
+                    isSaving={savingKey === 'pexels'}
+                    isValidating={validating['pexels']}
+                    validationResult={validationResults['pexels']}
+                    icon={<ImageIcon className="h-5 w-5 text-teal-500" />}
+                    placeholder="Pexels Key"
+                    issueURL="https://www.pexels.com/api/"
+                />
 
-                            <ApiInputRow
-                                label="Pexels (무료 이미지)"
-                                description="Pexels의 감각적인 무료 사진을 사용합니다."
-                                value={keys.pexelsApiKey}
-                                onChange={(v) => handleChange('pexelsApiKey', 'pexels', v)}
-                                onTest={() => testConnection('pexels')}
-                                onSave={() => handleSaveSingle('pexels', 'Pexels', validationResults['pexels'])}
-                                isSaving={savingKey === 'pexels'}
-                                isValidating={validating['pexels']}
-                                validationResult={validationResults['pexels']}
-                                icon={<ImageIcon className="h-5 w-5 text-teal-500" />}
-                                placeholder="Pexels API Key"
-                            />
+                <ApiInputRow
+                    label="FREEPIK"
+                    description="프리미엄급 고화질 이미지 검색"
+                    value={keys.freepikApiKey}
+                    onChange={(v) => handleChange('freepikApiKey', 'freepik', v)}
+                    onTest={() => testConnection('freepik')}
+                    onSave={() => handleSaveSingle('freepik', 'Freepik', validationResults['freepik'])}
+                    isSaving={savingKey === 'freepik'}
+                    isValidating={validating['freepik']}
+                    validationResult={validationResults['freepik']}
+                    icon={<ImageIcon className="h-5 w-5 text-blue-600" />}
+                    placeholder="Freepik Key"
+                    issueURL="https://www.freepik.com/api"
+                />
 
-                            <ApiInputRow
-                                label="Freepik (고품질 이미지)"
-                                description="Freepik의 프리미엄급 이미지를 사용합니다."
-                                value={keys.freepikApiKey}
-                                onChange={(v) => handleChange('freepikApiKey', 'freepik', v)}
-                                onTest={() => testConnection('freepik')}
-                                onSave={() => handleSaveSingle('freepik', 'Freepik', validationResults['freepik'])}
-                                isSaving={savingKey === 'freepik'}
-                                isValidating={validating['freepik']}
-                                validationResult={validationResults['freepik']}
-                                icon={<ImageIcon className="h-5 w-5 text-blue-600" />}
-                                placeholder="Freepik API Key"
-                            />
-                        </div>
-
-                        <div className="space-y-6">
-                            <div className="w-full h-px bg-slate-100 dark:bg-slate-800" />
-
-                            <div className="flex items-center gap-2">
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <ImageIcon className="h-5 w-5 text-gray-500" />
-                                    Unsplash 설정 (App ID, Access Key, Secret Key)
-                                </h3>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-6">
-                                <ApiInputRow
-                                    label="App ID"
-                                    description="Application ID"
-                                    value={keys.unsplashAppId}
-                                    onChange={(v) => handleChange('unsplashAppId', 'unsplash', v)}
-                                    // App ID는 Access Key 테스트에 의존하거나 별도 테스트 없으므로 일단 검증 생략
-                                    onSave={() => handleSaveSingle('unsplash', 'Unsplash', null, true)}
-                                    isSaving={savingKey === 'unsplash'}
-                                    isValidating={false}
-                                    validationResult={null}
-                                    icon={<ImageIcon className="h-5 w-5 text-gray-500" />}
-                                    placeholder="App ID"
-                                />
-                                <ApiInputRow
-                                    label="Access Key"
-                                    description="Public Access Key"
-                                    value={keys.unsplashAccessKey}
-                                    onChange={(v) => handleChange('unsplashAccessKey', 'unsplash', v)}
-                                    onTest={() => testConnection('unsplash')}
-                                    onSave={() => handleSaveSingle('unsplash', 'Unsplash', validationResults['unsplash'])}
-                                    isSaving={savingKey === 'unsplash'}
-                                    isValidating={validating['unsplash']}
-                                    validationResult={validationResults['unsplash']}
-                                    icon={<Key className="h-5 w-5 text-gray-500" />}
-                                    placeholder="Access Key"
-                                />
-                                <ApiInputRow
-                                    label="Secret Key"
-                                    description="Secret Key (보안 주의)"
-                                    value={keys.unsplashSecretKey}
-                                    onChange={(v) => handleChange('unsplashSecretKey', 'unsplash', v)}
-                                    // Secret Key도 검증 생략
-                                    onSave={() => handleSaveSingle('unsplash', 'Unsplash', null, true)}
-                                    isSaving={savingKey === 'unsplash'}
-                                    isValidating={false}
-                                    validationResult={null}
-                                    icon={<Key className="h-5 w-5 text-gray-500" />}
-                                    placeholder="Secret Key"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-6">
-                            <div className="w-full h-px bg-slate-100 dark:bg-slate-800" />
-
-                            <div className="flex items-center gap-2">
-                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                    <Key className="h-5 w-5 text-amber-500" />
-                                    Google OAuth 설정 (블로그스팟용)
-                                </h3>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-6">
-                                <ApiInputRow
-                                    label="Google Client ID"
-                                    description="블로그스팟 연결을 위한 OAuth 2.0 클라이언트 ID입니다."
-                                    value={keys.googleClientId || ''}
-                                    onChange={(v) => handleChange('googleClientId', 'google', v)}
-                                    // Google OAuth는 테스트 버튼이 없으므로 검증 생략
-                                    onSave={() => handleSaveSingle('google', 'Google OAuth', null, true)}
-                                    isSaving={savingKey === 'google'}
-                                    isValidating={false}
-                                    validationResult={null}
-                                    icon={<Globe className="h-5 w-5 text-amber-500" />}
-                                    placeholder="example.apps.googleusercontent.com"
-                                />
-
-                                <ApiInputRow
-                                    label="Google Client Secret"
-                                    description="OAuth 2.0 클라이언트 보안 비밀번호입니다."
-                                    value={keys.googleClientSecret || ''}
-                                    onChange={(v) => handleChange('googleClientSecret', 'google', v)}
-                                    // Google OAuth는 테스트 버튼이 없으므로 검증 생략
-                                    onSave={() => handleSaveSingle('google', 'Google OAuth', null, true)}
-                                    isSaving={savingKey === 'google'}
-                                    isValidating={false}
-                                    validationResult={null}
-                                    icon={<Globe className="h-5 w-5 text-amber-500" />}
-                                    placeholder="****************"
-                                />
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-
-                {/* Right Column: API Resources Sidebar */}
-                <div className="xl:col-span-1 space-y-4">
-                    <div className="sticky top-8">
-                        <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-4 px-1">
-                            텍스트 생성 API
-                        </h3>
-                        <div className="grid grid-cols-1 gap-3">
-                            <ExternalLinkBtn
-                                href="https://openai.com/ko-KR/index/openai-api/"
-                                icon={<Brain className="h-5 w-5" />}
-                                label="OpenAI API"
-                                subLabel="유료"
-                                color="bg-[#10a37f]"
-                            />
-                            <ExternalLinkBtn
-                                href="https://aistudio.google.com/app/api-keys?hl=ko"
-                                icon={<Sparkles className="h-5 w-5" />}
-                                label="Gemini API"
-                                subLabel="일정량 무료"
-                                color="bg-[#4285f4]"
-                            />
-                            <ExternalLinkBtn
-                                href="https://console.cloud.google.com/welcome"
-                                icon={<Globe className="h-5 w-5" />}
-                                label="Google Cloud"
-                                subLabel="플랫폼"
-                                color="bg-[#fbbc04] text-black"
-                            />
-                        </div>
-
-                        <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 mt-8 mb-4 px-1">
-                            이미지 생성/검색 API
-                        </h3>
-                        <div className="grid grid-cols-1 gap-3">
-                            <ExternalLinkBtn
-                                href="https://piapi.ai/"
-                                icon={<ImageIcon className="h-5 w-5" />}
-                                label="PiAPI (FLUX)"
-                                subLabel="유료"
-                                color="bg-[#8e24aa]"
-                            />
-                            <ExternalLinkBtn
-                                href="https://pixabay.com/service/about/api/"
-                                icon={<ImageIcon className="h-5 w-5" />}
-                                label="Pixabay"
-                                subLabel="무료"
-                                color="bg-[#02be6e]"
-                            />
-                            <ExternalLinkBtn
-                                href="https://www.pexels.com/api/"
-                                icon={<ImageIcon className="h-5 w-5" />}
-                                label="Pexels"
-                                subLabel="무료"
-                                color="bg-[#05a081]"
-                            />
-                            <ExternalLinkBtn
-                                href="https://unsplash.com/developers"
-                                icon={<ImageIcon className="h-5 w-5" />}
-                                label="Unsplash"
-                                subLabel="무료"
-                                color="bg-[#000000]"
-                            />
-                            <ExternalLinkBtn
-                                href="https://www.freepik.com/api"
-                                icon={<ImageIcon className="h-5 w-5" />}
-                                label="Freepik"
-                                subLabel="무료"
-                                color="bg-[#1273eb]"
-                            />
-                        </div>
-                    </div>
-                </div>
-
+                {/* Consolidated Unsplash Card */}
+                <ApiInputRowGroup
+                    label="UNSPLASH"
+                    description={"App ID & Access Key"}
+                    icon={<ImageIcon className="h-5 w-5 text-gray-400" />}
+                    issueURL="https://unsplash.com/developers"
+                    inputs={[
+                        { label: 'APP ID', value: keys.unsplashAppId, placeholder: 'App ID', onChange: (v) => handleChange('unsplashAppId', 'unsplash', v) },
+                        { label: 'ACCESS KEY', value: keys.unsplashAccessKey, placeholder: 'Access Key', onChange: (v) => handleChange('unsplashAccessKey', 'unsplash', v) }
+                    ]}
+                    onTest={() => testConnection('unsplash')}
+                    onSave={() => handleSaveSingle('unsplash', 'Unsplash', validationResults['unsplash'], true)}
+                    isSaving={savingKey === 'unsplash'}
+                    isValidating={validating['unsplash']}
+                    validationResult={validationResults['unsplash']}
+                    color="slate"
+                />
             </div>
         </div>
     )
@@ -468,37 +331,51 @@ interface ApiInputRowProps {
     validationResult: { success: boolean, message: string } | null | undefined
     icon: React.ReactNode
     placeholder: string
+    compact?: boolean
+    issueURL?: string
 }
 
-function ApiInputRow({ label, description, value, onChange, onTest, onSave, isSaving, isValidating, validationResult, icon, placeholder }: ApiInputRowProps) {
+function ApiInputRow({ label, description, value, onChange, onTest, onSave, isSaving, isValidating, validationResult, icon, placeholder, compact, issueURL }: ApiInputRowProps) {
     return (
-        <div className="bg-white dark:bg-[#111722] rounded-2xl border border-slate-200 dark:border-[#324467] shadow-sm overflow-hidden group transition-all hover:border-blue-400/50">
-            <div className="p-6 space-y-4">
-                <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-slate-50 dark:bg-[#192233] rounded-xl group-hover:bg-blue-50 dark:group-hover:bg-blue-900/10 transition-colors">
-                            {icon}
-                        </div>
-                        <div>
-                            <h3 className="text-base font-bold text-slate-900 dark:text-white">{label}</h3>
-                            <p className="text-xs text-slate-500 mt-0.5">{description}</p>
-                        </div>
+        <div className={clsx(
+            "bg-white dark:bg-[#111722] rounded-2xl border border-slate-200 dark:border-[#324467] shadow-lg overflow-hidden group transition-all hover:border-blue-400/50 flex flex-col p-6 w-full max-w-[300px]",
+            compact && "rounded-xl"
+        )}>
+            <div className="flex flex-col gap-4 flex-1 items-center text-center">
+                <div className="space-y-1">
+                    <h3 className="text-lg font-black text-slate-800 dark:text-white tracking-tighter leading-tight uppercase font-heading">
+                        {label}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium whitespace-pre-line leading-relaxed">
+                        {description}
+                    </p>
+                </div>
+
+                <div className="w-full space-y-2.5">
+                    <div className="relative">
+                        <input
+                            type="password"
+                            value={value}
+                            onChange={(e) => onChange(e.target.value)}
+                            placeholder="키 입력"
+                            className="w-full px-4 py-2.5 rounded-xl bg-[#00e5ff]/10 dark:bg-[#00e5ff]/5 border-2 border-[#00e5ff]/30 text-center text-xs focus:outline-none focus:ring-4 focus:ring-[#00e5ff]/20 transition-all font-bold text-slate-900 dark:text-[#00e5ff] placeholder:text-[#00e5ff]/50"
+                        />
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-col gap-1.5">
                         {onTest && (
                             <button
                                 onClick={onTest}
                                 disabled={isValidating || !value}
                                 className={clsx(
-                                    "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border",
+                                    "w-full py-2 rounded-xl text-[12px] font-black transition-all flex items-center justify-center gap-2 border shadow-sm active:scale-95 uppercase",
                                     !value
                                         ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
-                                        : "bg-white dark:bg-transparent text-blue-600 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                        : "bg-[#333c4d] text-white border-[#333c4d] hover:bg-[#1f2937]"
                                 )}
                             >
-                                {isValidating ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                                연결 테스트
+                                {isValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                                {isValidating ? '연결 중...' : '연결 테스트'}
                             </button>
                         )}
 
@@ -506,34 +383,137 @@ function ApiInputRow({ label, description, value, onChange, onTest, onSave, isSa
                             onClick={onSave}
                             disabled={isSaving}
                             className={clsx(
-                                "px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 border",
-                                "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 hover:border-blue-700 active:scale-95",
+                                "w-full py-2 rounded-xl text-[12px] font-black transition-all flex items-center justify-center gap-2 border shadow-sm active:scale-95 uppercase",
+                                "bg-[#1d4ed8] text-white border-[#1d4ed8] hover:bg-[#1e40af]",
                                 isSaving && "opacity-70 cursor-not-allowed"
                             )}
                         >
-                            {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                             적용하기
                         </button>
-                    </div>
-                </div>
 
-                <div className="relative">
-                    <input
-                        type="password"
-                        value={value}
-                        onChange={(e) => onChange(e.target.value)}
-                        placeholder={placeholder}
-                        className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-[#101622] border border-slate-200 dark:border-[#324467] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium text-slate-900 dark:text-white placeholder:text-slate-400"
-                    />
+                        {issueURL && (
+                            <a
+                                href={issueURL}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full py-2 rounded-xl text-[12px] font-black transition-all flex items-center justify-center gap-2 border shadow-sm active:scale-95 uppercase bg-[#059669] text-white border-[#059669] hover:bg-[#047857]"
+                            >
+                                발급받기
+                            </a>
+                        )}
+                    </div>
                 </div>
 
                 {validationResult && (
                     <div className={clsx(
-                        "flex items-center gap-2 text-xs font-bold animate-in fade-in slide-in-from-left-2",
+                        "mt-auto pt-1 flex items-center gap-2 text-[10px] font-black animate-in fade-in slide-in-from-bottom-1",
                         validationResult.success ? "text-green-600" : "text-red-500"
                     )}>
-                        {validationResult.success ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
-                        {validationResult.message}
+                        {validationResult.success ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                        <span className="truncate">{validationResult.message}</span>
+                    </div>
+                )}
+            </div>
+        </div>
+    )
+}
+
+interface ApiInputRowGroupProps {
+    label: string
+    description: string
+    inputs: { label: string, value: string, placeholder: string, onChange: (v: string) => void }[]
+    onTest?: () => void
+    onSave: () => void
+    isSaving: boolean
+    isValidating: boolean
+    validationResult: { success: boolean, message: string } | null | undefined
+    icon: React.ReactNode
+    issueURL?: string
+    color: 'slate' | 'amber'
+}
+
+function ApiInputRowGroup({ label, description, inputs, onTest, onSave, isSaving, isValidating, validationResult, icon, issueURL, color }: ApiInputRowGroupProps) {
+    return (
+        <div className={clsx(
+            "bg-white dark:bg-[#111722] rounded-2xl border border-slate-200 dark:border-[#324467] shadow-lg overflow-hidden group transition-all hover:border-blue-400/50 flex flex-col p-6 w-full max-w-[300px]"
+        )}>
+            <div className="flex flex-col gap-4 flex-1 items-center text-center">
+                <div className="space-y-1">
+                    <h3 className="text-lg font-black text-slate-800 dark:text-white tracking-tighter leading-tight uppercase font-heading">
+                        {label}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium whitespace-pre-line leading-relaxed">
+                        {description}
+                    </p>
+                </div>
+
+                <div className="w-full space-y-3">
+                    <div className="space-y-2">
+                        {inputs.map((input, idx) => (
+                            <div key={idx} className="space-y-1">
+                                <div className="text-[9px] font-bold text-slate-400 text-left px-1">{input.label}</div>
+                                <input
+                                    type="password"
+                                    value={input.value}
+                                    onChange={(e) => input.onChange(e.target.value)}
+                                    placeholder={input.placeholder}
+                                    className="w-full px-4 py-2 rounded-xl bg-[#00e5ff]/10 dark:bg-[#00e5ff]/5 border-2 border-[#00e5ff]/30 text-center text-xs focus:outline-none focus:ring-4 focus:ring-[#00e5ff]/20 transition-all font-bold text-slate-900 dark:text-[#00e5ff] placeholder:text-[#00e5ff]/50"
+                                />
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                        {onTest && (
+                            <button
+                                onClick={onTest}
+                                disabled={isValidating || inputs.some(i => !i.value)}
+                                className={clsx(
+                                    "w-full py-2 rounded-xl text-[12px] font-black transition-all flex items-center justify-center gap-2 border shadow-sm active:scale-95 uppercase",
+                                    inputs.some(i => !i.value)
+                                        ? "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed"
+                                        : "bg-[#333c4d] text-white border-[#333c4d] hover:bg-[#1f2937]"
+                                )}
+                            >
+                                {isValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                                {isValidating ? '연결 중...' : '연결 테스트'}
+                            </button>
+                        )}
+
+                        <button
+                            onClick={onSave}
+                            disabled={isSaving}
+                            className={clsx(
+                                "w-full py-2 rounded-xl text-[12px] font-black transition-all flex items-center justify-center gap-2 border shadow-sm active:scale-95 uppercase",
+                                "bg-[#1d4ed8] text-white border-[#1d4ed8] hover:bg-[#1e40af]",
+                                isSaving && "opacity-70 cursor-not-allowed"
+                            )}
+                        >
+                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            전체 적용하기
+                        </button>
+
+                        {issueURL && (
+                            <a
+                                href={issueURL}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="w-full py-2 rounded-xl text-[12px] font-black transition-all flex items-center justify-center gap-2 border shadow-sm active:scale-95 uppercase bg-[#059669] text-white border-[#059669] hover:bg-[#047857]"
+                            >
+                                발급받기
+                            </a>
+                        )}
+                    </div>
+                </div>
+
+                {validationResult && (
+                    <div className={clsx(
+                        "mt-auto pt-1 flex items-center gap-2 text-[10px] font-black animate-in fade-in slide-in-from-bottom-1",
+                        validationResult.success ? "text-green-600" : "text-red-500"
+                    )}>
+                        {validationResult.success ? <CheckCircle2 className="h-3.5 w-3.5" /> : <XCircle className="h-3.5 w-3.5" />}
+                        <span className="truncate">{validationResult.message}</span>
                     </div>
                 )}
             </div>
@@ -545,33 +525,29 @@ interface ExternalLinkBtnProps {
     href: string
     icon: React.ReactNode
     label: string
-    subLabel: string
     color: string
 }
 
-function ExternalLinkBtn({ href, icon, label, subLabel, color }: ExternalLinkBtnProps) {
+function ExternalLinkBtn({ href, icon, label, color }: ExternalLinkBtnProps) {
     return (
         <a
             href={href}
             target="_blank"
             rel="noopener noreferrer"
             className={clsx(
-                "flex items-center gap-3 p-3 rounded-xl transition-all hover:scale-[1.02] active:scale-95 shadow-sm group",
-                "bg-white dark:bg-[#111722] border border-slate-200 dark:border-[#324467] hover:border-blue-300 dark:hover:border-blue-700"
+                "flex items-center gap-2.5 p-2 rounded-2xl transition-all hover:scale-[1.02] active:scale-95 shadow-sm group border",
+                "bg-white dark:bg-[#111722] border-slate-200 dark:border-[#324467] hover:border-blue-300 dark:hover:border-blue-700"
             )}
         >
-            <div className={clsx("p-2 rounded-lg text-white shadow-sm", color)}>
+            <div className={clsx("p-1.5 rounded-xl text-white shadow-sm shrink-0", color)}>
                 {icon}
             </div>
-            <div className="flex-1">
-                <div className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors">
+            <div className="flex-1 min-w-0">
+                <div className="text-[10px] font-black text-slate-900 dark:text-white group-hover:text-blue-600 transition-colors truncate">
                     {label}
                 </div>
-                <div className="text-[10px] text-slate-500 font-medium">
-                    {subLabel}
-                </div>
             </div>
-            <ExternalLink className="h-3 w-3 text-slate-400 group-hover:text-blue-500" />
+            <ExternalLink className="h-3 w-3 text-slate-400 group-hover:text-blue-500 shrink-0" />
         </a>
     )
 }
