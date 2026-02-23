@@ -162,3 +162,44 @@ export async function updateUserImageRights(userId: string, hasRights: boolean) 
         return { success: false, error: '이미지 권한 업데이트에 실패했습니다.' }
     }
 }
+/**
+ * 사용자 다중 권한 일괄 설정 (관리자 전용)
+ */
+export async function updateUserPermissions(userId: string, permissions: { 
+    hasManualPostRights?: boolean, 
+    hasYoutubeRights?: boolean, 
+    hasTistoryRewriteRights?: boolean, 
+    hasImageGenRights?: boolean 
+}) {
+    try {
+        const user = await getOrCreateUser()
+        if (user.role !== 'ADMIN') {
+            return { success: false, error: '권한이 없습니다.' }
+        }
+
+        const allowedKeys = ['hasManualPostRights', 'hasYoutubeRights', 'hasTistoryRewriteRights', 'hasImageGenRights']
+        const updates: string[] = []
+        const values: any[] = []
+
+        Object.entries(permissions).forEach(([key, value], index) => {
+            if (allowedKeys.includes(key)) {
+                updates.push(`"${key}" = $${index + 1}`)
+                values.push(value)
+            }
+        })
+
+        if (updates.length === 0) return { success: true }
+
+        values.push(userId)
+        await prisma.$executeRawUnsafe(
+            `UPDATE "users" SET ${updates.join(', ')} WHERE "id" = $${values.length}`,
+            ...values
+        )
+
+        revalidatePath('/dashboard/admin/users')
+        return { success: true }
+    } catch (error) {
+        console.error('Failed to update permissions:', error)
+        return { success: false, error: '권한 업데이트에 실패했습니다.' }
+    }
+}

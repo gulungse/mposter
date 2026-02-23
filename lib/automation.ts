@@ -12,6 +12,21 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { calculateNextRun } from '@/lib/cron'
 
+/**
+ * 생성된 제목에서 불필요한 접두어(그대, <, > 등)를 제거합니다.
+ */
+export function cleanTitle(title: string): string {
+    if (!title) return '';
+    // Normalize and remove common prefixes/symbols
+    return title
+        .replace(/^\[.*?\]\s*/, '') // Remove [Tags]
+        .replace(/^(제목|썸네일|요약|그대):\s*/i, '') // Remove "제목:", "그대:" etc.
+        .replace(/[<>]/g, '') // Remove < >
+        .replace(/^["']|["']$/g, '') // Remove starting/ending quotes
+        .replace(/\s+/g, ' ') // Normalize spaces
+        .trim();
+}
+
 // Helper to clean and parse JSON from AI responses
 function cleanAndParseJson(text: string): any {
     if (!text) return {};
@@ -45,6 +60,9 @@ function cleanAndParseJson(text: string): any {
                 .replace(/<script[\s\S]*?<\/script>/ig, '')
                 .trim();
         }
+        if (parsed.title) {
+            parsed.title = cleanTitle(parsed.title);
+        }
         return parsed;
     } catch (e) {
         // console.warn('JSON Parse Failed, attempting manual cleanup', e);
@@ -74,10 +92,7 @@ export function getSafeThumbnailText(aiThumbText: string | undefined, title: str
 
     // 1. 기본 정제
     if (candidate) {
-        candidate = candidate.replace(/['"]/g, '').trim();
-        if (candidate.endsWith('.')) candidate = candidate.slice(0, -1);
-        // "제목: ..." 같은 접두어 제거
-        candidate = candidate.replace(/^(제목|썸네일|요약):\s*/, '');
+        candidate = cleanTitle(candidate);
     }
 
     // 2. 유효성 검사 (매우 엄격하게 12자 제한)
@@ -205,8 +220,10 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
 절대로 <h1>, <html>, <head>, <body>, <!DOCTYPE>, <style>, <script> 태그를 사용하지 마. 본문에는 오직 문서 내용(<p>, <h2>, <ul>, <li> 등)만 포함해야 하며, 내부 CSS나 인라인 스타일도 금지야.
 제목은 이미 글 상단에 있으므로 본문에는 <h2>, <h3>, <h4> 태그만 사용해야 해.
 또한, 이 글과 관련된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 배열로 제공해줘. (LoremFlickr 검색용)
-마지막으로, 썸네일 이미지에 들어갈 **10자 이내의 클릭을 부르는 자극적인 문구**를 'thumbnailText' 필드에 제공해줘. \n**주의: 절대 제목을 그대로 쓰지 마.** 독자가 클릭하고 싶게 만드는 "낚시성 멘트"나 "충격적인 질문" 형태로 짧게(단어 위주). (예: "저속노화의 충격 진실", "절대 먹지 마세요")
-반드시 JSON 형식 {"title": "...", "content": "...", "imageKeywords": ["..."], "thumbnailText": "..."}으로만 답변하고, JSON 외의 텍스트는 절대 포함하지 마.`
+마지막으로, 썸네일 이미지에 들어갈 **10자 이내의 클릭을 부르는 짧은 문구**를 'thumbnailText' 필드에 제공해줘. 
+**주의: 제목과 다른 내용을 문구로 사용하세요.** 독자가 클릭하고 싶게 만드는 "짧은 강조 멘트"나 "궁금증을 유발하는 질문" 형태로 핵심 단어 위주로 작성해줘. (예: "저속노화의 충격 진실", "절대 먹지 마세요")
+반드시 JSON 형식 {"title": "...", "content": "...", "imageKeywords": ["..."], "thumbnailText": "..."}으로만 답변하고, JSON 외의 텍스트는 절대 포함하지 마.
+**중요: 제목('title')에는 어떠한 접두어나 불필요한 특수기호(<, > 등)를 절대 붙이지 마세요. 오직 본문 내용을 관통하는 깔끔하고 완성된 제목만 작성하세요.**`
                 }]
             }]
         }, {
@@ -263,7 +280,8 @@ export async function generateClaudeContent(apiKey: string, systemPrompt: string
 3. SEO에 최적화된 유용한 정보 위주로 작성.
 4. **반드시 JSON 형식만 반환**하고, 마크다운 코드 블록(\`\`\`json)이나 사족을 달지 마시오.
 5. 'imageKeywords' 필드에는 이미지 검색용 영문 키워드 5개를 배열로 포함.
-6. 'thumbnailText' 필드에는 썸네일용 10자 이내의 **클릭을 부르는 자극적인 문구** 포함. (**절대 제목과 같으면 안 됨**. 예: "이것만 알면 끝", "충격적인 결말")`
+6. 'thumbnailText' 필드에는 썸네일용 10자 이내의 **클릭을 유도하는 짧은 문구** 포함. (**제목과 다른 내용을 사용**. 예: "이것만 알면 끝", "충격적인 결말")
+**7. 중요: 제목('title')은 불필요한 접두어나 기호(<, >) 없이 독창적이고 깔끔한 문장으로만 작성하시오.**`
                 }
             ]
         });
@@ -301,7 +319,7 @@ export async function generateGPTContent(apiKey: string, systemPrompt: string, t
 1. **형식**: 반드시 JSON 형식으로만 응답해야 합니다. (JSON 파싱 실패 시 시스템 오류 발생)
 2. **태그 제한**: <h1>, <html>, <head>, <body>, <style>, <script> 태그 및 인라인 스타일은 절대 금지입니다. (<h2>, <h3>, <p>, <ul> 등 사용 권장)
 3. **필수 필드**:
-   - title: 글 제목
+   - title: 글 제목 (불필요한 접두어나 구문 없이, 태그나 특수문자(<, >) 없이 공백 포함 완성된 문장으로 작성)
    - content: 글 본문 (HTML 태그 포함)
    - imageKeywords: 이미지 검색용 영어 키워드 5개 (배열)
    - thumbnailText: 썸네일용 텍스트 (10자 이내)
@@ -382,6 +400,25 @@ ${systemPrompt || '별도의 추가 지침 없음. 자유롭게 작성.'}
     }
 
     return cleanAndParseJson(rawContent);
+}
+
+/**
+ * 외부 이미지 URL을 Buffer로 다운로드합니다.
+ */
+export async function downloadImage(url: string): Promise<Buffer> {
+    try {
+        const response = await axios.get(url, {
+            responseType: 'arraybuffer',
+            timeout: 15000,
+            headers: {
+                'User-Agent': 'Mozilla/5.0'
+            }
+        });
+        return Buffer.from(response.data);
+    } catch (error: any) {
+        console.error(`Image download failed (${url}):`, error.message);
+        throw new Error(`이미지 다운로드 실패: ${error.message}`);
+    }
 }
 
 /**

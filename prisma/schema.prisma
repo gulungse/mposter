@@ -24,6 +24,9 @@ model User {
   limits                   Json?
   settings                 Json?
   hasImageGenRights        Boolean         @default(false)
+  hasManualPostRights      Boolean         @default(false)
+  hasYoutubeRights         Boolean         @default(false)
+  hasTistoryRewriteRights  Boolean         @default(false)
   automationJobs           AutomationJob[]
   keywordGroups            KeywordGroup[]
   payments                 Payment[]

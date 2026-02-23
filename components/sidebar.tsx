@@ -19,7 +19,11 @@ import {
     ShoppingBag,
     X,
     ScrollText,
-    Wand2
+    Wand2,
+    ChevronDown,
+    ChevronUp,
+    Youtube,
+    ShieldAlert
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -31,7 +35,7 @@ import { createClient } from '@/lib/supabase/client'
 import { DeleteAccountButton } from '@/components/delete-account-button'
 
 const ICON_MAP: Record<string, any> = {
-    LayoutDashboard, Globe, Key, Terminal, Cpu, Code2, MenuIcon, Coins, ShoppingBag, ScrollText, Sparkles, Wand2
+    LayoutDashboard, Globe, Key, Terminal, Cpu, Code2, MenuIcon, Coins, ShoppingBag, ScrollText, Sparkles, Wand2, Youtube, ShieldCheck, ShieldAlert
 }
 
 interface SidebarProps {
@@ -43,9 +47,26 @@ interface SidebarProps {
 export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
     const pathname = usePathname()
     const router = useRouter()
-    const [user, setUser] = useState<{ name: string | null; email: string; role: string } | null>(null)
+    const [user, setUser] = useState<{
+        name: string | null;
+        email: string;
+        role: string;
+        hasImageGenRights?: boolean;
+        hasManualPostRights?: boolean;
+        hasYoutubeRights?: boolean;
+        hasTistoryRewriteRights?: boolean;
+    } | null>(null)
     const [menus, setMenus] = useState<any[]>([])
     const [showUpgrade, setShowUpgrade] = useState(false)
+    const [expandedGroups, setExpandedGroups] = useState<string[]>(['MANAGEMENT', 'PUBLISHING', 'ADMIN'])
+
+    const toggleGroup = (groupId: string) => {
+        setExpandedGroups(prev =>
+            prev.includes(groupId)
+                ? prev.filter(id => id !== groupId)
+                : [...prev, groupId]
+        )
+    }
 
     const handleLogout = async () => {
         const supabase = createClient()
@@ -54,43 +75,99 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
         router.push('/')
     }
 
-    useEffect(() => {
-        async function loadProfile() {
-            const res = await getUserProfile()
-            if (res.success && res.data) {
-                setUser(res.data as any)
-            }
+    async function loadProfile() {
+        const res = await getUserProfile()
+        if (res.success && res.data) {
+            setUser(res.data as any)
         }
-        async function loadMenus() {
-            const res = await getActiveSidebarMenus()
-            const defaultMenus = [
-                { href: '/dashboard', icon: 'LayoutDashboard', label: '대시보드' },
+    }
+
+    async function loadMenus() {
+        const res = await getActiveSidebarMenus()
+        
+        // Groups based on user request
+        const dashboardMenu = { href: '/dashboard', icon: 'LayoutDashboard', label: '대시보드' }
+        const shopMenu = { href: '/dashboard/shop', icon: 'Coins', label: '충전소' }
+
+        const managementGroup = {
+            id: 'MANAGEMENT',
+            label: '관리메뉴',
+            items: [
                 { href: '/dashboard/sites', icon: 'Globe', label: '사이트 관리' },
-                { href: '/dashboard/keywords', icon: 'Key', label: '키워드 관리' },
                 { href: '/dashboard/prompts', icon: 'Terminal', label: '프롬프트 관리' },
-                { href: '/dashboard/prompts/test', icon: 'Sparkles', label: '프롬프트 테스트' },
-                { href: '/dashboard/prompts/manual', icon: 'Wand2', label: '수동 글 생성' },
-                { href: '/dashboard/tasks', icon: 'Cpu', label: '자동화 작업' },
-                { href: '/dashboard/tasks/youtube', icon: 'Youtube', label: '유튜브 → 블로그' },
+                { href: '/dashboard/keywords', icon: 'Key', label: '키워드 관리' },
                 { href: '/dashboard/api', icon: 'Code2', label: 'API 관리' },
-                { href: '/dashboard/logs', icon: 'ScrollText', label: '활동 로그' },
-                { href: '/dashboard/shop', icon: 'Coins', label: '충전소/상점' },
+                { href: '/dashboard/logs', icon: 'ScrollText', label: '활동로그 관리' },
             ]
-
-            if (res.success && res.data && res.data.length > 0) {
-                const dbMenus = res.data
-                const merged = [...defaultMenus]
-
-                dbMenus.forEach((dbItem: any) => {
-                    if (!merged.find(m => m.href === dbItem.href)) {
-                        merged.push(dbItem)
-                    }
-                })
-                setMenus(merged)
-            } else {
-                setMenus(defaultMenus)
-            }
         }
+
+        const publishingGroup = {
+            id: 'PUBLISHING',
+            label: '발행메뉴',
+            items: [
+                { href: '/dashboard/prompts/test', icon: 'Sparkles', label: '프롬프트 테스트' },
+                { href: '/dashboard/tasks', icon: 'Cpu', label: '자동화 발행' },
+                // Conditional permissions
+                ...(user?.hasManualPostRights || user?.role === 'ADMIN' ? [
+                    { href: '/dashboard/prompts/manual', icon: 'Wand2', label: '수동 발행' }
+                ] : []),
+                ...(user?.hasYoutubeRights || user?.role === 'ADMIN' ? [
+                    { href: '/dashboard/tasks/youtube', icon: 'Youtube', label: '유튜브 > 블로그발행' }
+                ] : []),
+                ...(user?.hasTistoryRewriteRights || user?.role === 'ADMIN' ? [
+                    { href: '/dashboard/prompts/tistory', icon: 'Sparkles', label: '티스토리 재작성' }
+                ] : []),
+            ]
+        }
+
+        const adminGroup = user?.role === 'ADMIN' ? {
+            id: 'ADMIN',
+            label: '관리자 메뉴',
+            href: '/dashboard/admin',
+            items: [
+                { href: '/dashboard/admin/users', icon: 'ShieldCheck', label: '사용자 관리' },
+                { href: '/dashboard/admin/slots', icon: 'ShieldAlert', label: '무료회원 슬롯관리' },
+                { href: '/dashboard/admin/prompts', icon: 'Terminal', label: '시스템 프롬프트관리' },
+                { href: '/dashboard/admin/tokens', icon: 'Coins', label: '토큰 관리' },
+                { href: '/dashboard/admin/shop', icon: 'ShoppingBag', label: '상점 상품 관리' },
+            ]
+        } : null
+
+        // Support DB menus - they will go into Management if not categorized
+        let extraMenus: any[] = []
+        if (res.success && res.data && res.data.length > 0) {
+            const allItems = [
+                dashboardMenu.href, shopMenu.href,
+                ...managementGroup.items.map(i => i.href),
+                ...publishingGroup.items.map(i => i.href),
+                ...(adminGroup ? adminGroup.items.map(i => i.href) : [])
+            ]
+            res.data.forEach((dbItem: any) => {
+                if (!allItems.includes(dbItem.href)) {
+                    extraMenus.push(dbItem)
+                }
+            })
+        }
+
+        const finalStructure = {
+            dashboard: dashboardMenu,
+            shop: shopMenu,
+            groups: [
+                { ...managementGroup, items: [...managementGroup.items, ...extraMenus] },
+                publishingGroup,
+                ...(adminGroup ? [adminGroup] : [])
+            ]
+        }
+        
+        setMenus([finalStructure])
+    }
+
+    useEffect(() => {
+        loadProfile()
+    }, [])
+
+    useEffect(() => {
+        loadMenus()
         async function loadSettings() {
             const res = await getGlobalSettings()
             if (res.success && res.data) {
@@ -98,10 +175,8 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                 setShowUpgrade(!!res.data.isUpgradeEnabled)
             }
         }
-        loadProfile()
-        loadMenus()
         loadSettings()
-    }, [])
+    }, [user])
 
     return (
         <>
@@ -146,49 +221,72 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                 </div>
 
                 {/* Navigation Section */}
-                <nav className="flex-1 px-4 py-6 space-y-8 overflow-y-auto no-scrollbar">
-
-                    {/* Main Menu */}
-                    <div className="space-y-1">
-                        <p className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">
-                            Platform
-                        </p>
-                        {menus.map((item) => {
-                            const isActive = pathname === item.href
-                            const IconComp = ICON_MAP[item.icon] || LayoutDashboard
-                            return (
-                                <NavItem
-                                    key={item.href}
-                                    href={item.href}
-                                    icon={<IconComp className="h-[18px] w-[18px]" />}
-                                    label={item.label}
-                                    isActive={isActive}
-                                    onClick={onClose} // Close sidebar on nav click (mobile)
-                                />
-                            )
-                        })}
-                    </div>
-
-                    {/* Admin Menu - Only visible to ADMIN role */}
-                    {user?.role === 'ADMIN' && (
-                        <div className="space-y-1">
-                            <div className="flex items-center px-4 mb-3">
-                                <div className="h-px bg-[#1F2937] flex-1" />
-                                <p className="px-2 text-[10px] font-bold text-amber-500/80 uppercase tracking-widest">
-                                    Admin
-                                </p>
-                                <div className="h-px bg-[#1F2937] flex-1" />
-                            </div>
-
+                <nav className="flex-1 px-4 py-6 space-y-4 overflow-y-auto no-scrollbar">
+                    {menus[0] && (
+                        <>
+                            {/* Dashboard */}
                             <NavItem
-                                href="/dashboard/admin"
-                                icon={<ShieldCheck className="h-[18px] w-[18px]" />}
-                                label="관리자 메뉴"
-                                isActive={pathname?.startsWith('/dashboard/admin')}
-                                variant="admin"
+                                href={menus[0].dashboard.href}
+                                icon={<LayoutDashboard className="h-[18px] w-[18px]" />}
+                                label={menus[0].dashboard.label}
+                                isActive={pathname === menus[0].dashboard.href}
                                 onClick={onClose}
                             />
-                        </div>
+
+                            {/* Groups */}
+                            {menus[0].groups.map((group: any) => {
+                                const isExpanded = expandedGroups.includes(group.id)
+                                return (
+                                    <div key={group.id} className="space-y-1">
+                                        <div 
+                                            className="flex items-center justify-between px-4 py-2 cursor-pointer group/header"
+                                            onClick={() => group.href ? router.push(group.href) : toggleGroup(group.id)}
+                                        >
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest group-hover/header:text-slate-300 transition-colors">
+                                                {group.label}
+                                            </p>
+                                            {!group.href && (
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); toggleGroup(group.id); }}
+                                                    className="text-slate-500 group-hover/header:text-slate-300"
+                                                >
+                                                    {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {isExpanded && (
+                                            <div className="space-y-1 ml-2 border-l border-slate-800/50 pl-2">
+                                                {group.items.map((item: any) => {
+                                                    const isActive = pathname === item.href
+                                                    const IconComp = ICON_MAP[item.icon] || LayoutDashboard
+                                                    return (
+                                                        <NavItem
+                                                            key={item.href}
+                                                            href={item.href}
+                                                            icon={<IconComp className="h-[16px] w-[16px]" />}
+                                                            label={item.label}
+                                                            isActive={isActive}
+                                                            onClick={onClose}
+                                                            size="sm"
+                                                        />
+                                                    )
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })}
+
+                            {/* Shop */}
+                            <NavItem
+                                href={menus[0].shop.href}
+                                icon={<Coins className="h-[18px] w-[18px]" />}
+                                label={menus[0].shop.label}
+                                isActive={pathname === menus[0].shop.href}
+                                onClick={onClose}
+                            />
+                        </>
                     )}
                 </nav>
 
@@ -235,6 +333,7 @@ function NavItem({
     label,
     isActive,
     variant = 'default',
+    size = 'default',
     onClick
 }: {
     href: string
@@ -242,6 +341,7 @@ function NavItem({
     label: string
     isActive?: boolean
     variant?: 'default' | 'admin'
+    size?: 'default' | 'sm'
     onClick?: () => void
 }) {
     return (
@@ -249,7 +349,8 @@ function NavItem({
             href={href}
             onClick={onClick}
             className={cn(
-                'group relative flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 overflow-hidden',
+                'group relative flex items-center gap-3 rounded-xl transition-all duration-200 overflow-hidden',
+                size === 'sm' ? 'px-3 py-2' : 'px-4 py-3',
                 isActive
                     ? variant === 'admin'
                         ? 'bg-amber-500/10 text-amber-500'
@@ -269,7 +370,8 @@ function NavItem({
                 {icon}
             </div>
             <span className={cn(
-                "relative z-10 text-sm font-medium transition-colors duration-200",
+                "relative z-10 font-medium transition-colors duration-200",
+                size === 'sm' ? "text-xs" : "text-sm",
                 isActive ? "font-bold" : ""
             )}>
                 {label}

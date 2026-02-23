@@ -221,12 +221,6 @@ export async function getUserProfile() {
     try {
         const user = await getOrCreateUser()
 
-        // Use simple string interpolation for ID to be safer with UUID types in Raw SQL
-        const rightsRes = await (prisma as any).$queryRawUnsafe(`SELECT "hasImageGenRights" FROM "users" WHERE "id" = '${user.id}'`)
-        const hasRights = rightsRes?.[0]?.hasImageGenRights === true
-        
-        console.log(`[AUTH_CHECK] User: ${user.email}, ID: ${user.id}, hasRights: ${hasRights}`)
-
         return {
             success: true,
             data: {
@@ -234,7 +228,10 @@ export async function getUserProfile() {
                 email: user.email,
                 image: user.image,
                 role: user.role,
-                hasImageGenRights: hasRights
+                hasImageGenRights: !!user.hasImageGenRights,
+                hasManualPostRights: !!user.hasManualPostRights,
+                hasYoutubeRights: !!user.hasYoutubeRights,
+                hasTistoryRewriteRights: !!user.hasTistoryRewriteRights
             }
         }
     } catch (error) {

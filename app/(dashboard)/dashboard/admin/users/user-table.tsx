@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Shield, ShieldAlert, Coins, Search, UserCheck, Eye, Image as ImageIcon, Loader2 as Loader2Icon } from 'lucide-react'
+import { Shield, ShieldAlert, ShieldCheck, Coins, Search, UserCheck, Eye, Image as ImageIcon, Loader2 as Loader2Icon } from 'lucide-react'
 import { clsx } from 'clsx'
 import { TokenAdjustmentModal } from './token-modal'
+import { PermissionModal } from './permission-modal'
 
 interface UserTableProps {
     users: any[]
@@ -14,6 +15,7 @@ export function UserTable({ users }: UserTableProps) {
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
     const [selectedUser, setSelectedUser] = useState<any>(null)
+    const [permissionUser, setPermissionUser] = useState<any>(null)
     const [searchTerm, setSearchTerm] = useState('')
 
     const filteredUsers = users.filter(user =>
@@ -69,21 +71,36 @@ export function UserTable({ users }: UserTableProps) {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <span className={clsx(
-                                            "inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold border",
-                                            user.role === 'ADMIN'
-                                                ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
-                                                : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700"
-                                        )}>
-                                            {user.role === 'ADMIN' && <Shield className="h-3 w-3" />}
-                                            {user.role === 'ADMIN' ? '관리자' : '일반 사용자'}
-                                        </span>
-                                        {user.hasImageGenRights && (
-                                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-black bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800 ml-1">
-                                                <ImageIcon className="h-3 w-3" />
-                                                이미지 권한
+                                        <div className="flex flex-wrap gap-1.5 max-w-[200px]">
+                                            <span className={clsx(
+                                                "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border",
+                                                user.role === 'ADMIN'
+                                                    ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+                                                    : "bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700"
+                                            )}>
+                                                {user.role === 'ADMIN' ? '관리자' : '일반 사용자'}
                                             </span>
-                                        )}
+                                            {user.hasImageGenRights && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-800">
+                                                    이미지
+                                                </span>
+                                            )}
+                                            {user.hasManualPostRights && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                                                    수동발행
+                                                </span>
+                                            )}
+                                            {user.hasYoutubeRights && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800">
+                                                    유튜브
+                                                </span>
+                                            )}
+                                            {user.hasTistoryRewriteRights && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                                                    티스토리
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-1.5 text-sm font-bold text-slate-700 dark:text-slate-200">
@@ -97,35 +114,11 @@ export function UserTable({ users }: UserTableProps) {
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex justify-end gap-2">
                                             <button
+                                                onClick={() => setPermissionUser(user)}
                                                 className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                                                title="권한 변경"
+                                                title="권한 관리"
                                             >
-                                                <ShieldAlert className="h-4 w-4" />
-                                            </button>
-                                            <button
-                                                disabled={isPending}
-                                                onClick={() => {
-                                                    startTransition(async () => {
-                                                        const { updateUserImageRights } = await import('@/app/actions/admin')
-                                                        const newStatus = !user.hasImageGenRights
-                                                        const res = await updateUserImageRights(user.id, newStatus)
-                                                        if (!res.success) {
-                                                            alert(res.error)
-                                                        } else {
-                                                            router.refresh()
-                                                        }
-                                                    })
-                                                }}
-                                                className={clsx(
-                                                    "p-1.5 rounded-lg transition-colors",
-                                                    isPending && "opacity-50 cursor-not-allowed",
-                                                    user.hasImageGenRights 
-                                                        ? "text-orange-600 bg-orange-50 dark:bg-orange-900/20" 
-                                                        : "text-slate-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20"
-                                                )}
-                                                title="이미지 생성 권한 토글"
-                                            >
-                                                {isPending ? <Loader2Icon className="h-4 w-4 animate-spin text-slate-400" /> : <ImageIcon className="h-4 w-4" />}
+                                                <ShieldCheck className="h-4 w-4" />
                                             </button>
                                             <button
                                                 onClick={() => setSelectedUser(user)}
@@ -167,11 +160,17 @@ export function UserTable({ users }: UserTableProps) {
                 </div>
             </div>
 
-            {/* Token Modal */}
+            {/* Modals */}
             <TokenAdjustmentModal
                 isOpen={!!selectedUser}
                 onClose={() => setSelectedUser(null)}
                 user={selectedUser}
+            />
+
+            <PermissionModal
+                isOpen={!!permissionUser}
+                onClose={() => setPermissionUser(null)}
+                user={permissionUser}
             />
         </div>
     )
