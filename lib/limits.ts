@@ -16,15 +16,34 @@ export const BASE_LIMITS: UserLimits = {
 }
 
 export async function getUserLimits(userId: string): Promise<UserLimits> {
-    // 1. 사용자의 플랜 정보 조회 (혹시 플랜이 있으면 그 기본값을 사용, 없으면 BASE_LIMITS 사용)
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-        include: { plan: true }
-    })
+    // 1. 사용자의 플랜 정보 조회 (Prisma Client mismatch 방어를 위해 Raw SQL 사용)
+    const users = await prisma.$queryRawUnsafe<any[]>(`
+        SELECT u.*, p.id as "plan_id", p.name as "plan_name", 
+               p."siteLimit", p."keywordGroupLimit", p."promptLimit", p."taskLimit"
+        FROM "users" u
+        LEFT JOIN "plans" p ON u."planId" = p.id
+        WHERE u.id = $1
+        LIMIT 1
+    `, userId);
+
+    const user = users?.[0] || null;
 
     if (!user) {
         return BASE_LIMITS
     }
+
+    // Map raw SQL fields to expected structure if needed, or just handle nulls
+    const plan = user.plan_id ? {
+        id: user.plan_id,
+        name: user.plan_name,
+        siteLimit: user.siteLimit,
+        keywordGroupLimit: user.keywordGroupLimit,
+        promptLimit: user.promptLimit,
+        taskLimit: user.taskLimit
+    } : null;
+
+    // Use user with plan
+    const userData = { ...user, plan };
 
     // [Admin Override] 특정 관리자 계정 무제한 (UI 표시용)
     if (user.email && user.email.toLowerCase().trim() === 'gulungse@gmail.com') {
@@ -38,12 +57,12 @@ export async function getUserLimits(userId: string): Promise<UserLimits> {
         tasks: BASE_LIMITS.tasks,
     }
 
-    if (user.plan) {
+    if (userData.plan) {
         currentLimits = {
-            sites: user.plan.siteLimit,
-            keywords: user.plan.keywordGroupLimit,
-            prompts: user.plan.promptLimit,
-            tasks: user.plan.taskLimit,
+            sites: userData.plan.siteLimit,
+            keywords: userData.plan.keywordGroupLimit,
+            prompts: userData.plan.promptLimit,
+            tasks: userData.plan.taskLimit,
         }
     } else {
         // 플랜이 없는 경우(무료 회원), DB에서 'Free Plan'을 찾아 그 설정을 따름
@@ -51,7 +70,7 @@ export async function getUserLimits(userId: string): Promise<UserLimits> {
         const freePlan = await prisma.plan.findFirst({
             where: { name: 'Free Plan' }
         })
-        
+
         if (freePlan) {
             currentLimits = {
                 sites: freePlan.siteLimit,

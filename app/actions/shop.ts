@@ -50,10 +50,7 @@ export async function buyShopItem(itemId: string) {
         }
 
         // 잔액 확인
-        const dbUser = await prisma.user.findUnique({
-            where: { id: user.id },
-            select: { tokenBalance: true }
-        })
+        const dbUser = await getOrCreateUser()
 
         if (!dbUser || dbUser.tokenBalance < item.price) {
             return { success: false, message: '토큰 잔액이 부족합니다.' }

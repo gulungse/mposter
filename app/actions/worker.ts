@@ -20,6 +20,7 @@ import {
 } from '@/lib/automation'
 import { fetchRandomImage } from '@/lib/image_providers'
 import axios from 'axios'
+import { scrapeNaverBlog } from '@/lib/scraper'
 
 
 
@@ -69,7 +70,7 @@ export async function testPublishAction(data: {
 }) {
     try {
         const user = await getOrCreateUser()
-        
+
         // Raw SQL check for hasImageGenRights (Prisma Client might be stale)
         const rightsRes = await (prisma as any).$queryRawUnsafe(`SELECT "hasImageGenRights" FROM "users" WHERE id = '${user.id}'`)
         const hasRights = rightsRes?.[0]?.hasImageGenRights || false
@@ -179,21 +180,21 @@ export async function testPublishAction(data: {
                         if (hasRights && data.advThumbnailLines?.length === 4) {
                             // 고급 권한: 4줄 텍스트 + 배경 (커스텀 갤러리 또는 키워드 검색)
                             const searchKeyword = targetKeyword.split(' ')[0] || 'business';
-                            
+
                             // 프리미엄 모드이고 커스텀 이미지가 있으면 랜덤하게 선택 (테스트용)
-                            let bgUrl = (data.advImageMode === 'PREMIUM' && data.advCustomImages?.length) 
-                                ? data.advCustomImages[Math.floor(Math.random() * data.advCustomImages.length)] 
+                            let bgUrl = (data.advImageMode === 'PREMIUM' && data.advCustomImages?.length)
+                                ? data.advCustomImages[Math.floor(Math.random() * data.advCustomImages.length)]
                                 : null;
 
                             if (!bgUrl) {
                                 const searchedBg = await fetchRandomImage(settings, searchKeyword, 1);
                                 bgUrl = searchedBg || `https://loremflickr.com/600/600/${encodeURIComponent(searchKeyword)}`;
                             }
-                            
+
                             // 1번 라인은 항상 현재 키워드로 고정
                             const finalLines = [...data.advThumbnailLines];
                             finalLines[0] = targetKeyword;
-                            
+
                             const thumbBuffer = await generateAdvancedThumbnail(bgUrl, finalLines);
                             const uploaded = await uploadToWordPress(site, thumbBuffer, `${targetKeyword}-adv-thumb-${Date.now()}`);
                             imageUrl = uploaded.url;
@@ -256,17 +257,17 @@ export async function testPublishAction(data: {
                 if (hasRights && i > 1 && data.advContentPhraseA && data.advContentPhraseB) {
                     try {
                         let bgUrl = imageUrl;
-                        
+
                         // 프리미엄 모드이고 커스텀 이미지가 있으면 랜덤하게 이미지 사용 (테스트용)
                         if (data.advImageMode === 'PREMIUM' && data.advCustomImages?.length) {
-                             bgUrl = data.advCustomImages[Math.floor(Math.random() * data.advCustomImages.length)];
+                            bgUrl = data.advCustomImages[Math.floor(Math.random() * data.advCustomImages.length)];
                         }
- 
+
                         if (bgUrl) {
                             const advancedImgBuffer = await generateAdvancedContentImage(bgUrl, targetKeyword, data.advContentPhraseA, data.advContentPhraseB);
                             if (site.type === 'WORDPRESS') {
-                                 const uploaded = await uploadToWordPress(site, advancedImgBuffer, `${targetKeyword}-adv-img-${i}-${Date.now()}`);
-                                 imageUrl = uploaded.url;
+                                const uploaded = await uploadToWordPress(site, advancedImgBuffer, `${targetKeyword}-adv-img-${i}-${Date.now()}`);
+                                imageUrl = uploaded.url;
                             }
                             success = true;
                         }
@@ -395,7 +396,7 @@ export async function generateManualContentAction(data: {
 }) {
     try {
         const user = await getOrCreateUser()
-        
+
         if (user.tokenBalance <= 0) {
             throw new Error('보유 토큰이 부족합니다.')
         }
@@ -422,9 +423,9 @@ export async function generateManualContentAction(data: {
         // AI 생성 요청에 원본 데이터 포함
         const targetKeyword = data.originalTitle || '제공된 제목'
         const inputContext = `[원본 제목]: ${data.originalTitle}\n\n[원본 내용]:\n${data.originalContent}`;
-        
+
         let aiResult: any = {};
-        
+
         if (data.aiModel === 'GPT4O') {
             const apiKey = settings.openaiApiKey
             if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
@@ -451,13 +452,13 @@ export async function generateManualContentAction(data: {
             user.id
         )
 
-        return { 
-            success: true, 
+        return {
+            success: true,
             data: {
                 title: aiResult.title,
                 content: aiResult.content
             },
-            message: '새 글 생성이 완료되었습니다. (1토큰 사용됨)' 
+            message: '새 글 생성이 완료되었습니다. (1토큰 사용됨)'
         }
 
     } catch (error: any) {
@@ -488,5 +489,19 @@ export async function runAutomationTask(jobId: string) {
         if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         console.error('자동화 실행 요청 실패:', error)
         return { success: false, error: error.message }
+    }
+}
+
+/**
+ * 네이버 블로그 URL로부터 내용을 추출합니다.
+ */
+export async function scrapeNaverBlogAction(url: string) {
+    try {
+        await getOrCreateUser();
+        const result = await scrapeNaverBlog(url);
+        return { success: true, data: result };
+    } catch (error: any) {
+        console.error('scrapeNaverBlogAction error:', error);
+        return { success: false, error: error.message };
     }
 }

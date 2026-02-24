@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma'
 import { getOrCreateUser } from '@/lib/auth'
 import OpenAI from 'openai'
 import axios from 'axios'
+import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 
 /**
  * 사용자 API 설정 조회
@@ -43,9 +46,6 @@ export async function updateUserSettings(data: any) {
     }
 }
 
-/**
- * OpenAI API 키 검증
- */
 /**
  * OpenAI API 키 검증
  */
@@ -160,9 +160,6 @@ export async function validateAnthropic(apiKey: string) {
         return { success: false, message: '유효하지 않은 API 키입니다.' }
     }
 }
-import { createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 
 /**
  * 회원 탈퇴 처리

@@ -23,9 +23,8 @@ export async function impersonateUser(userId: string) {
             return { success: false, message: '로그인이 필요합니다.' }
         }
 
-        const realUser = await prisma.user.findUnique({
-            where: { id: authUser.id }
-        })
+        const users = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "users" WHERE "id" = $1 LIMIT 1`, authUser.id)
+        const realUser = users?.[0] || null
 
         if (!realUser || realUser.role !== 'ADMIN') {
             return { success: false, message: '관리자 권한이 없습니다.' }
@@ -68,10 +67,8 @@ export async function getImpersonationStatus() {
     if (!impersonatedId) return { isImpersonating: false }
 
     try {
-        const targetUser = await prisma.user.findUnique({
-            where: { id: impersonatedId },
-            select: { name: true, email: true }
-        })
+        const users = await prisma.$queryRawUnsafe<any[]>(`SELECT * FROM "users" WHERE "id" = $1 LIMIT 1`, impersonatedId)
+        const targetUser = users?.[0] || null
 
         if (!targetUser) return { isImpersonating: false }
 
@@ -165,11 +162,11 @@ export async function updateUserImageRights(userId: string, hasRights: boolean) 
 /**
  * 사용자 다중 권한 일괄 설정 (관리자 전용)
  */
-export async function updateUserPermissions(userId: string, permissions: { 
-    hasManualPostRights?: boolean, 
-    hasYoutubeRights?: boolean, 
-    hasTistoryRewriteRights?: boolean, 
-    hasImageGenRights?: boolean 
+export async function updateUserPermissions(userId: string, permissions: {
+    hasManualPostRights?: boolean,
+    hasYoutubeRights?: boolean,
+    hasTistoryRewriteRights?: boolean,
+    hasImageGenRights?: boolean
 }) {
     try {
         const user = await getOrCreateUser()

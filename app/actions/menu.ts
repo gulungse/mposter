@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { getOrCreateUser } from '@/lib/auth'
 import { revalidatePath } from 'next/cache'
+import crypto from 'crypto'
 
 /**
  * 모든 사이드바 메뉴를 가져옵니다.

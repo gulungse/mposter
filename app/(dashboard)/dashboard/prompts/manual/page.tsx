@@ -11,11 +11,13 @@ import {
     Check as CheckIcon,
     FileText,
     Bot as BotIcon,
-    Wand2
+    Wand2,
+    Link as LinkIcon,
+    ArrowRight
 } from 'lucide-react'
 import Link from 'next/link'
 import { getPrompts } from '@/app/actions/prompt'
-import { generateManualContentAction } from '@/app/actions/worker'
+import { generateManualContentAction, scrapeNaverBlogAction } from '@/app/actions/worker'
 
 export default function ManualPostPage() {
     const [loading, setLoading] = useState(true)
@@ -32,6 +34,8 @@ export default function ManualPostPage() {
         customPrompt: '',
         aiModel: 'GPT4O' as const
     })
+    const [naverUrl, setNaverUrl] = useState('')
+    const [scraping, setScraping] = useState(false)
 
     const [result, setResult] = useState<{ title: string; content: string } | null>(null)
 
@@ -43,6 +47,35 @@ export default function ManualPostPage() {
         }
         loadData()
     }, [])
+
+    const handleScrape = async () => {
+        if (!naverUrl.trim()) {
+            alert('네이버 블로그 URL을 입력해주세요.')
+            return
+        }
+        if (!naverUrl.includes('blog.naver.com')) {
+            alert('올바른 네이버 블로그 URL이 아닙니다.')
+            return
+        }
+
+        setScraping(true)
+        try {
+            const res = await scrapeNaverBlogAction(naverUrl)
+            if (res.success && res.data) {
+                setFormData(prev => ({
+                    ...prev,
+                    originalTitle: res.data.title,
+                    originalContent: res.data.content
+                }))
+            } else {
+                alert(res.error || '내용 추출에 실패했습니다.')
+            }
+        } catch (error) {
+            alert('오류가 발생했습니다.')
+        } finally {
+            setScraping(false)
+        }
+    }
 
     const handleGenerate = async () => {
         if (!formData.originalContent.trim()) {
@@ -113,7 +146,34 @@ export default function ManualPostPage() {
                         <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
                             <FileText className="h-4 w-4 text-blue-600" /> 1. 원본 데이터 입력
                         </h3>
-                        
+
+                        {/* Naver Blog Scraper Section */}
+                        <div className="bg-slate-50 dark:bg-[#1e293b] p-4 rounded-2xl border border-slate-200 dark:border-[#324467] space-y-3">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1.5">
+                                <LinkIcon className="h-3 w-3" /> 네이버 블로그 URL 추출 (선택 사항)
+                            </label>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={naverUrl}
+                                    onChange={e => setNaverUrl(e.target.value)}
+                                    placeholder="https://blog.naver.com/..."
+                                    className="flex-1 bg-white dark:bg-[#111722] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20"
+                                />
+                                <button
+                                    onClick={handleScrape}
+                                    disabled={scraping}
+                                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs flex items-center gap-2 transition-all"
+                                >
+                                    {scraping ? <Loader2Icon className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
+                                    추출
+                                </button>
+                            </div>
+                            <p className="text-[9px] text-slate-400 font-medium leading-relaxed">
+                                네이버 블로그 URL을 넣고 추출을 누르면 아래 제목과 본문이 자동으로 채워집니다.
+                            </p>
+                        </div>
+
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold text-slate-400 uppercase">원본 제목 (옵션)</label>
                             <input
@@ -247,7 +307,7 @@ export default function ManualPostPage() {
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-4 animate-pulse">
                                     <SparklesIcon className="h-12 w-12 opacity-20" />
-                                    <p className="font-bold text-center">왼쪽에서 데이터를 입력하고 <br/>생성 버튼을 눌러주세요.</p>
+                                    <p className="font-bold text-center">왼쪽에서 데이터를 입력하고 <br />생성 버튼을 눌러주세요.</p>
                                 </div>
                             )}
                         </div>

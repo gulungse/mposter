@@ -5,12 +5,7 @@ import { TokenChargeCard } from '@/components/shop/token-charge-card'
 import { ShopItemCard } from '@/components/shop/shop-item-card'
 
 export default async function ShopPage() {
-    const user = await getOrCreateUser() // auth check
-
-    // DB에서 사용자 정보 최신화 (잔액 표시용)
-    const userData = await prisma.user.findUnique({
-        where: { id: user.id }
-    })
+    const userData = await getOrCreateUser() // auth check & resilient data fetching
 
     // 판매 중인 상점 아이템 조회
     const shopItems = await prisma.shopItem.findMany({
@@ -60,9 +55,9 @@ export default async function ShopPage() {
                             amount={pkg.tokenAmount}
                             price={pkg.price}
                             isPopular={pkg.tokenAmount === 10000} // Example logic: 10k is popular
-                            buyerEmail={user.email}
-                            buyerName={user.name ?? undefined}
-                            userId={user.id}
+                            buyerEmail={userData.email}
+                            buyerName={userData.name ?? undefined}
+                            userId={userData.id}
                         />
                     ))}
                 </div>

@@ -25,11 +25,8 @@ import { LogoutButton } from '@/components/logout-button'
 export default async function DashboardPage() {
     const user = await getOrCreateUser()
 
-    // 사용자 플랜 및 리소스 사용량 조회
-    const userData = await prisma.user.findUnique({
-        where: { id: user.id },
-        include: { plan: true }
-    })
+    // 사용자 데이터 조회 (getOrCreateUser 내부의 raw SQL 로직을 활용하여 schema mismatch 방어)
+    const userData = await getOrCreateUser()
 
     // 동적 리소스 제한 조회 (기본 + 슬롯 구매)
     const limits = await getUserLimits(user.id)
