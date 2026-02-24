@@ -17,7 +17,8 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { getPrompts } from '@/app/actions/prompt'
-import { generateManualContentAction, scrapeNaverBlogAction } from '@/app/actions/worker'
+import { generateManualContentAction, scrapeNaverBlogAction, publishManualAction } from '@/app/actions/worker'
+import { getSites, getWordPressCategories } from '@/app/actions/site'
 
 export default function ManualPostPage() {
     const [loading, setLoading] = useState(true)
@@ -32,8 +33,18 @@ export default function ManualPostPage() {
         originalContent: '',
         promptId: '',
         customPrompt: '',
-        aiModel: 'GPT4O' as const
+        aiModel: 'GPT4O' as const,
+        siteId: '',
+        wpCategoryId: 0,
+        postStatus: 'draft' as 'publish' | 'draft',
+        imageSource: 'NONE' as 'NONE' | 'ORIGINAL' | 'AI' | 'SCRAP' | 'DALLE' | 'FLUX',
+        imageCount: 1
     })
+
+    const [sites, setSites] = useState<any[]>([])
+    const [categories, setCategories] = useState<any[]>([])
+    const [fetchingCats, setFetchingCats] = useState(false)
+    const [publishing, setPublishing] = useState(false)
     const [naverUrl, setNaverUrl] = useState('')
     const [scraping, setScraping] = useState(false)
 
@@ -41,12 +52,36 @@ export default function ManualPostPage() {
 
     useEffect(() => {
         async function loadData() {
-            const res = await getPrompts()
-            if (res.success) setPrompts(res.data || [])
+            const [promptRes, siteRes] = await Promise.all([
+                getPrompts(),
+                getSites()
+            ])
+            if (promptRes.success) setPrompts(promptRes.data || [])
+            if (siteRes.success) setSites(siteRes.data || [])
             setLoading(false)
         }
         loadData()
     }, [])
+
+    // 사이트 변경 시 카테고리 로드
+    useEffect(() => {
+        if (!formData.siteId) {
+            setCategories([])
+            return
+        }
+        const site = sites.find(s => s.id === formData.siteId)
+        if (site?.type === 'WORDPRESS') {
+            async function loadCats() {
+                setFetchingCats(true)
+                const res = await getWordPressCategories(formData.siteId)
+                if (res.success) setCategories(res.data || [])
+                setFetchingCats(false)
+            }
+            loadCats()
+        } else {
+            setCategories([])
+        }
+    }, [formData.siteId, sites])
 
     const handleScrape = async () => {
         if (!naverUrl.trim()) {
@@ -88,13 +123,36 @@ export default function ManualPostPage() {
         }
 
         setGenerating(true)
-        const res = await generateManualContentAction(formData)
+        const res = await generateManualContentAction(formData as any)
         if (res.success && res.data) {
             setResult(res.data)
         } else {
             alert(res.error || '생성 실패')
         }
         setGenerating(false)
+    }
+
+    const handlePublish = async () => {
+        if (!formData.originalContent.trim()) {
+            alert('원본 내용을 입력해주세요.')
+            return
+        }
+        if (!formData.siteId) {
+            alert('발행할 사이트를 선택해주세요.')
+            return
+        }
+
+        if (!confirm('설정한 옵션으로 글을 생성하고 사이트에 발행하시겠습니까? (1토큰 소모)')) return
+
+        setPublishing(true)
+        const res = await publishManualAction(formData as any)
+        if (res.success) {
+            alert(res.message || '발행 성공!')
+            // 결과는 보여주지 않거나, 필요시 갱신
+        } else {
+            alert(res.error || '발행 실패')
+        }
+        setPublishing(false)
     }
 
     const handleCopyAll = () => {
@@ -147,33 +205,6 @@ export default function ManualPostPage() {
                             <FileText className="h-4 w-4 text-blue-600" /> 1. 원본 데이터 입력
                         </h3>
 
-                        {/* Naver Blog Scraper Section */}
-                        <div className="bg-slate-50 dark:bg-[#1e293b] p-4 rounded-2xl border border-slate-200 dark:border-[#324467] space-y-3">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1.5">
-                                <LinkIcon className="h-3 w-3" /> 네이버 블로그 URL 추출 (선택 사항)
-                            </label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={naverUrl}
-                                    onChange={e => setNaverUrl(e.target.value)}
-                                    placeholder="https://blog.naver.com/..."
-                                    className="flex-1 bg-white dark:bg-[#111722] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500/20"
-                                />
-                                <button
-                                    onClick={handleScrape}
-                                    disabled={scraping}
-                                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs flex items-center gap-2 transition-all"
-                                >
-                                    {scraping ? <Loader2Icon className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
-                                    추출
-                                </button>
-                            </div>
-                            <p className="text-[9px] text-slate-400 font-medium leading-relaxed">
-                                네이버 블로그 URL을 넣고 추출을 누르면 아래 제목과 본문이 자동으로 채워집니다.
-                            </p>
-                        </div>
-
                         <div className="space-y-2">
                             <label className="text-[10px] font-bold text-slate-400 uppercase">원본 제목 (옵션)</label>
                             <input
@@ -191,64 +222,64 @@ export default function ManualPostPage() {
                                 value={formData.originalContent}
                                 onChange={e => setFormData({ ...formData, originalContent: e.target.value })}
                                 placeholder="가공할 원본 글 내용을 여기에 붙여넣으세요..."
-                                className="w-full h-64 p-4 text-sm font-medium bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 resize-none leading-relaxed"
+                                className="w-full h-80 p-4 text-sm font-medium bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 resize-none leading-relaxed"
                             />
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-[#111722] rounded-3xl border border-slate-200 dark:border-[#324467] shadow-xl p-6 space-y-4">
-                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
-                            <TerminalIcon className="h-4 w-4 text-blue-600" /> 2. 프롬프트 및 옵션 선택
-                        </h3>
+                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                        <TerminalIcon className="h-4 w-4 text-blue-600" /> 2. 프롬프트 및 옵션 선택
+                    </h3>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase">프로프트 선택</label>
-                                <select
-                                    value={formData.promptId}
-                                    onChange={e => setFormData({ ...formData, promptId: e.target.value, customPrompt: '' })}
-                                    className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2.5 text-sm font-bold outline-none"
-                                >
-                                    <option value="">직접 입력...</option>
-                                    {prompts.map(p => (
-                                        <option key={p.id} value={p.id}>{p.title}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase">AI 모델</label>
-                                <select
-                                    value={formData.aiModel}
-                                    onChange={e => setFormData({ ...formData, aiModel: e.target.value as any })}
-                                    className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2.5 text-sm font-bold outline-none"
-                                >
-                                    <option value="GPT4O">GPT-4o</option>
-                                    <option value="CLAUDE">Claude 3.5</option>
-                                    <option value="GEMINI">Gemini 2.5</option>
-                                    <option value="GPT5">GPT-5 mini</option>
-                                </select>
-                            </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase">프로프트 선택</label>
+                            <select
+                                value={formData.promptId}
+                                onChange={e => setFormData({ ...formData, promptId: e.target.value, customPrompt: '' })}
+                                className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2.5 text-sm font-bold outline-none"
+                            >
+                                <option value="">직접 입력...</option>
+                                {prompts.map(p => (
+                                    <option key={p.id} value={p.id}>{p.title}</option>
+                                ))}
+                            </select>
                         </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase">AI 모델</label>
+                            <select
+                                value={formData.aiModel}
+                                onChange={e => setFormData({ ...formData, aiModel: e.target.value as any })}
+                                className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2.5 text-sm font-bold outline-none"
+                            >
+                                <option value="GPT4O">GPT-4o</option>
+                                <option value="CLAUDE">Claude 3.5</option>
+                                <option value="GEMINI">Gemini 2.5</option>
+                                <option value="GPT5">GPT-5 mini</option>
+                            </select>
+                        </div>
+                    </div>
 
-                        {!formData.promptId && (
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase">사용자 정의 프롬프트</label>
-                                <textarea
-                                    value={formData.customPrompt}
-                                    onChange={e => setFormData({ ...formData, customPrompt: e.target.value })}
-                                    placeholder="적용할 프롬프트 명령을 입력하세요..."
-                                    className="w-full h-32 p-4 text-sm font-medium bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 resize-none leading-relaxed"
-                                />
-                            </div>
-                        )}
+                    {!formData.promptId && (
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase">사용자 정의 프롬프트</label>
+                            <textarea
+                                value={formData.customPrompt}
+                                onChange={e => setFormData({ ...formData, customPrompt: e.target.value })}
+                                placeholder="적용할 프롬프트 명령을 입력하세요..."
+                                className="w-full h-32 p-4 text-sm font-medium bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 resize-none leading-relaxed"
+                            />
+                        </div>
+                    )}
 
+                    <div className="flex gap-4 pt-2">
                         <button
                             onClick={handleGenerate}
                             disabled={generating}
-                            className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-500/20 flex items-center justify-center gap-3 transition-all active:scale-95"
+                            className="w-full py-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white rounded-2xl font-black text-sm transition-all active:scale-95 flex items-center justify-center gap-2"
                         >
                             {generating ? <Loader2Icon className="h-5 w-5 animate-spin" /> : <SparklesIcon className="h-5 w-5" />}
-                            {generating ? '생성 중...' : '새 글 생성하기'}
+                            {generating ? '생성 중...' : '블로그 글 생성하기'}
                         </button>
                     </div>
                 </div>

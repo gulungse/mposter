@@ -2,12 +2,12 @@
 
 import { prisma } from '@/lib/prisma'
 import { getOrCreateUser } from '@/lib/auth'
-import { 
-    generateGPTContent, 
-    generateGeminiContent, 
-    generateClaudeContent, 
-    uploadToWordPress, 
-    generateThumbnail, 
+import {
+    generateGPTContent,
+    generateGeminiContent,
+    generateClaudeContent,
+    uploadToWordPress,
+    generateThumbnail,
     getSafeThumbnailText,
     generateAdvancedThumbnail,
     cleanTitle,
@@ -38,7 +38,7 @@ export async function tistoryRewritePublishAction(data: {
 }) {
     try {
         const user = await getOrCreateUser()
-        
+
         // 권한 체크 (가져오기 권한 또는 관리자)
         const rightsRes = await (prisma as any).$queryRawUnsafe(`SELECT "hasImageGenRights" FROM "users" WHERE id = '${user.id}'`)
         const hasRights = rightsRes?.[0]?.hasImageGenRights || false
@@ -51,7 +51,7 @@ export async function tistoryRewritePublishAction(data: {
         // 토큰 체크
         const globalSettings = await prisma.globalSetting.findUnique({ where: { id: 'SYSTEM' } })
         const costs = globalSettings || { costPerPost: 1, costPerScrap: 1, costPerAIImage: 2 }
-        
+
         if (user.tokenBalance < costs.costPerPost) {
             throw new Error(`보유 토큰이 부족합니다. (현재: ${user.tokenBalance})`)
         }
@@ -117,7 +117,7 @@ export async function tistoryRewritePublishAction(data: {
                 let imageUrl = ''
 
                 // 모든 이미지는 동일한 로직으로 가져오되, i=1인 경우 featuredMediaId로 저장
-                
+
                 // 1. AI 이미지 생성 (DALLE, FLUX)
                 if (data.imageSource === 'DALLE' || data.imageSource === 'FLUX') {
                     try {
@@ -140,16 +140,16 @@ export async function tistoryRewritePublishAction(data: {
                     const searchKeyword = (aiResult.imageKeywords && aiResult.imageKeywords[i - 1])
                         ? aiResult.imageKeywords[i - 1]
                         : (originalTitle.split(' ')[0] || 'korea')
-                    
+
                     let targetUrl = await fetchRandomImage(settings, searchKeyword, i)
                     if (!targetUrl) {
                         // LoremFlickr 403 대비 PicsumFallback 사용 또는 랜덤 이미지 서비스 교체
                         targetUrl = `https://picsum.photos/seed/${Date.now()}${i}/800/500`
                     }
-                    
+
                     try {
-                        const imgBuffer = await downloadImage(targetUrl);
-                        const uploaded = await uploadToWordPress(site, imgBuffer, `post-img-${Date.now()}-${i}`);
+                        const { buffer, contentType } = await downloadImage(targetUrl);
+                        const uploaded = await uploadToWordPress(site, buffer, `post-img-${Date.now()}-${i}`, contentType);
                         imageUrl = uploaded.url;
                         if (i === 1) featuredMediaId = uploaded.id;
                     } catch (e) {
@@ -161,8 +161,8 @@ export async function tistoryRewritePublishAction(data: {
                 // 3. AI 이미지 업로드 (i=1 featured media 설정을 위해)
                 if (imageUrl && i === 1 && (data.imageSource === 'DALLE' || data.imageSource === 'FLUX')) {
                     try {
-                        const imgBuffer = await downloadImage(imageUrl);
-                        const uploaded = await uploadToWordPress(site, imgBuffer, `featured-${Date.now()}`);
+                        const { buffer, contentType } = await downloadImage(imageUrl);
+                        const uploaded = await uploadToWordPress(site, buffer, `featured-${Date.now()}`, contentType);
                         imageUrl = uploaded.url;
                         featuredMediaId = uploaded.id;
                     } catch (e) {

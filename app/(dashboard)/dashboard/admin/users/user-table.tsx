@@ -100,6 +100,11 @@ export function UserTable({ users }: UserTableProps) {
                                                     티스토리
                                                 </span>
                                             )}
+                                            {user.hasNaverRewriteRights && (
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800">
+                                                    네이버
+                                                </span>
+                                            )}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">

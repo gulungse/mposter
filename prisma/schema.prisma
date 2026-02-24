@@ -27,6 +27,7 @@ model User {
   hasManualPostRights      Boolean         @default(false)
   hasYoutubeRights         Boolean         @default(false)
   hasTistoryRewriteRights  Boolean         @default(false)
+  hasNaverRewriteRights    Boolean         @default(false)
   automationJobs           AutomationJob[]
   keywordGroups            KeywordGroup[]
   payments                 Payment[]

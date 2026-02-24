@@ -50,6 +50,7 @@ function cleanAndParseJson(text: string): any {
         // HTML 태그 정제 (<html>, <head>, <body>, <style>, <script> 제거)
         if (parsed.content) {
             parsed.content = parsed.content
+                .replace(/\\n/g, '\n') // AI가 이스케이프한 줄바꿈 복원
                 .replace(/<!DOCTYPE[^>]*>/ig, '')
                 .replace(/<html[^>]*>/ig, '')
                 .replace(/<\/html>/ig, '')
@@ -65,8 +66,27 @@ function cleanAndParseJson(text: string): any {
         }
         return parsed;
     } catch (e) {
-        // console.warn('JSON Parse Failed, attempting manual cleanup', e);
-        // Fallback: Return text as content if parsing fails completely
+        // Fallback: Regex로 최소한 title과 content만이라도 추출 시도 ([\s\S] 사용하여 줄바꿈 포함 매칭)
+        const titleMatch = cleaned.match(/"title"\s*:\s*"([\s\S]*?)"/);
+        const contentMatch = cleaned.match(/"content"\s*:\s*"([\s\S]*?)"/);
+
+        if (titleMatch || contentMatch) {
+            const title = titleMatch ? titleMatch[1].replace(/\\"/g, '"').replace(/\\n/g, ' ') : '';
+            let content = contentMatch ? contentMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n') : text;
+
+            content = content
+                .replace(/<!DOCTYPE[^>]*>/ig, '')
+                .replace(/<html[^>]*>/ig, '')
+                .replace(/<\/html>/ig, '')
+                .replace(/<head>[\s\S]*?<\/head>/ig, '')
+                .replace(/<body[^>]*>/ig, '')
+                .replace(/<\/body>/ig, '')
+                .trim();
+
+            return { title: cleanTitle(title), content: content, imageKeywords: [], thumbnailText: '' };
+        }
+
+        // 최후의 수단: 전체 텍스트를 content로
         let content = text;
         content = content
             .replace(/<!DOCTYPE[^>]*>/ig, '')
@@ -223,7 +243,7 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
 마지막으로, 썸네일 이미지에 들어갈 **10자 이내의 클릭을 부르는 짧은 문구**를 'thumbnailText' 필드에 제공해줘. 
 **주의: 제목과 다른 내용을 문구로 사용하세요.** 독자가 클릭하고 싶게 만드는 "짧은 강조 멘트"나 "궁금증을 유발하는 질문" 형태로 핵심 단어 위주로 작성해줘. (예: "저속노화의 충격 진실", "절대 먹지 마세요")
 반드시 JSON 형식 {"title": "...", "content": "...", "imageKeywords": ["..."], "thumbnailText": "..."}으로만 답변하고, JSON 외의 텍스트는 절대 포함하지 마.
-**중요: 제목('title')에는 어떠한 접두어나 불필요한 특수기호(<, > 등)를 절대 붙이지 마세요. 오직 본문 내용을 관통하는 깔끔하고 완성된 제목만 작성하세요.**`
+**중요: 제목('title')은 제공된 원본 제목을 그대로 쓰지 말고, 독창적이고 매력적인 새로운 제목으로 반드시 패러프레이징해서 작성해줘. 어떠한 접두어나 불필요한 특수기호(<, > 등)를 절대 붙이지 마세요.**`
                 }]
             }]
         }, {
@@ -319,7 +339,7 @@ export async function generateGPTContent(apiKey: string, systemPrompt: string, t
 1. **형식**: 반드시 JSON 형식으로만 응답해야 합니다. (JSON 파싱 실패 시 시스템 오류 발생)
 2. **태그 제한**: <h1>, <html>, <head>, <body>, <style>, <script> 태그 및 인라인 스타일은 절대 금지입니다. (<h2>, <h3>, <p>, <ul> 등 사용 권장)
 3. **필수 필드**:
-   - title: 글 제목 (불필요한 접두어나 구문 없이, 태그나 특수문자(<, >) 없이 공백 포함 완성된 문장으로 작성)
+   - title: 글 제목 (원본을 그대로 사용하지 말고 반드시 새롭게 패러프레이징할 것. 접두어나 특수문자 없이 공백 포함 완성된 문장으로 작성)
    - content: 글 본문 (HTML 태그 포함)
    - imageKeywords: 이미지 검색용 영어 키워드 5개 (배열)
    - thumbnailText: 썸네일용 텍스트 (10자 이내)
@@ -403,18 +423,22 @@ ${systemPrompt || '별도의 추가 지침 없음. 자유롭게 작성.'}
 }
 
 /**
- * 외부 이미지 URL을 Buffer로 다운로드합니다.
+ * 외부 이미지 URL을 다운로드합니다.
  */
-export async function downloadImage(url: string): Promise<Buffer> {
+export async function downloadImage(url: string, headers: any = {}): Promise<{ buffer: Buffer, contentType: string }> {
     try {
         const response = await axios.get(url, {
             responseType: 'arraybuffer',
-            timeout: 15000,
+            timeout: 20000,
             headers: {
-                'User-Agent': 'Mozilla/5.0'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                ...headers
             }
         });
-        return Buffer.from(response.data);
+        return {
+            buffer: Buffer.from(response.data),
+            contentType: response.headers['content-type'] || 'image/png'
+        };
     } catch (error: any) {
         console.error(`Image download failed (${url}):`, error.message);
         throw new Error(`이미지 다운로드 실패: ${error.message}`);
@@ -651,7 +675,7 @@ export async function generateAdvancedThumbnail(backgroundUrl: string, lines: st
     // Fetch background image
     let base64Bg = '';
     try {
-        const bgResponse = await axios.get(backgroundUrl, { 
+        const bgResponse = await axios.get(backgroundUrl, {
             responseType: 'arraybuffer',
             timeout: 10000,
             headers: { 'User-Agent': 'Mozilla/5.0' }
@@ -739,7 +763,7 @@ export async function generateAdvancedContentImage(backgroundUrl: string, keywor
 
     let base64Bg = '';
     try {
-        const bgResponse = await axios.get(backgroundUrl, { 
+        const bgResponse = await axios.get(backgroundUrl, {
             responseType: 'arraybuffer',
             timeout: 10000,
             headers: { 'User-Agent': 'Mozilla/5.0' }
@@ -794,12 +818,12 @@ export async function generateAdvancedContentImage(backgroundUrl: string, keywor
 /**
  * 워드프레스 미디어 라이브러리에 이미지를 업로드합니다.
  */
-export async function uploadToWordPress(site: any, imageBuffer: Buffer, filename: string): Promise<{ id: number, url: string }> {
+export async function uploadToWordPress(site: any, imageBuffer: Buffer, filename: string, contentType: string = 'image/png'): Promise<{ id: number, url: string }> {
     try {
         const response = await axios.post(`${site.url}/wp-json/wp/v2/media`, imageBuffer, {
             headers: {
-                'Content-Type': 'image/png',
-                'Content-Disposition': `attachment; filename=${encodeURIComponent(filename)}.png`,
+                'Content-Type': contentType,
+                'Content-Disposition': `attachment; filename=${encodeURIComponent(filename)}${filename.includes('.') ? '' : '.png'}`,
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             },
             auth: {
@@ -832,7 +856,7 @@ export async function processAutomationJob(jobId: string) {
         if (!job.user) return { success: false, error: '작업 소유자를 찾을 수 없습니다.' }
 
         const user = job.user;
-        
+
         // Raw SQL check for hasImageGenRights (Prisma Client might be stale)
         const rightsRes = await prisma.$queryRawUnsafe<any[]>(
             'SELECT "hasImageGenRights" FROM "users" WHERE id = $1',
@@ -946,17 +970,17 @@ export async function processAutomationJob(jobId: string) {
                             // 고급 권한: 4줄 텍스트 + 배경 (커스텀 갤러리 또는 키워드 검색)
                             const searchKeyword = targetKeyword.split(' ')[0] || 'business';
                             let bgUrl = getNextBgUrl(searchKeyword);
-                            
+
                             if (!bgUrl) {
                                 // 일반 모드인 경우 기존처럼 랜덤 검색
                                 const searchedBg = await fetchRandomImage(settings, searchKeyword, 1);
                                 bgUrl = searchedBg || `https://loremflickr.com/600/600/${encodeURIComponent(searchKeyword)}`;
                             }
-                            
+
                             // 1번 라인은 항상 현재 키워드로 고정
                             const finalLines = [...(job as any).advThumbnailLines];
                             finalLines[0] = targetKeyword;
-                            
+
                             const thumbBuffer = await generateAdvancedThumbnail(bgUrl, finalLines);
                             const uploaded = await uploadToWordPress(job.site, thumbBuffer, `${targetKeyword}-adv-thumb-${Date.now()}`);
                             imageUrl = uploaded.url;

@@ -228,7 +228,8 @@ export async function getUserProfile() {
                 hasImageGenRights: !!user.hasImageGenRights,
                 hasManualPostRights: !!user.hasManualPostRights,
                 hasYoutubeRights: !!user.hasYoutubeRights,
-                hasTistoryRewriteRights: !!user.hasTistoryRewriteRights
+                hasTistoryRewriteRights: !!user.hasTistoryRewriteRights,
+                hasNaverRewriteRights: !!user.hasNaverRewriteRights
             }
         }
     } catch (error) {

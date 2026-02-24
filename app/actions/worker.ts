@@ -16,7 +16,8 @@ import {
     refreshBloggerToken,
     getSafeThumbnailText,
     generateAdvancedThumbnail,
-    generateAdvancedContentImage
+    generateAdvancedContentImage,
+    downloadImage
 } from '@/lib/automation'
 import { fetchRandomImage } from '@/lib/image_providers'
 import axios from 'axios'
@@ -488,6 +489,316 @@ export async function runAutomationTask(jobId: string) {
     } catch (error: any) {
         if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         console.error('자동화 실행 요청 실패:', error)
+        return { success: false, error: error.message }
+    }
+}
+
+
+/**
+ * 수동Generated 콘텐츠를 사이트에 발행합니다.
+ */
+export async function publishManualAction(data: {
+    originalTitle: string;
+    originalContent: string;
+    promptId?: string;
+    customPrompt?: string;
+    aiModel: 'GPT4O' | 'GEMINI' | 'CLAUDE' | 'GPT5';
+    siteId: string;
+    wpCategoryId?: number;
+    postStatus: 'publish' | 'draft';
+    imageSource: 'ORIGINAL' | 'AI' | 'SCRAP' | 'NONE' | 'DALLE' | 'FLUX'; // mapping user input to internal keys
+    imageCount: number;
+}) {
+    try {
+        const user = await getOrCreateUser()
+
+        // 토큰 체크 (2개 소모: 생성 + 발행) or (1개 소모)
+        // 사용자가 "토큰 소모하게 해줘"라고 했으므로 1개 이상 필수.
+        // 여기서는 자동화와 동일하게 1개 소모하는 것으로 구현 (또는 2개로 조정 가능)
+        if (user.tokenBalance <= 0) {
+            throw new Error('보유 토큰이 부족합니다.')
+        }
+
+        const settings = (user as any).settings || {}
+
+        // 1. 사이트 및 프롬프트 로드
+        const [site, promptByDb] = await Promise.all([
+            prisma.site.findUnique({ where: { id: data.siteId, userId: user.id } }),
+            data.promptId ? prisma.prompt.findFirst({
+                where: {
+                    id: data.promptId,
+                    OR: [{ userId: user.id }, { type: 'SYSTEM' }]
+                }
+            }) : Promise.resolve(null)
+        ])
+
+        if (!site) throw new Error('대상 사이트를 찾을 수 없습니다.')
+
+        const finalPromptContent = data.customPrompt || promptByDb?.content
+        if (!finalPromptContent) throw new Error('사용할 프롬프트가 없습니다.')
+
+        // 2. AI 텍스트 생성 (원본 내용을 기반으로)
+        const targetKeyword = data.originalTitle || '제공된 제목'
+        const inputContext = `[원본 제목]: ${data.originalTitle}\n\n[원본 내용]:\n${data.originalContent}`;
+
+        let title = ''
+        let content = ''
+        let aiResult: any = {};
+
+        try {
+            if (data.aiModel === 'GPT4O') {
+                const apiKey = settings.openaiApiKey
+                if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
+                aiResult = await generateGPTContent(apiKey, finalPromptContent, targetKeyword, 'gpt-4o', inputContext)
+            } else if (data.aiModel === 'CLAUDE') {
+                const apiKey = settings.anthropicApiKey
+                if (!apiKey) throw new Error('Claude API 키가 설정되어 있지 않습니다.')
+                aiResult = await generateClaudeContent(apiKey, finalPromptContent, targetKeyword, inputContext)
+            } else if (data.aiModel === 'GEMINI') {
+                const apiKey = settings.geminiApiKey
+                if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
+                aiResult = await generateGeminiContent(apiKey, finalPromptContent, targetKeyword, inputContext)
+            } else if (data.aiModel === 'GPT5') {
+                const apiKey = settings.openaiApiKey
+                if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
+                aiResult = await generateGPTContent(apiKey, finalPromptContent, targetKeyword, 'gpt-5-mini', inputContext)
+            }
+            // Ensure title/content are using the parsed results even if parsing was partial
+            title = aiResult.title || targetKeyword;
+            content = aiResult.content && aiResult.content.includes('<') ? aiResult.content : convertMarkdownToHtml(aiResult.content || '');
+        } catch (err: any) {
+            console.error('AI Generation/Parsing failed:', err);
+            // Fallback to minimal if everything fails
+            title = targetKeyword;
+            content = convertMarkdownToHtml(data.originalContent);
+        }
+
+        // 3. 이미지 처리
+        const imageSource = data.imageSource
+        const imageCount = data.imageCount || 0
+        let featuredMediaId = 0
+
+        const $ = cheerio.load(content);
+        const headings = $('h2, h3');
+
+        // 원본 이미지 추출 (ORIGINAL 선택 시)
+        let originalImages: string[] = []
+        if (imageSource === 'ORIGINAL') {
+            const $orig = cheerio.load(data.originalContent)
+            $orig('img').each((_, img) => {
+                const src = $orig(img).attr('src')
+                if (src) originalImages.push(src)
+            })
+        }
+
+        if (imageSource !== 'NONE' && (headings.length > 0 || imageSource === 'ORIGINAL')) {
+            const insertionRules = [
+                { imgIdx: 1, headIdx: 0, pos: 'before' },
+                { imgIdx: 2, headIdx: 2, pos: 'after' },
+                { imgIdx: 3, headIdx: 3, pos: 'after' },
+                { imgIdx: 4, headIdx: 4, pos: 'after' },
+                { imgIdx: 5, headIdx: 5, pos: 'after' },
+            ];
+
+            const effectiveCount = imageSource === 'ORIGINAL' ? originalImages.length : imageCount
+
+            for (let i = 1; i <= Math.min(effectiveCount, 5); i++) {
+                const rule = insertionRules.find(r => r.imgIdx === i);
+                if (!rule) continue;
+
+                let imageUrl = '';
+                if (imageSource === 'ORIGINAL') {
+                    const rawUrl = originalImages[i - 1];
+                    const isNaverImage = rawUrl && (rawUrl.includes('naver') || rawUrl.includes('pstatic.net'));
+                    if (isNaverImage) {
+                        try {
+                            // 네이버 이미지는 직접 다운로드 후 업로드 필수
+                            const { buffer, contentType } = await downloadImage(rawUrl, {
+                                'Referer': 'https://blog.naver.com/',
+                                'Origin': 'https://naver.com'
+                            });
+                            if (site.type === 'WORDPRESS') {
+                                const uploaded = await uploadToWordPress(site, buffer, `naver-orig-${Date.now()}-${i}`, contentType);
+                                imageUrl = uploaded.url;
+                                if (i === 1) featuredMediaId = uploaded.id;
+                            } else {
+                                // Blogger 등은 일단 원본 주소 유지 (또는 프록시 필요)
+                                imageUrl = rawUrl;
+                            }
+                        } catch (e) {
+                            console.warn(`Naver image download/upload failed for idx ${i}:`, e);
+                            imageUrl = ''; // 이미지 업로드 실패 시 빈 값으로 두어 태그 삽입 방지 (엑박 방지)
+                        }
+                    } else {
+                        imageUrl = rawUrl;
+                    }
+                } else {
+                    // AI 또는 SCRAP 로직
+                    try {
+                        const searchKeyword = (aiResult.imageKeywords && aiResult.imageKeywords[i - 1])
+                            ? aiResult.imageKeywords[i - 1]
+                            : (targetKeyword.split(' ')[0] || 'korea');
+
+                        if (imageSource === 'DALLE') {
+                            const apiKey = settings.openaiApiKey
+                            if (apiKey) {
+                                const openai = new OpenAI({ apiKey })
+                                const imgPrompt = i === 1 ? `${targetKeyword} minimal vector art` : `${targetKeyword} detailed photo ${i}`;
+                                const image = await openai.images.generate({ model: "dall-e-3", prompt: imgPrompt, size: "1024x1024" })
+                                imageUrl = image.data?.[0]?.url || ''
+                            }
+                        } else if (imageSource === 'FLUX') {
+                            const apiKey = settings.piApiKey
+                            if (apiKey) {
+                                imageUrl = await generateFluxImage(apiKey, `${targetKeyword} blog image ${i}`)
+                            }
+                        } else if (imageSource === 'SCRAP') {
+                            imageUrl = await fetchRandomImage(settings, searchKeyword, i);
+                            if (!imageUrl) {
+                                imageUrl = `https://loremflickr.com/768/512/${encodeURIComponent(searchKeyword)}?lock=${Math.floor(Math.random() * 100000) + i}`
+                            }
+                        }
+                    } catch (e) {
+                        console.warn(`Manual image gen failed for idx ${i}:`, e)
+                    }
+                }
+
+                if (imageUrl) {
+                    if (i === 1 && site.type === 'WORDPRESS' && imageSource !== 'ORIGINAL') {
+                        // 썸네일 처리 (AI/SCRAP 시에만 새로 업로드, ORIGINAL은 위에서 처리됨)
+                        try {
+                            const { buffer, contentType } = await downloadImage(imageUrl);
+                            const uploaded = await uploadToWordPress(site, buffer, `${targetKeyword}-thumb-${Date.now()}`, contentType);
+                            imageUrl = uploaded.url;
+                            featuredMediaId = uploaded.id;
+                        } catch (e) {
+                            console.warn('WP Media Upload Failed:', e)
+                        }
+                    }
+
+                    const alt = `${targetKeyword} ${i > 1 ? i : ''}`;
+                    const imgTag = `<img src="${imageUrl}" alt="${alt}" style="width:100%; max-width:700px; height:auto; display:block; margin: 20px auto; border-radius:8px;" />`;
+
+                    const targetHeadingIdx = Math.min(rule.headIdx, headings.length - 1)
+
+                    if (targetHeadingIdx >= 0) {
+                        const targetHeading = $(headings[targetHeadingIdx]);
+                        if (rule.pos === 'before') targetHeading.before(imgTag);
+                        else targetHeading.after(imgTag);
+                    } else if (i === 1) {
+                        $.root().prepend(imgTag)
+                    } else {
+                        $.root().append(imgTag)
+                    }
+                }
+            }
+        }
+
+        // [추가] 본문 내 모든 네이버 이미지를 워드프레스로 마이그레이션 (엑박 방지)
+        const allImages = $('img');
+        for (let i = 0; i < allImages.length; i++) {
+            const $img = $(allImages[i]);
+            let src = $img.attr('src') || '';
+            if (src.includes('pstatic.net') || src.includes('naver.com')) {
+                try {
+                    // 도메인 변환 (가장 원본 노출이 잘 되는 blogfiles로)
+                    let cleanSrc = src.split('?')[0];
+                    const domainsToReplace = [
+                        'postfiles.pstatic.net',
+                        'mblogthumb-phinf.pstatic.net',
+                        'phinf.pstatic.net'
+                    ];
+                    for (const domain of domainsToReplace) {
+                        if (cleanSrc.includes(domain)) {
+                            cleanSrc = cleanSrc.replace(domain, 'blogfiles.pstatic.net');
+                            break;
+                        }
+                    }
+
+                    const { buffer, contentType } = await downloadImage(cleanSrc, {
+                        'Referer': 'https://blog.naver.com/'
+                    });
+
+                    if (site.type === 'WORDPRESS') {
+                        const uploaded = await uploadToWordPress(site, buffer, `migrated-${Date.now()}-${i}`, contentType);
+                        $img.attr('src', uploaded.url);
+                        // lazy load 속성 제거
+                        $img.removeAttr('data-lazy-src');
+                        $img.removeAttr('data-src');
+
+                        // 첫 번째로 성공한 마이그레이션 이미지를 대표 이미지로 (기존 것이 없는 경우)
+                        if (featuredMediaId === 0) {
+                            featuredMediaId = uploaded.id;
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`Global image migration failed for ${src}:`, e);
+                    $img.remove(); // 마이그레이션 실패 시 태그 제거 (엑박 방지)
+                }
+            }
+        }
+
+        content = $.html();
+
+        // 4. 사이트 발행
+        try {
+            if (site.type === 'WORDPRESS') {
+                const payload: any = {
+                    title: title,
+                    content: content,
+                    status: 'draft',
+                    categories: data.wpCategoryId ? [data.wpCategoryId] : []
+                };
+                if (featuredMediaId > 0) payload.featured_media = featuredMediaId;
+
+                const wpRes = await axios.post(`${site.url}/wp-json/wp/v2/posts`, payload, {
+                    auth: { username: site.username || '', password: site.apiToken || '' },
+                    timeout: 60000
+                })
+
+                if (data.postStatus === 'publish') {
+                    await axios.post(`${site.url}/wp-json/wp/v2/posts/${wpRes.data.id}`, { status: 'publish' }, {
+                        auth: { username: site.username || '', password: site.apiToken || '' },
+                        timeout: 60000
+                    })
+                }
+            } else if (site.type === 'BLOGSPOT') {
+                const blogId = site.username || site.url.split('blogId=')[1] || site.url.replace(/[^0-9]/g, '');
+                const postToBlogger = async (token: string) => {
+                    return axios.post(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/`, {
+                        title: title,
+                        content: content,
+                        status: data.postStatus === 'publish' ? 'LIVE' : 'DRAFT'
+                    }, {
+                        headers: { 'Authorization': `Bearer ${token}` },
+                        timeout: 30000
+                    });
+                };
+
+                try {
+                    await postToBlogger(site.apiToken || '');
+                } catch (err: any) {
+                    if (err.response?.status === 401 && (site as any).refreshToken) {
+                        const newToken = await refreshBloggerToken(site, settings.googleClientId, settings.googleClientSecret);
+                        await postToBlogger(newToken);
+                    } else throw err;
+                }
+            }
+        } catch (err: any) {
+            throw new Error(`[발행 실패] ${err.message}`)
+        }
+
+        // 5. 토큰 차감 (-1)
+        await (prisma as any).$executeRawUnsafe(
+            'UPDATE "users" SET "tokenBalance" = "tokenBalance" - 1 WHERE "id" = $1',
+            user.id
+        )
+
+        revalidatePath('/dashboard')
+        return { success: true, message: '글 생성 및 사이트 발행이 완료되었습니다! (1토큰 사용됨)' }
+
+    } catch (error: any) {
+        console.error('publishManualAction Error:', error)
         return { success: false, error: error.message }
     }
 }

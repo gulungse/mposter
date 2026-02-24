@@ -18,7 +18,8 @@ export function PermissionModal({ isOpen, onClose, user }: PermissionModalProps)
         hasImageGenRights: false,
         hasManualPostRights: false,
         hasYoutubeRights: false,
-        hasTistoryRewriteRights: false
+        hasTistoryRewriteRights: false,
+        hasNaverRewriteRights: false
     })
 
     useEffect(() => {
@@ -27,7 +28,8 @@ export function PermissionModal({ isOpen, onClose, user }: PermissionModalProps)
                 hasImageGenRights: !!user.hasImageGenRights,
                 hasManualPostRights: !!user.hasManualPostRights,
                 hasYoutubeRights: !!user.hasYoutubeRights,
-                hasTistoryRewriteRights: !!user.hasTistoryRewriteRights
+                hasTistoryRewriteRights: !!user.hasTistoryRewriteRights,
+                hasNaverRewriteRights: !!user.hasNaverRewriteRights
             })
         }
     }, [user, isOpen])
@@ -101,6 +103,13 @@ export function PermissionModal({ isOpen, onClose, user }: PermissionModalProps)
                         checked={permissions.hasTistoryRewriteRights}
                         onChange={() => handleToggle('hasTistoryRewriteRights')}
                     />
+                    <PermissionToggle
+                        icon={<Zap className="h-4 w-4 text-green-500" />}
+                        label="네이버 재구성"
+                        description="네이버 블로그를 AI로 재구성하여 발행"
+                        checked={permissions.hasNaverRewriteRights}
+                        onChange={() => handleToggle('hasNaverRewriteRights')}
+                    />
                 </div>
 
                 <div className="flex gap-3 pt-6">
@@ -124,25 +133,23 @@ export function PermissionModal({ isOpen, onClose, user }: PermissionModalProps)
     )
 }
 
-function PermissionToggle({ icon, label, description, checked, onChange }: { 
-    icon: React.ReactNode, 
-    label: string, 
-    description: string, 
-    checked: boolean, 
-    onChange: () => void 
+function PermissionToggle({ icon, label, description, checked, onChange }: {
+    icon: React.ReactNode,
+    label: string,
+    description: string,
+    checked: boolean,
+    onChange: () => void
 }) {
     return (
-        <div 
+        <div
             onClick={onChange}
-            className={`flex items-center gap-4 p-4 rounded-xl border transition-all cursor-pointer ${
-                checked 
-                    ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800' 
+            className={`flex items-center gap-4 p-4 rounded-xl border transition-all cursor-pointer ${checked
+                    ? 'bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800'
                     : 'bg-slate-50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800 opacity-60 hover:opacity-100'
-            }`}
+                }`}
         >
-            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${
-                checked ? 'bg-white dark:bg-slate-800 shadow-sm' : 'bg-slate-200/50 dark:bg-slate-800/50'
-            }`}>
+            <div className={`h-10 w-10 rounded-lg flex items-center justify-center ${checked ? 'bg-white dark:bg-slate-800 shadow-sm' : 'bg-slate-200/50 dark:bg-slate-800/50'
+                }`}>
                 {icon}
             </div>
             <div className="flex-1">

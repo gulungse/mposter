@@ -166,7 +166,8 @@ export async function updateUserPermissions(userId: string, permissions: {
     hasManualPostRights?: boolean,
     hasYoutubeRights?: boolean,
     hasTistoryRewriteRights?: boolean,
-    hasImageGenRights?: boolean
+    hasImageGenRights?: boolean,
+    hasNaverRewriteRights?: boolean
 }) {
     try {
         const user = await getOrCreateUser()
@@ -174,7 +175,7 @@ export async function updateUserPermissions(userId: string, permissions: {
             return { success: false, error: '권한이 없습니다.' }
         }
 
-        const allowedKeys = ['hasManualPostRights', 'hasYoutubeRights', 'hasTistoryRewriteRights', 'hasImageGenRights']
+        const allowedKeys = ['hasManualPostRights', 'hasYoutubeRights', 'hasTistoryRewriteRights', 'hasImageGenRights', 'hasNaverRewriteRights']
         const updates: string[] = []
         const values: any[] = []
 

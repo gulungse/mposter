@@ -55,6 +55,7 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
         hasManualPostRights?: boolean;
         hasYoutubeRights?: boolean;
         hasTistoryRewriteRights?: boolean;
+        hasNaverRewriteRights?: boolean;
     } | null>(null)
     const [menus, setMenus] = useState<any[]>([])
     const [showUpgrade, setShowUpgrade] = useState(false)
@@ -84,7 +85,7 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
 
     async function loadMenus() {
         const res = await getActiveSidebarMenus()
-        
+
         // Groups based on user request
         const dashboardMenu = { href: '/dashboard', icon: 'LayoutDashboard', label: '대시보드' }
         const shopMenu = { href: '/dashboard/shop', icon: 'Coins', label: '충전소' }
@@ -116,6 +117,9 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                 ] : []),
                 ...(user?.hasTistoryRewriteRights || user?.role === 'ADMIN' ? [
                     { href: '/dashboard/prompts/tistory', icon: 'Sparkles', label: '티스토리 재작성' }
+                ] : []),
+                ...(user?.hasNaverRewriteRights || user?.role === 'ADMIN' ? [
+                    { href: '/dashboard/naver-rewrite', icon: 'Wand2', label: '네이버 블로그 재구성' }
                 ] : []),
             ]
         }
@@ -158,7 +162,7 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                 ...(adminGroup ? [adminGroup] : [])
             ]
         }
-        
+
         setMenus([finalStructure])
     }
 
@@ -238,7 +242,7 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                                 const isExpanded = expandedGroups.includes(group.id)
                                 return (
                                     <div key={group.id} className="space-y-1">
-                                        <div 
+                                        <div
                                             className="flex items-center justify-between px-4 py-2 cursor-pointer group/header"
                                             onClick={() => group.href ? router.push(group.href) : toggleGroup(group.id)}
                                         >
@@ -246,7 +250,7 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                                                 {group.label}
                                             </p>
                                             {!group.href && (
-                                                <button 
+                                                <button
                                                     onClick={(e) => { e.stopPropagation(); toggleGroup(group.id); }}
                                                     className="text-slate-500 group-hover/header:text-slate-300"
                                                 >

@@ -37,13 +37,34 @@ export async function scrapeNaverBlog(url: string) {
                 const $comp = $(el);
 
                 // 이미지 처리
-                if ($comp.hasClass('se-image')) {
-                    const imgUrl = $comp.find('img').attr('data-lazy-src')
-                        || $comp.find('img').attr('src')
-                        || $comp.find('img').attr('data-src');
+                if ($comp.hasClass('se-image') || $comp.find('img').length > 0) {
+                    const $img = $comp.find('img');
+                    let imgUrl = $img.attr('data-lazy-src')
+                        || $img.attr('src')
+                        || $img.attr('data-src')
+                        || $img.attr('data-lazy-srcset')?.split(' ')[0];
+
                     if (imgUrl) {
-                        const cleanUrl = imgUrl.split('?')[0];
-                        content += `<img src="${cleanUrl}" style="max-width: 100%; height: auto; display: block; margin: 20px auto; border-radius: 8px;" />\n\n`;
+                        // 네이버 원본 이미지 주소로 변환
+                        // https://postfiles.pstatic.net/... -> https://blogfiles.pstatic.net/...
+                        if (imgUrl.includes('pstatic.net')) {
+                            // 쿼리 스트링 제거
+                            imgUrl = imgUrl.split('?')[0];
+                            // 도메인을 blogfiles로 통일 (가장 원본이 잘 나옴)
+                            const domainsToReplace = [
+                                'postfiles.pstatic.net',
+                                'mblogthumb-phinf.pstatic.net',
+                                'phinf.pstatic.net'
+                            ];
+                            for (const domain of domainsToReplace) {
+                                if (imgUrl.includes(domain)) {
+                                    imgUrl = imgUrl.replace(domain, 'blogfiles.pstatic.net');
+                                    break;
+                                }
+                            }
+                        }
+
+                        content += `<img src="${imgUrl}" style="max-width: 100%; height: auto; display: block; margin: 20px auto; border-radius: 8px;" />\n\n`;
                     }
                 }
                 // 텍스트 처리
