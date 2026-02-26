@@ -239,7 +239,8 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
 본문은 반드시 5개 이상의 문단으로 구성하고, 독자에게 유용하고 상세한 정보를 제공하는 SEO 최적화된 글이어야 해. 분량은 가급적 1000자 이상으로 풍부하게 작성해줘.
 절대로 <h1>, <html>, <head>, <body>, <!DOCTYPE>, <style>, <script> 태그를 사용하지 마. 본문에는 오직 문서 내용(<p>, <h2>, <ul>, <li> 등)만 포함해야 하며, 내부 CSS나 인라인 스타일도 금지야.
 제목은 이미 글 상단에 있으므로 본문에는 <h2>, <h3>, <h4> 태그만 사용해야 해.
-또한, 이 글과 관련된 **영어 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 배열로 제공해줘. (LoremFlickr 검색용)
+또한, 이 글의 각 주요 섹션과 어울리는 **매우 상세하고 묘사적인 영문 이미지 검색 키워드 5개**를 'imageKeywords' 필드에 배열로 제공해줘. (Unsplash, Pixabay 검색용)
+단순한 단어(예: "coffee")가 아니라, 장면을 묘사하는 구체적인 표현(예: "minimalist coffee cup on wooden table warm morning light", "professional business meeting in modern office")을 사용해야 해. 'high quality', 'professional photography' 같은 수식어를 적절히 섞어줘.
 마지막으로, 썸네일 이미지에 들어갈 **10자 이내의 클릭을 부르는 짧은 문구**를 'thumbnailText' 필드에 제공해줘. 
 **주의: 제목과 다른 내용을 문구로 사용하세요.** 독자가 클릭하고 싶게 만드는 "짧은 강조 멘트"나 "궁금증을 유발하는 질문" 형태로 핵심 단어 위주로 작성해줘. (예: "저속노화의 충격 진실", "절대 먹지 마세요")
 반드시 JSON 형식 {"title": "...", "content": "...", "imageKeywords": ["..."], "thumbnailText": "..."}으로만 답변하고, JSON 외의 텍스트는 절대 포함하지 마.
@@ -299,7 +300,7 @@ export async function generateClaudeContent(apiKey: string, systemPrompt: string
 2. <h1>, <html>, <head>, <body>, <style>, <script> 태그 사용 금지. 또한 인라인 스타일(style="...")도 금지. 오직 순수한 본문 태그(<h2>, <p>, <ul> 등)만 사용.
 3. SEO에 최적화된 유용한 정보 위주로 작성.
 4. **반드시 JSON 형식만 반환**하고, 마크다운 코드 블록(\`\`\`json)이나 사족을 달지 마시오.
-5. 'imageKeywords' 필드에는 이미지 검색용 영문 키워드 5개를 배열로 포함.
+5. 'imageKeywords' 필드에는 각 문단의 맥락과 어울리는 **상세한 영문 이미지 검색 키워드 5개**를 배열로 포함. (예: "modern laptop on white desk with plant"와 같이 구체적인 장면 묘사형 키워드 사용)
 6. 'thumbnailText' 필드에는 썸네일용 10자 이내의 **클릭을 유도하는 짧은 문구** 포함. (**제목과 다른 내용을 사용**. 예: "이것만 알면 끝", "충격적인 결말")
 **7. 중요: 제목('title')은 불필요한 접두어나 기호(<, >) 없이 독창적이고 깔끔한 문장으로만 작성하시오.**`
                 }
@@ -341,7 +342,7 @@ export async function generateGPTContent(apiKey: string, systemPrompt: string, t
 3. **필수 필드**:
    - title: 글 제목 (원본을 그대로 사용하지 말고 반드시 새롭게 패러프레이징할 것. 접두어나 특수문자 없이 공백 포함 완성된 문장으로 작성)
    - content: 글 본문 (HTML 태그 포함)
-   - imageKeywords: 이미지 검색용 영어 키워드 5개 (배열)
+   - imageKeywords: 이미지 검색용 상세 영문 키워드 5개 (배열). 단순 단어가 아닌 장면을 구체적으로 묘사하는 문구 형태(예: "cozy home office interior with warm lighting")로 작성할 것.
    - thumbnailText: 썸네일용 텍스트 (10자 이내)
 
 그 외의 **글의 스타일, 어조, 길이, 구성** 등은 오직 아래 **사용자(User)의 요청**을 최우선으로 따르세요. 시스템이 강제하는 문체나 형식은 없습니다.`
@@ -425,24 +426,55 @@ ${systemPrompt || '별도의 추가 지침 없음. 자유롭게 작성.'}
 /**
  * 외부 이미지 URL을 다운로드합니다.
  */
-export async function downloadImage(url: string, headers: any = {}): Promise<{ buffer: Buffer, contentType: string }> {
-    try {
-        const response = await axios.get(url, {
-            responseType: 'arraybuffer',
-            timeout: 20000,
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                ...headers
+export async function downloadImage(url: string, headers: any = {}, retries: number = 2): Promise<{ buffer: Buffer, contentType: string }> {
+    const defaultHeaders = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+    };
+
+    let lastError: any;
+    for (let i = 0; i < retries; i++) {
+        try {
+            // 특정 도메인에 대한 Referer 자동 설정
+            const domainHeaders: any = {};
+            const isPollinations = url.includes('pollinations.ai');
+
+            if (url.includes('loremflickr.com')) {
+                domainHeaders['Referer'] = 'https://loremflickr.com/';
+            } else if (url.includes('unsplash.com')) {
+                domainHeaders['Referer'] = 'https://unsplash.com/';
+            } else if (url.includes('naver.com') || url.includes('pstatic.net')) {
+                domainHeaders['Referer'] = 'https://blog.naver.com/';
             }
-        });
-        return {
-            buffer: Buffer.from(response.data),
-            contentType: response.headers['content-type'] || 'image/png'
-        };
-    } catch (error: any) {
-        console.error(`Image download failed (${url}):`, error.message);
-        throw new Error(`이미지 다운로드 실패: ${error.message}`);
+
+            // [수정] Pollinations AI는 특정 헤더(특히 Referer)가 있을 때 530 에러를 뱉는 경우가 있음
+            const finalHeaders = isPollinations 
+                ? { 'User-Agent': defaultHeaders['User-Agent'] } // 최소 헤더만 사용
+                : { ...defaultHeaders, ...domainHeaders, ...headers };
+
+            const response = await axios.get(url, {
+                responseType: 'arraybuffer',
+                timeout: 30000,
+                headers: finalHeaders
+            });
+            return {
+                buffer: Buffer.from(response.data),
+                contentType: response.headers['content-type'] || 'image/png'
+            };
+        } catch (error: any) {
+            lastError = error;
+            console.warn(`Image download attempt ${i + 1} failed (${url}):`, error.message);
+            if (i < retries - 1) {
+                await new Promise(r => setTimeout(r, 1000 * (i + 1))); // 지수 백오프
+            }
+        }
     }
+
+    console.error(`Final image download failure (${url}):`, lastError.message);
+    throw new Error(`이미지 다운로드 실패: ${lastError.message}`);
 }
 
 /**

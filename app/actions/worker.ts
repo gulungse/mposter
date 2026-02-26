@@ -519,7 +519,15 @@ export async function publishManualAction(data: {
             throw new Error('보유 토큰이 부족합니다.')
         }
 
-        const settings = (user as any).settings || {}
+        let settings = (user as any).settings || {}
+        
+        if (typeof settings === 'string') {
+            try {
+                settings = JSON.parse(settings);
+            } catch (e) {
+                console.error('[Manual Publish] settings is a string but not valid JSON');
+            }
+        }
 
         // 1. 사이트 및 프롬프트 로드
         const [site, promptByDb] = await Promise.all([
@@ -635,9 +643,20 @@ export async function publishManualAction(data: {
                 } else {
                     // AI 또는 SCRAP 로직
                     try {
-                        const searchKeyword = (aiResult.imageKeywords && aiResult.imageKeywords[i - 1])
-                            ? aiResult.imageKeywords[i - 1]
-                            : (targetKeyword.split(' ')[0] || 'korea');
+                        let searchKeyword = '';
+                        if (aiResult.imageKeywords && aiResult.imageKeywords[i - 1]) {
+                            searchKeyword = aiResult.imageKeywords[i - 1];
+                        } else {
+                            // [고도화] 폴백 키워드 추출: 제목에서 핵심 단어 추출 및 정리
+                            const cleanTitle = targetKeyword
+                                .replace(/[^\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318Fa-zA-Z0-9\s]/g, '') // 특수문자 제거
+                                .split(/\s+/)
+                                .filter(word => word.length > 1); // 1글자 제외
+
+                            // 최대 2-3단어 조합하여 검색어 생성
+                            searchKeyword = cleanTitle.slice(0, 3).join(' ') || 'korea culture';
+                            console.log(`[Manual Publish] No AI keyword for image ${i}, extracted fallback: "${searchKeyword}"`);
+                        }
 
                         if (imageSource === 'DALLE') {
                             const apiKey = settings.openaiApiKey
@@ -655,7 +674,10 @@ export async function publishManualAction(data: {
                         } else if (imageSource === 'SCRAP') {
                             imageUrl = await fetchRandomImage(settings, searchKeyword, i);
                             if (!imageUrl) {
-                                imageUrl = `https://loremflickr.com/768/512/${encodeURIComponent(searchKeyword)}?lock=${Math.floor(Math.random() * 100000) + i}`
+                                // [수정] pollinations.ai에 캐시 버스터 추가 및 530 에러 대비
+                                console.log(`[Manual Publish] Scrap failed for "${searchKeyword}", using AI fallback...`);
+                                const seed = Math.floor(Math.random() * 1000000);
+                                imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(searchKeyword + ' high quality professional photography')}?width=800&height=500&seed=${seed}&nologo=true&t=${Date.now()}`;
                             }
                         }
                     } catch (e) {
@@ -664,15 +686,19 @@ export async function publishManualAction(data: {
                 }
 
                 if (imageUrl) {
-                    if (i === 1 && site.type === 'WORDPRESS' && imageSource !== 'ORIGINAL') {
-                        // 썸네일 처리 (AI/SCRAP 시에만 새로 업로드, ORIGINAL은 위에서 처리됨)
+                    // [수정] 모든 외부 이미지(AI/SCRAP)를 워드프레스로 업로드하여 엑박 방지
+                    if (site.type === 'WORDPRESS' && imageSource !== 'ORIGINAL') {
                         try {
                             const { buffer, contentType } = await downloadImage(imageUrl);
-                            const uploaded = await uploadToWordPress(site, buffer, `${targetKeyword}-thumb-${Date.now()}`, contentType);
+                            const uploaded = await uploadToWordPress(site, buffer, `${targetKeyword}-${i}-${Date.now()}`, contentType);
                             imageUrl = uploaded.url;
-                            featuredMediaId = uploaded.id;
+                            
+                            // 첫 번째 이미지는 썸네일(featured_media)로 설정
+                            if (i === 1) {
+                                featuredMediaId = uploaded.id;
+                            }
                         } catch (e) {
-                            console.warn('WP Media Upload Failed:', e)
+                            console.warn(`WP Media Upload Failed for image ${i}:`, e)
                         }
                     }
 
@@ -694,47 +720,59 @@ export async function publishManualAction(data: {
             }
         }
 
-        // [추가] 본문 내 모든 네이버 이미지를 워드프레스로 마이그레이션 (엑박 방지)
+        // [수정] 모든 외부 이미지를 해당 사이트로 마이그레이션하여 엑박 원천 차단
         const allImages = $('img');
         for (let i = 0; i < allImages.length; i++) {
             const $img = $(allImages[i]);
             let src = $img.attr('src') || '';
-            if (src.includes('pstatic.net') || src.includes('naver.com')) {
-                try {
-                    // 도메인 변환 (가장 원본 노출이 잘 되는 blogfiles로)
-                    let cleanSrc = src.split('?')[0];
+            
+            // 이미 사이트 도메인이거나 데이터 URI, 또는 비어있으면 스탠바이
+            if (!src || src.startsWith('data:') || (site.url && src.includes(site.url.replace(/^https?:\/\//, '')))) continue;
+
+            try {
+                // 네이버 이미지용 특수 처리
+                const isNaver = src.includes('pstatic.net') || src.includes('naver.com');
+                let downloadUrl = src;
+                let downloadHeaders: any = {};
+
+                if (isNaver) {
+                    downloadUrl = src.split('?')[0];
                     const domainsToReplace = [
                         'postfiles.pstatic.net',
                         'mblogthumb-phinf.pstatic.net',
                         'phinf.pstatic.net'
                     ];
                     for (const domain of domainsToReplace) {
-                        if (cleanSrc.includes(domain)) {
-                            cleanSrc = cleanSrc.replace(domain, 'blogfiles.pstatic.net');
+                        if (downloadUrl.includes(domain)) {
+                            downloadUrl = downloadUrl.replace(domain, 'blogfiles.pstatic.net');
                             break;
                         }
                     }
-
-                    const { buffer, contentType } = await downloadImage(cleanSrc, {
-                        'Referer': 'https://blog.naver.com/'
-                    });
-
-                    if (site.type === 'WORDPRESS') {
-                        const uploaded = await uploadToWordPress(site, buffer, `migrated-${Date.now()}-${i}`, contentType);
-                        $img.attr('src', uploaded.url);
-                        // lazy load 속성 제거
-                        $img.removeAttr('data-lazy-src');
-                        $img.removeAttr('data-src');
-
-                        // 첫 번째로 성공한 마이그레이션 이미지를 대표 이미지로 (기존 것이 없는 경우)
-                        if (featuredMediaId === 0) {
-                            featuredMediaId = uploaded.id;
-                        }
-                    }
-                } catch (e) {
-                    console.warn(`Global image migration failed for ${src}:`, e);
-                    $img.remove(); // 마이그레이션 실패 시 태그 제거 (엑박 방지)
+                    downloadHeaders = { 'Referer': 'https://blog.naver.com/' };
                 }
+
+                const { buffer, contentType } = await downloadImage(downloadUrl, downloadHeaders);
+
+                if (site.type === 'WORDPRESS') {
+                    const uploaded = await uploadToWordPress(site, buffer, `migrated-${Date.now()}-${i}`, contentType);
+                    $img.attr('src', uploaded.url);
+                    // 레이지 로딩 속성 제거 및 정리
+                    $img.removeAttr('data-lazy-src');
+                    $img.removeAttr('data-src');
+                    $img.attr('loading', 'lazy');
+
+                    // 썸네일이 아직 지정되지 않았다면 첫 번째 성공 이미지로 지정
+                    if (featuredMediaId === 0) {
+                        featuredMediaId = uploaded.id;
+                    }
+                    
+                    // 연속 업로드 시 과부하 방지 (0.3초 대기)
+                    await new Promise(r => setTimeout(r, 300));
+                }
+            } catch (e) {
+                console.warn(`Global image migration failed for ${src}:`, e);
+                // 마이그레이션에 실패한 외부 이미지는 엑박이 나올 확률이 높으므로 본문에서 제거
+                $img.remove();
             }
         }
 
