@@ -3,7 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { getOrCreateUser } from '@/lib/auth'
 import OpenAI from 'openai'
-import { revalidatePath } from 'next/cache'
+import { revalidatePath, unstable_noStore as noStore } from 'next/cache'
 import * as cheerio from 'cheerio'
 import {
     processAutomationJob,
@@ -70,6 +70,7 @@ export async function testPublishAction(data: {
     advCustomImages?: string[];
 }) {
     try {
+        noStore();
         const user = await getOrCreateUser()
 
         // Raw SQL check for hasImageGenRights (Prisma Client might be stale)
@@ -396,6 +397,7 @@ export async function generateManualContentAction(data: {
     aiModel: 'GPT4O' | 'GEMINI' | 'CLAUDE' | 'GPT5';
 }) {
     try {
+        noStore();
         const user = await getOrCreateUser()
 
         if (user.tokenBalance <= 0) {
@@ -474,6 +476,7 @@ export async function generateManualContentAction(data: {
  */
 export async function runAutomationTask(jobId: string) {
     try {
+        noStore();
         const user = await getOrCreateUser()
 
         // 권한 체크: 사용자가 작업의 소유자인지 확인
@@ -510,6 +513,7 @@ export async function publishManualAction(data: {
     imageCount: number;
 }) {
     try {
+        noStore();
         const user = await getOrCreateUser()
 
         // 토큰 체크 (2개 소모: 생성 + 발행) or (1개 소모)
@@ -520,7 +524,7 @@ export async function publishManualAction(data: {
         }
 
         let settings = (user as any).settings || {}
-        
+
         if (typeof settings === 'string') {
             try {
                 settings = JSON.parse(settings);
@@ -692,7 +696,7 @@ export async function publishManualAction(data: {
                             const { buffer, contentType } = await downloadImage(imageUrl);
                             const uploaded = await uploadToWordPress(site, buffer, `${targetKeyword}-${i}-${Date.now()}`, contentType);
                             imageUrl = uploaded.url;
-                            
+
                             // 첫 번째 이미지는 썸네일(featured_media)로 설정
                             if (i === 1) {
                                 featuredMediaId = uploaded.id;
@@ -725,7 +729,7 @@ export async function publishManualAction(data: {
         for (let i = 0; i < allImages.length; i++) {
             const $img = $(allImages[i]);
             let src = $img.attr('src') || '';
-            
+
             // 이미 사이트 도메인이거나 데이터 URI, 또는 비어있으면 스탠바이
             if (!src || src.startsWith('data:') || (site.url && src.includes(site.url.replace(/^https?:\/\//, '')))) continue;
 
@@ -765,7 +769,7 @@ export async function publishManualAction(data: {
                     if (featuredMediaId === 0) {
                         featuredMediaId = uploaded.id;
                     }
-                    
+
                     // 연속 업로드 시 과부하 방지 (0.3초 대기)
                     await new Promise(r => setTimeout(r, 300));
                 }
@@ -846,6 +850,7 @@ export async function publishManualAction(data: {
  */
 export async function scrapeNaverBlogAction(url: string) {
     try {
+        noStore();
         await getOrCreateUser();
         const result = await scrapeNaverBlog(url);
         return { success: true, data: result };
