@@ -199,7 +199,8 @@ function YoutubeToBlogForm() {
                 imageSource: formData.imageSource as any,
                 imageCount: formData.imageCount,
                 wpCategoryId: formData.wpCategoryId,
-                postStatus: formData.postStatus
+                postStatus: formData.postStatus,
+                useThumbnailTemplate: true
             });
 
             if (!result.success) {

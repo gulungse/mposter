@@ -58,7 +58,8 @@ function TaskForm() {
         advContentPhraseA: '',
         advContentPhraseB: '',
         advImageMode: 'STANDARD',
-        advCustomImages: [] as string[]
+        advCustomImages: [] as string[],
+        useThumbnailTemplate: true
     })
 
     const [keywordMode, setKeywordMode] = useState<'GROUP' | 'MANUAL'>('GROUP')
@@ -116,7 +117,8 @@ function TaskForm() {
                         advContentPhraseA: (t as any).advContentPhraseA || '',
                         advContentPhraseB: (t as any).advContentPhraseB || '',
                         advImageMode: (t as any).advImageMode || 'STANDARD',
-                        advCustomImages: (t as any).advCustomImages || []
+                        advCustomImages: (t as any).advCustomImages || [],
+                        useThumbnailTemplate: (t as any).useThumbnailTemplate ?? true
                     })
                 } else {
                     alert('작업 정보를 불러올 수 없습니다.')
@@ -181,7 +183,8 @@ function TaskForm() {
             advContentPhraseA: formData.advContentPhraseA,
             advContentPhraseB: formData.advContentPhraseB,
             advImageMode: formData.advImageMode,
-            advCustomImages: formData.advCustomImages
+            advCustomImages: formData.advCustomImages,
+            useThumbnailTemplate: formData.useThumbnailTemplate
         })
         if (result.success) {
             alert('테스트 발행 성공! 실제 사이트에서 확인해 보세요.')
@@ -524,6 +527,27 @@ function TaskForm() {
                                 <option value={4}>4개</option>
                                 <option value={5}>5개</option>
                             </select>
+                        </div>
+                    </div>
+                    {/* Thumbnail Template Toggle */}
+                    <div className={clsx("pl-9 flex items-center gap-2", formData.imageSource === 'NONE' && "opacity-50 grayscale pointer-events-none")}>
+                        <div className="flex items-center gap-2 bg-card border border-border px-3 py-2 rounded-lg cursor-pointer hover:border-primary/50 transition-all">
+                            <input
+                                type="checkbox"
+                                id="useThumbnailTemplate"
+                                checked={formData.useThumbnailTemplate}
+                                onChange={e => setFormData({ ...formData, useThumbnailTemplate: e.target.checked })}
+                                disabled={formData.imageSource === 'NONE'}
+                                className="h-4 w-4 rounded border-border text-primary cursor-pointer"
+                            />
+                            <div className="flex flex-col">
+                                <label htmlFor="useThumbnailTemplate" className="text-xs font-bold text-foreground cursor-pointer">
+                                    첫 번째 이미지를 텍스트 썸네일 템플릿으로 생성
+                                </label>
+                                <p className="text-[10px] text-muted-foreground">
+                                    체크 해제 시 선택된 소스(AI/스크래핑)의 원본을 그대로 썸네일로 사용합니다.
+                                </p>
+                            </div>
                         </div>
                     </div>
                     </div>

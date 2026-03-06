@@ -19,6 +19,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "MediPoster",
   description: "MediPoster - AI Automated Blogging Platform",
+  icons: {
+    icon: process.env.NODE_ENV === 'development' ? '/favicon-dev.svg' : '/favicon.ico',
+  },
 };
 
 export default function RootLayout({

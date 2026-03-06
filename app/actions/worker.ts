@@ -68,6 +68,7 @@ export async function testPublishAction(data: {
     advContentPhraseB?: string;
     advImageMode?: string;
     advCustomImages?: string[];
+    useThumbnailTemplate?: boolean;
 }) {
     try {
         const user = await getOrCreateUser()
@@ -175,46 +176,52 @@ export async function testPublishAction(data: {
                 const targetHeading = $(headings[rule.headIdx]);
                 let imageUrl = '';
                 let success = false;
+                const isPremium = data.advImageMode === 'PREMIUM';
 
+                // 1. 첫 번째 이미지 (썸네일)
                 if (i === 1 && site.type === 'WORDPRESS') {
-                    try {
-                        if (hasRights && data.advThumbnailLines?.length === 4) {
-                            // 고급 권한: 4줄 텍스트 + 배경 (커스텀 갤러리 또는 키워드 검색)
-                            const searchKeyword = targetKeyword.split(' ')[0] || 'business';
+                    const useTemplate = data.useThumbnailTemplate !== false;
+                    
+                    if (useTemplate) {
+                        try {
+                            if (hasRights && data.advThumbnailLines?.length === 4) {
+                                // 고급 권한: 4줄 텍스트 + 배경 (커스텀 갤러리 또는 키워드 검색)
+                                const searchKeyword = targetKeyword.split(' ')[0] || 'business';
 
-                            // 프리미엄 모드이고 커스텀 이미지가 있으면 랜덤하게 선택 (테스트용)
-                            let bgUrl = (data.advImageMode === 'PREMIUM' && data.advCustomImages?.length)
-                                ? data.advCustomImages[Math.floor(Math.random() * data.advCustomImages.length)]
-                                : null;
+                                // 프리미엄 모드이고 커스텀 이미지가 있으면 랜덤하게 선택 (테스트용)
+                                let bgUrl = (isPremium && data.advCustomImages?.length)
+                                    ? data.advCustomImages[Math.floor(Math.random() * data.advCustomImages.length)]
+                                    : null;
 
-                            if (!bgUrl) {
-                                const searchedBg = await fetchRandomImage(settings, searchKeyword, 1);
-                                bgUrl = searchedBg || `https://loremflickr.com/600/600/${encodeURIComponent(searchKeyword)}`;
+                                if (!bgUrl) {
+                                    const searchedBg = await fetchRandomImage(settings, searchKeyword, 1);
+                                    bgUrl = searchedBg || `https://picsum.photos/600/600?random=${Date.now()}`;
+                                }
+
+                                // 1번 라인은 항상 현재 키워드로 고정
+                                const finalLines = [...data.advThumbnailLines];
+                                finalLines[0] = targetKeyword;
+
+                                const thumbBuffer = await generateAdvancedThumbnail(bgUrl, finalLines);
+                                const uploaded = await uploadToWordPress(site, thumbBuffer, `${targetKeyword}-adv-thumb-${Date.now()}`);
+                                imageUrl = uploaded.url;
+                                featuredMediaId = uploaded.id;
+                            } else {
+                                // 일반 권한: 기존 텍스트 썸네일
+                                const safeThumbText = getSafeThumbnailText(aiResult.thumbnailText, title, targetKeyword);
+                                const thumbBuffer = await generateThumbnail(safeThumbText);
+                                const uploaded = await uploadToWordPress(site, thumbBuffer, `${targetKeyword}-thumb-${Date.now()}`);
+                                imageUrl = uploaded.url;
+                                featuredMediaId = uploaded.id;
                             }
-
-                            // 1번 라인은 항상 현재 키워드로 고정
-                            const finalLines = [...data.advThumbnailLines];
-                            finalLines[0] = targetKeyword;
-
-                            const thumbBuffer = await generateAdvancedThumbnail(bgUrl, finalLines);
-                            const uploaded = await uploadToWordPress(site, thumbBuffer, `${targetKeyword}-adv-thumb-${Date.now()}`);
-                            imageUrl = uploaded.url;
-                            featuredMediaId = uploaded.id;
-                        } else {
-                            // 일반 권한: 기존 텍스트 썸네일
-                            const safeThumbText = getSafeThumbnailText(aiResult.thumbnailText, title, targetKeyword);
-                            const thumbBuffer = await generateThumbnail(safeThumbText);
-                            const uploaded = await uploadToWordPress(site, thumbBuffer, `${targetKeyword}-thumb-${Date.now()}`);
-                            imageUrl = uploaded.url;
-                            featuredMediaId = uploaded.id;
+                            success = true;
+                        } catch (e) {
+                            console.warn('WP/Thumbnail Template Error:', e);
                         }
-                        success = true;
-                    } catch (e) {
-                        console.warn('WP/Thumbnail Error:', e);
                     }
                 }
 
-                const isPremium = data.advImageMode === 'PREMIUM';
+                // 2. 템플릿을 쓰지 않기로 했거나 (썸네일 포함), 2번째 이후의 이미지일 때
                 if (!imageUrl && !isPremium) {
                     try {
                         if (imageSource === 'DALLE') {
@@ -235,11 +242,11 @@ export async function testPublishAction(data: {
                             // Multi-Source Image Fetch
                             imageUrl = await fetchRandomImage(settings, searchKeyword, i);
 
-                            // Fallback to LoremFlickr
+                            // Fallback
                             if (!imageUrl) {
                                 const w = i === 1 ? 768 : 768;
                                 const h = i === 1 ? 512 : 512;
-                                imageUrl = `https://loremflickr.com/${w}/${h}/${encodeURIComponent(searchKeyword)}?lock=${Math.floor(Math.random() * 100000) + i}&random=${Date.now()}${i}`
+                                imageUrl = `https://picsum.photos/${w}/${h}?random=${Math.floor(Math.random() * 10000) + i}`
                             }
                             success = true;
                         } else if (imageSource === 'FLUX') {
@@ -250,11 +257,29 @@ export async function testPublishAction(data: {
                             }
                         }
                     } catch (e) {
-                        console.warn(`Image ${i} Generation Failed`, e);
+                        console.warn(`Image ${i} Generation/Scrape Failed`, e);
                     }
                 }
 
-                // 고급 권한: 본문 이미지 특수 처리 (나머지 이미지들)
+                // 외부 이미지를 직접 본문에 넣지 않고 무조건 다운로드 & 업로드 처리
+                if (imageUrl && site.type === 'WORDPRESS' && (!imageUrl.includes(site.url.replace(/^https?:\/\//, '')))) {
+                    try {
+                        const { buffer, contentType } = await downloadImage(imageUrl);
+                        const uploaded = await uploadToWordPress(site, buffer, `${targetKeyword}-img-${i}-${Date.now()}`, contentType);
+                        imageUrl = uploaded.url; // 사이트 내부 URL로 교체
+
+                        // 썸네일로 지정되어야 하면 (위에서 템플릿으로 안 만들어진 1번 이미지)
+                        if (i === 1) {
+                            featuredMediaId = uploaded.id;
+                        }
+                    } catch (e) {
+                         console.warn(`Failed to process WP upload for external image ${i}:`, e);
+                         imageUrl = ''; // 업로드 실패 시 빈 문자열로 처리하여 태그가 본문에 삽입되지 않도록 함 (엑박 방지)
+                         success = false;
+                    }
+                }
+
+                // 고급 권한: 본문 이미지 특수 처리 (나머지 이미지들) (여기서도 실패시 imageUrl 초기화)
                 if (hasRights && i > 1 && data.advContentPhraseA && data.advContentPhraseB) {
                     try {
                         let bgUrl = imageUrl;

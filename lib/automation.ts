@@ -994,61 +994,49 @@ export async function processAutomationJob(jobId: string) {
                 const targetHeading = $(headings[rule.headIdx]);
                 let imageUrl = '';
                 let success = false;
+                const isPremium = (job as any).advImageMode === 'PREMIUM';
 
                 // 1번 이미지 (썸네일) 특별 처리
                 if (i === 1 && job.site.type === 'WORDPRESS') {
-                    try {
-                        if (hasRights && (job as any).advThumbnailLines?.length === 4) {
-                            // 고급 권한: 4줄 텍스트 + 배경 (커스텀 갤러리 또는 키워드 검색)
-                            const searchKeyword = targetKeyword.split(' ')[0] || 'business';
-                            let bgUrl = getNextBgUrl(searchKeyword);
+                    const useTemplate = (job as any).useThumbnailTemplate !== false;
+                    
+                    if (useTemplate) {
+                        try {
+                            if (hasRights && (job as any).advThumbnailLines?.length === 4) {
+                                // 고급 권한: 4줄 텍스트 + 배경 (커스텀 갤러리 또는 키워드 검색)
+                                const searchKeyword = targetKeyword.split(' ')[0] || 'business';
+                                let bgUrl = getNextBgUrl(searchKeyword);
 
-                            if (!bgUrl) {
-                                // 일반 모드인 경우 기존처럼 랜덤 검색
-                                const searchedBg = await fetchRandomImage(settings, searchKeyword, 1);
-                                bgUrl = searchedBg || `https://loremflickr.com/600/600/${encodeURIComponent(searchKeyword)}`;
+                                if (!bgUrl) {
+                                    // 일반 모드인 경우 기존처럼 랜덤 검색
+                                    const searchedBg = await fetchRandomImage(settings, searchKeyword, 1);
+                                    bgUrl = searchedBg || `https://picsum.photos/600/600?random=${Date.now()}`;
+                                }
+
+                                // 1번 라인은 항상 현재 키워드로 고정
+                                const finalLines = [...(job as any).advThumbnailLines];
+                                finalLines[0] = targetKeyword;
+
+                                const thumbBuffer = await generateAdvancedThumbnail(bgUrl, finalLines);
+                                const uploaded = await uploadToWordPress(job.site, thumbBuffer, `${targetKeyword}-adv-thumb-${Date.now()}`);
+                                imageUrl = uploaded.url;
+                                featuredMediaId = uploaded.id;
+                            } else {
+                                // 일반 권한: 기존 텍스트 썸네일
+                                const safeThumbText = getSafeThumbnailText(aiResult.thumbnailText, title, targetKeyword);
+                                const thumbBuffer = await generateThumbnail(safeThumbText);
+                                const uploaded = await uploadToWordPress(job.site, thumbBuffer, `${targetKeyword}-thumb-${Date.now()}`);
+                                imageUrl = uploaded.url;
+                                featuredMediaId = uploaded.id;
                             }
-
-                            // 1번 라인은 항상 현재 키워드로 고정
-                            const finalLines = [...(job as any).advThumbnailLines];
-                            finalLines[0] = targetKeyword;
-
-                            const thumbBuffer = await generateAdvancedThumbnail(bgUrl, finalLines);
-                            const uploaded = await uploadToWordPress(job.site, thumbBuffer, `${targetKeyword}-adv-thumb-${Date.now()}`);
-                            imageUrl = uploaded.url;
-                            featuredMediaId = uploaded.id;
-                        } else {
-                            // 일반 권한: 기존 텍스트 썸네일
-                            const safeThumbText = getSafeThumbnailText(aiResult.thumbnailText, title, targetKeyword);
-                            const thumbBuffer = await generateThumbnail(safeThumbText);
-                            const uploaded = await uploadToWordPress(job.site, thumbBuffer, `${targetKeyword}-thumb-${Date.now()}`);
-                            imageUrl = uploaded.url;
-                            featuredMediaId = uploaded.id;
+                            success = true;
+                        } catch (e) {
+                            console.warn('WP/Thumbnail Template Error:', e);
                         }
-                        success = true;
-                    } catch (e) {
-                        console.warn('WP/Thumbnail Error:', e);
                     }
                 }
 
-                // 2. SCRAP (멀티 프로바이더)
-                const isPremium = (job as any).advImageMode === 'PREMIUM';
-                if (!imageUrl && imageSource === 'SCRAP' && !isPremium) {
-                    const searchKeyword = (aiResult.imageKeywords && aiResult.imageKeywords[i - 1])
-                        ? aiResult.imageKeywords[i - 1]
-                        : (targetKeyword.split(' ')[0] || 'korea');
-
-                    imageUrl = await fetchRandomImage(settings, searchKeyword, i);
-
-                    if (!imageUrl) {
-                        const w = i === 1 ? 768 : 768;
-                        const h = i === 1 ? 512 : 512;
-                        imageUrl = `https://loremflickr.com/${w}/${h}/${encodeURIComponent(searchKeyword)}?lock=${Math.floor(Math.random() * 100000) + i}&random=${Date.now()}${i}`
-                    }
-                    success = true;
-                }
-
-                // 3. DALLE / FLUX
+                // 2. 템플릿 안 쓰기로 했거나 본문 이미지일 때
                 if (!imageUrl && !isPremium) {
                     try {
                         if (imageSource === 'DALLE') {
@@ -1058,22 +1046,51 @@ export async function processAutomationJob(jobId: string) {
                             const image = await openai.images.generate({ model: "dall-e-3", prompt: imgPrompt, size: "1024x1024" })
                             imageUrl = image.data?.[0]?.url || ''
                             if (imageUrl) success = true;
+                        } else if (imageSource === 'SCRAP') {
+                            const searchKeyword = (aiResult.imageKeywords && aiResult.imageKeywords[i - 1])
+                                ? aiResult.imageKeywords[i - 1]
+                                : (targetKeyword.split(' ')[0] || 'korea');
+
+                            imageUrl = await fetchRandomImage(settings, searchKeyword, i);
+
+                            // Fallback
+                            if (!imageUrl) {
+                                const w = i === 1 ? 768 : 768;
+                                const h = i === 1 ? 512 : 512;
+                                imageUrl = `https://picsum.photos/${w}/${h}?random=${Math.floor(Math.random() * 10000) + i}`
+                            }
+                            success = true;
                         } else if (imageSource === 'FLUX') {
                             if (!settings.piApiKey) throw new Error('PiAPI (FLUX) API 키가 없습니다.');
                             imageUrl = await generateFluxImage(settings.piApiKey, `${targetKeyword} blog image ${i}`)
                             if (imageUrl) success = true;
                         }
                     } catch (e) {
-                        console.warn(`Image ${i} Generation Failed`, e);
+                        console.warn(`Image ${i} Generation/Scrape Failed`, e);
                     }
                 }
 
-                // 고급 권한: 본문 이미지 특수 처리 (나머지 이미지들)
+                // 외부 이미지를 무조건 WP에 다운로드&업로드 처리
+                if (imageUrl && job.site.type === 'WORDPRESS' && (!imageUrl.includes(job.site.url.replace(/^https?:\/\//, '')))) {
+                    try {
+                        const { buffer, contentType } = await downloadImage(imageUrl);
+                        const uploaded = await uploadToWordPress(job.site, buffer, `${targetKeyword}-img-${i}-${Date.now()}`, contentType);
+                        imageUrl = uploaded.url;
+                        if (i === 1) {
+                            featuredMediaId = uploaded.id;
+                        }
+                    } catch (e) {
+                        console.warn(`Failed to process WP upload for external image ${i}:`, e);
+                        imageUrl = ''; // 엑박 방지를 위해 초기화
+                        success = false;
+                    }
+                }
+
+                // 고급 권한: 본문 이미지 특수 처리 (나머지 이미지들, 위에서 가져온 imageUrl을 bgUrl로 활용)
                 if (hasRights && i > 1 && (job as any).advContentPhraseA && (job as any).advContentPhraseB) {
                     try {
-                        // 프리미엄 모드인 경우 배경 이미지를 갤러리에서 가져옴
                         const searchKeyword = targetKeyword.split(' ')[0] || 'korea';
-                        let bgUrl = imageUrl; // 이미 생성된 이미지(DALLE 등)가 있으면 그것을 배경으로 사용
+                        let bgUrl = imageUrl;
 
                         if ((job as any).advImageMode === 'PREMIUM' && customImages.length > 0) {
                             bgUrl = getNextBgUrl(searchKeyword);

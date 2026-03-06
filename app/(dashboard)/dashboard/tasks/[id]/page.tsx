@@ -125,7 +125,7 @@ export default function TaskDetailPage() {
                                     <Zap className="h-5 w-5 text-slate-400 mt-0.5" />
                                     <div>
                                         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">AI 모델 / 이미지 소스</p>
-                                        <p className="font-bold text-sm capitalize">{task.aiModel || 'GPT4O'} / {task.imageSource || 'NONE'}</p>
+                                        <p className="font-bold text-sm capitalize">{task.aiModel || 'GPT4O'} / {task.imageSource || 'NONE'} (템플릿: {task.useThumbnailTemplate !== false ? '✅' : '❌'})</p>
                                     </div>
                                 </div>
                             </div>
