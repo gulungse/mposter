@@ -29,6 +29,7 @@ export async function createAutomationTask(data: {
     advContentPhraseB?: string;
     advImageMode?: string;
     advCustomImages?: string[];
+    useThumbnailTemplate?: boolean;
 }) {
     try {
         const user = await getOrCreateUser()
@@ -59,6 +60,7 @@ export async function createAutomationTask(data: {
                 advContentPhraseB: data.advContentPhraseB,
                 advImageMode: data.advImageMode || 'STANDARD',
                 advCustomImages: data.advCustomImages || [],
+                useThumbnailTemplate: data.useThumbnailTemplate ?? true,
                 advNextImageIdx: 0,
                 // 스케줄에 따른 첫 실행 시간 설정 (등록 직후 실행 방지, 지정된 간격 후 실행)
                 nextRunAt: calculateNextRun(data.scheduleCron)
@@ -107,6 +109,7 @@ export async function updateAutomationTask(id: string, data: {
     advContentPhraseB?: string;
     advImageMode?: string;
     advCustomImages?: string[];
+    useThumbnailTemplate?: boolean;
 }) {
     try {
         const user = await getOrCreateUser()
@@ -152,6 +155,7 @@ export async function updateAutomationTask(id: string, data: {
                 advContentPhraseB: data.advContentPhraseB,
                 advImageMode: data.advImageMode,
                 advCustomImages: data.advCustomImages,
+                useThumbnailTemplate: data.useThumbnailTemplate,
                 ...(nextRunAt ? { nextRunAt } : {})
             }
         })
