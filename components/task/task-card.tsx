@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { MoreHorizontal as MoreHorizontalIcon, Play as PlayIcon, Pause as PauseIcon, Clock as ClockIcon, Calendar as CalendarIcon, Edit as EditIcon, Trash2 as Trash2Icon, Loader2 as Loader2Icon, Hash as HashIcon, Terminal as TerminalIcon, Globe as GlobeIcon, ExternalLink as ExternalLinkIcon } from 'lucide-react'
+import { MoreHorizontal as MoreHorizontalIcon, Play as PlayIcon, Pause as PauseIcon, Clock as ClockIcon, Calendar as CalendarIcon, Edit as EditIcon, Trash2 as Trash2Icon, Loader2 as Loader2Icon, Hash as HashIcon, Terminal as TerminalIcon, Globe as GlobeIcon, ExternalLink as ExternalLinkIcon, Copy as CopyIcon } from 'lucide-react'
 import { clsx } from 'clsx'
 import Link from 'next/link'
-import { toggleTaskStatus, deleteAutomationTask } from '@/app/actions/task'
+import { toggleTaskStatus, deleteAutomationTask, copyAutomationTask } from '@/app/actions/task'
 import { useRouter } from 'next/navigation'
 
 interface TaskCardProps {
@@ -33,6 +33,23 @@ export function TaskCard({
     const router = useRouter()
     const [isToggling, setIsToggling] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
+    const [isCopying, setIsCopying] = useState(false)
+
+    const handleCopy = async () => {
+        setIsCopying(true)
+        try {
+            const result = await copyAutomationTask(id)
+            if (result.success) {
+                router.refresh()
+            } else {
+                alert(result.error || '복사 실패')
+            }
+        } catch (error) {
+            alert('복사 중 오류가 발생했습니다.')
+        } finally {
+            setIsCopying(false)
+        }
+    }
 
     const handleToggle = async () => {
         setIsToggling(true)
@@ -143,7 +160,15 @@ export function TaskCard({
                 </button>
 
                 {/* Sub Actions */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
+                    <button
+                        onClick={handleCopy}
+                        disabled={isCopying}
+                        className="h-12 rounded-xl bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30 text-purple-600 dark:text-purple-400 font-bold flex items-center justify-center gap-2 transition-colors hover:bg-purple-100 dark:hover:bg-purple-900/30 text-sm shadow-sm"
+                    >
+                        {isCopying ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <CopyIcon className="h-4 w-4" />}
+                        복사
+                    </button>
                     <Link
                         href={`/dashboard/tasks/new?edit=${id}`}
                         className="h-12 rounded-xl bg-blue-600 border border-blue-700 hover:bg-blue-700 text-white font-bold flex items-center justify-center gap-2 transition-colors text-sm shadow-lg shadow-blue-500/20"
@@ -154,7 +179,7 @@ export function TaskCard({
                     <button
                         onClick={handleDelete}
                         disabled={isDeleting}
-                        className="h-12 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 font-bold flex items-center justify-center gap-2 transition-colors hover:bg-red-100 dark:hover:bg-red-900/30 text-sm"
+                        className="h-12 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 text-red-600 dark:text-red-400 font-bold flex items-center justify-center gap-2 transition-colors hover:bg-red-100 dark:hover:bg-red-900/30 text-sm shadow-sm"
                     >
                         {isDeleting ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <Trash2Icon className="h-4 w-4" />}
                         삭제

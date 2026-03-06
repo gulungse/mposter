@@ -169,6 +169,71 @@ export async function updateAutomationTask(id: string, data: {
 }
 
 /**
+ * 자동화 작업 복사
+ */
+export async function copyAutomationTask(id: string) {
+    try {
+        const user = await getOrCreateUser()
+
+        // 요금제 한도 체크
+        const limitRes = await checkLimit('automationJob')
+        if (!limitRes.success) {
+            return { success: false, error: limitRes.error }
+        }
+
+        // 원본 작업 조회
+        const originalJob = await prisma.automationJob.findUnique({
+            where: { id, userId: user.id }
+        })
+
+        if (!originalJob) {
+            return { success: false, error: '복사할 원본 작업을 찾을 수 없습니다.' }
+        }
+
+        // 새 작업 데이터 구성 (일부 필드 초기화/수정)
+        const copyData = {
+            userId: user.id,
+            name: `[복사본] ${originalJob.name}`,
+            siteId: originalJob.siteId,
+            keywordGroupId: originalJob.keywordGroupId,
+            keywords: originalJob.keywords,
+            promptId: originalJob.promptId,
+            scheduleCron: originalJob.scheduleCron,
+            aiModel: originalJob.aiModel,
+            imageSource: originalJob.imageSource,
+            imageCount: originalJob.imageCount,
+            isActive: false, // 복사본은 기본적으로 일시정지 상태로 생성
+            wpCategoryId: originalJob.wpCategoryId,
+            wpCategoryName: originalJob.wpCategoryName,
+            postStatus: originalJob.postStatus,
+            advContentPhraseA: originalJob.advContentPhraseA,
+            advContentPhraseB: originalJob.advContentPhraseB,
+            advThumbnailLines: originalJob.advThumbnailLines,
+            advImageMode: originalJob.advImageMode,
+            advCustomImages: originalJob.advCustomImages,
+            advNextImageIdx: 0,
+            useThumbnailTemplate: (originalJob as any).useThumbnailTemplate,
+            // 새 스케줄 계산
+            nextRunAt: originalJob.scheduleCron ? calculateNextRun(originalJob.scheduleCron) : null
+        }
+
+        const newTask = await (prisma.automationJob as any).create({
+            data: copyData
+        })
+
+        revalidatePath('/dashboard/tasks')
+        return { success: true, data: newTask }
+    } catch (error: any) {
+        if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
+        console.error('자동화 작업 복사 실패:', error)
+        return {
+            success: false,
+            error: `자동화 작업을 복사하는 중 오류가 발생했습니다: ${error.message || '알 수 없는 오류'}`
+        }
+    }
+}
+
+/**
  * 자동화 작업 목록 조회
  */
 export async function getAutomationTasks() {
