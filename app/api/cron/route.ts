@@ -27,7 +27,24 @@ export async function GET(request: Request) {
         for (const job of jobs) {
             console.log(`[CRON] Executing Job: ${job.name} (${job.id})`)
 
-            // 1. Run Task (Auth Free)
+            // 1. Prevent concurrent executions (Atomic Lock)
+            if (job.scheduleCron && job.scheduleCron !== 'MANUAL') {
+                const nextDate = calculateNextRun(job.scheduleCron)
+                const lockResult = await prisma.automationJob.updateMany({
+                    where: { id: job.id, nextRunAt: job.nextRunAt },
+                    data: { nextRunAt: nextDate }
+                })
+                
+                // If count is 0, another cron instance already picked it up
+                if (lockResult.count === 0) {
+                    console.log(`[CRON] Job skipped (already locked): ${job.name} (${job.id})`)
+                    continue;
+                }
+            } else {
+                continue; // MANUAL shouldn't be executed via background CRON ideally, but skipped for safety
+            }
+
+            // 2. Run Task (Auth Free)
             let start = Date.now()
             let res: any = { success: false, error: 'Unknown' }
             try {
@@ -36,17 +53,13 @@ export async function GET(request: Request) {
                 res = { success: false, error: e.message }
             }
 
-            // 2. Schedule Next
-            if (job.scheduleCron && job.scheduleCron !== 'MANUAL') {
-                const nextDate = calculateNextRun(job.scheduleCron) // Use imported function
-                await prisma.automationJob.update({
-                    where: { id: job.id },
-                    data: {
-                        lastRunAt: new Date(),
-                        nextRunAt: nextDate
-                    }
-                })
-            }
+            // 3. Record lastRunAt
+            await prisma.automationJob.update({
+                where: { id: job.id },
+                data: {
+                    lastRunAt: new Date()
+                }
+            })
 
             results.push({
                 id: job.id,
