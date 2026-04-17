@@ -166,6 +166,41 @@ export default function AdminSettingsPage() {
                         </div>
                     </div>
 
+                    <div className="flex items-center gap-2 mb-4 pt-6 border-t border-slate-100 dark:border-[#2a364d]">
+                        <SettingsIcon className="h-5 w-5 text-green-500" />
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white">시스템 통합 연동 키</h2>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="p-5 rounded-xl bg-slate-50 dark:bg-[#1a2333] border border-slate-100 dark:border-[#2a364d] flex flex-col gap-3">
+                            <div>
+                                <label className="text-sm font-bold text-slate-700 dark:text-slate-200">Google OAuth Client ID</label>
+                                <p className="text-xs text-slate-400 mt-1">모든 사용자가 공통으로 사용할 마스터 구글 클라이언트 ID (Blogger 연동 용도)</p>
+                            </div>
+                            <input
+                                type="text"
+                                value={settings.googleClientId}
+                                onChange={e => setSettings({ ...settings, googleClientId: e.target.value })}
+                                placeholder="예: 123456789-abcdefghijklmn.apps.googleusercontent.com"
+                                className="w-full px-4 py-3 rounded-lg bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-[#324467] font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500/50 outline-none"
+                            />
+                        </div>
+
+                        <div className="p-5 rounded-xl bg-slate-50 dark:bg-[#1a2333] border border-slate-100 dark:border-[#2a364d] flex flex-col gap-3">
+                            <div>
+                                <label className="text-sm font-bold text-slate-700 dark:text-slate-200">Google OAuth Client Secret</label>
+                                <p className="text-xs text-slate-400 mt-1">구글 클라이언트 보안 비밀번호</p>
+                            </div>
+                            <input
+                                type="password"
+                                value={settings.googleClientSecret}
+                                onChange={e => setSettings({ ...settings, googleClientSecret: e.target.value })}
+                                placeholder="예: GOCSPX-abcdefghijklmn1234567890"
+                                className="w-full px-4 py-3 rounded-lg bg-white dark:bg-[#0f172a] border border-slate-200 dark:border-[#324467] font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-blue-500/50 outline-none"
+                            />
+                        </div>
+                    </div>
+
                     <div className="flex items-start gap-3 p-4 bg-blue-50 dark:bg-blue-900/10 rounded-xl text-blue-700 dark:text-blue-300 text-xs leading-relaxed">
                         <AlertCircle className="h-5 w-5 shrink-0" />
                         <p>

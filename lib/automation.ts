@@ -140,15 +140,16 @@ export function getSafeThumbnailText(aiThumbText: string | undefined, title: str
 /**
  * 블로거(Blogger)의 만료된 Access Token을 Refresh Token으로 갱신합니다.
  */
-export async function refreshBloggerToken(site: any, clientId?: string, clientSecret?: string) {
+export async function refreshBloggerToken(site: any, legacyClientId?: string, legacyClientSecret?: string) {
     const refreshToken = site.refreshToken || (site as any).refreshToken;
     if (!refreshToken) throw new Error('Refresh Token이 없어 토큰을 갱신할 수 없습니다. 사이트를 다시 연결해 주세요.');
 
-    const finalClientId = clientId || process.env.GOOGLE_CLIENT_ID;
-    const finalClientSecret = clientSecret || process.env.GOOGLE_CLIENT_SECRET;
+    const globalSettings = await prisma.globalSetting.findUnique({ where: { id: 'SYSTEM' } });
+    const finalClientId = globalSettings?.googleClientId || process.env.GOOGLE_CLIENT_ID;
+    const finalClientSecret = globalSettings?.googleClientSecret || process.env.GOOGLE_CLIENT_SECRET;
 
     if (!finalClientId || !finalClientSecret) {
-        throw new Error('토큰이 만료되었으나 자동 갱신을 위한 설정(Google Client ID/Secret)이 없습니다. API 관리 메뉴에서 설정을 확인하거나 사이트를 다시 연결해 주세요.');
+        throw new Error('토큰이 만료되었으나 자동 갱신을 위한 시스템 설정(Google Client ID/Secret)이 없습니다. 관리자에게 문의하세요.');
     }
 
     try {

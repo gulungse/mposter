@@ -243,11 +243,11 @@ export async function getWordPressCategories(siteId: string) {
  */
 export async function getBloggerAuthUrl() {
     try {
-        const user = await getOrCreateUser() as any
-        const clientId = user.settings?.googleClientId
+        const globalSettings = await prisma.globalSetting.findUnique({ where: { id: 'SYSTEM' } })
+        const clientId = globalSettings?.googleClientId
 
         if (!clientId) {
-            return { success: false, error: 'Google Client ID가 설정되지 않았습니다. API 관리 메뉴에서 설정해 주세요.' }
+            return { success: false, error: '시스템 설정 오류: 관리자가 Google Client ID를 아직 등록하지 않았습니다.' }
         }
 
         const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/sites/new`
@@ -266,12 +266,12 @@ export async function getBloggerAuthUrl() {
  */
 export async function exchangeBloggerCode(code: string) {
     try {
-        const user = await getOrCreateUser() as any
-        const clientId = user.settings?.googleClientId
-        const clientSecret = user.settings?.googleClientSecret
+        const globalSettings = await prisma.globalSetting.findUnique({ where: { id: 'SYSTEM' } })
+        const clientId = globalSettings?.googleClientId
+        const clientSecret = globalSettings?.googleClientSecret
 
         if (!clientId || !clientSecret) {
-            return { success: false, error: 'Google API 설정이 누락되었습니다.' }
+            return { success: false, error: '시스템 설정 오류: 관리자가 Google API 시스템을 아직 설정하지 않았습니다.' }
         }
 
         const redirectUri = `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/sites/new`

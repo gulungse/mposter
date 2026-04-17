@@ -217,22 +217,7 @@ export default function ApiManagementPage() {
                     issueURL="https://console.anthropic.com/"
                 />
 
-                {/* Consolidated Google OAuth Card */}
-                <ApiInputRowGroup
-                    label="GOOGLE OAUTH"
-                    description={"블로그스팟 사용 필수연결"}
-                    icon={<Globe className="h-5 w-5 text-amber-500" />}
-                    issueURL="https://console.cloud.google.com/welcome"
-                    inputs={[
-                        { label: 'CLIENT ID', value: keys.googleClientId || '', placeholder: 'Client ID', onChange: (v) => handleChange('googleClientId', 'google', v) },
-                        { label: 'CLIENT SECRET', value: keys.googleClientSecret || '', placeholder: 'Secret Key', onChange: (v) => handleChange('googleClientSecret', 'google', v) }
-                    ]}
-                    onSave={() => handleSaveSingle('google', 'Google OAuth', null, true)}
-                    isSaving={savingKey === 'google'}
-                    isValidating={false}
-                    validationResult={null}
-                    color="amber"
-                />
+
             </div>
 
             {/* Row 2: piAPI, Pixabay, Pexels, Freepik, Unsplash (5 Columns) */}
