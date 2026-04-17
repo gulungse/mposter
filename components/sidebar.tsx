@@ -246,7 +246,7 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                                             className="flex items-center justify-between px-4 py-2 cursor-pointer group/header"
                                             onClick={() => group.href ? router.push(group.href) : toggleGroup(group.id)}
                                         >
-                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest group-hover/header:text-slate-300 transition-colors">
+                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest group-hover/header:text-slate-300 transition-colors">
                                                 {group.label}
                                             </p>
                                             {!group.href && (
@@ -348,10 +348,14 @@ function NavItem({
     size?: 'default' | 'sm'
     onClick?: () => void
 }) {
+    const isExternal = href.startsWith('http')
+
     return (
         <Link
             href={href}
             onClick={onClick}
+            target={isExternal ? "_blank" : "_self"}
+            rel={isExternal ? "noopener noreferrer" : undefined}
             className={cn(
                 'group relative flex items-center gap-3 rounded-xl transition-all duration-200 overflow-hidden',
                 size === 'sm' ? 'px-3 py-2' : 'px-4 py-3',
@@ -375,7 +379,7 @@ function NavItem({
             </div>
             <span className={cn(
                 "relative z-10 font-medium transition-colors duration-200",
-                size === 'sm' ? "text-xs" : "text-sm",
+                size === 'sm' ? "text-sm" : "text-[15px]",
                 isActive ? "font-bold" : ""
             )}>
                 {label}
