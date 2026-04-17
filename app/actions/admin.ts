@@ -167,7 +167,8 @@ export async function updateUserPermissions(userId: string, permissions: {
     hasYoutubeRights?: boolean,
     hasTistoryRewriteRights?: boolean,
     hasImageGenRights?: boolean,
-    hasNaverRewriteRights?: boolean
+    hasNaverRewriteRights?: boolean,
+    limits?: any
 }) {
     try {
         const user = await getOrCreateUser()
@@ -175,14 +176,20 @@ export async function updateUserPermissions(userId: string, permissions: {
             return { success: false, error: '권한이 없습니다.' }
         }
 
-        const allowedKeys = ['hasManualPostRights', 'hasYoutubeRights', 'hasTistoryRewriteRights', 'hasImageGenRights', 'hasNaverRewriteRights']
+        const allowedKeys = ['hasManualPostRights', 'hasYoutubeRights', 'hasTistoryRewriteRights', 'hasImageGenRights', 'hasNaverRewriteRights', 'limits']
         const updates: string[] = []
         const values: any[] = []
 
-        Object.entries(permissions).forEach(([key, value], index) => {
+        Object.entries(permissions).forEach(([key, value]) => {
             if (allowedKeys.includes(key)) {
-                updates.push(`"${key}" = $${index + 1}`)
-                values.push(value)
+                const index = updates.length + 1
+                if (key === 'limits') {
+                    updates.push(`"limits" = $${index}::jsonb`)
+                    values.push(value ? JSON.stringify(value) : null)
+                } else {
+                    updates.push(`"${key}" = $${index}`)
+                    values.push(value)
+                }
             }
         })
 

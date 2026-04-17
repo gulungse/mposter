@@ -91,11 +91,8 @@ export async function getUserLimits(userId: string): Promise<UserLimits> {
         include: { item: true }
     })
 
-    // 3. 추가 슬롯 합산
+    // 3. 추가 슬롯 합산 (정기 구매)
     for (const purchase of validPurchases) {
-        // userPurchase에 slotAmount가 저장되어 있다고 가정 (구매 시점의 수량)
-        // 만약 userPurchase.slotAmount 데이터가 없다면 item.amount를 써야겠지만,
-        // 스키마상 userPurchase.slotAmount가 있으므로 그것을 신뢰함.
         const amount = purchase.slotAmount
 
         switch (purchase.type) {
@@ -112,6 +109,15 @@ export async function getUserLimits(userId: string): Promise<UserLimits> {
                 currentLimits.tasks += amount
                 break
         }
+    }
+
+    // 4. 관리자 수동 할당 보너스 합산 (User.limits JSON 필드)
+    if (user.limits && typeof user.limits === 'object') {
+        const customLimits = user.limits as any
+        if (customLimits.siteBonus) currentLimits.sites += Number(customLimits.siteBonus)
+        if (customLimits.keywordBonus) currentLimits.keywords += Number(customLimits.keywordBonus)
+        if (customLimits.promptBonus) currentLimits.prompts += Number(customLimits.promptBonus)
+        if (customLimits.taskBonus) currentLimits.tasks += Number(customLimits.taskBonus)
     }
 
     return currentLimits
