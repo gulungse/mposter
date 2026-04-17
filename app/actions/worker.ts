@@ -44,6 +44,27 @@ function convertMarkdownToHtml(text: string): string {
     // 3. 리스트 (- item -> <li>item</li>)
     html = html.replace(/^\-\s+(.*$)/gim, '<li>$1</li>');
 
+    // 4. 문단(단락)을 <p> 태그 혹은 블록 태그로 래핑하여 Blogger 에디터(Compose) 버그 방지
+    // 두 번 이상의 줄바꿈(\n\n)을 기준으로 문단을 나눔
+    const blocks = html.split(/\n\s*\n/);
+    html = blocks.map(block => {
+        const trimmed = block.trim();
+        if (!trimmed) return '';
+
+        // Blogger 에디터는 최상단에 <p>, <div>, <h2> 등의 블록 태그가 명시되어 있지 않으면
+        // '작성(Compose)' 모드에서 본문을 렌더링하지 못하는 버그가 있음 (빈 화면 노출)
+        // 따라서 모든 조각을 검사하여 블록 태그로 시작하지 않으면 <p>로 감쌈
+        const isBlockTag = /^<(p|div|h[1-6]|ul|ol|li|blockquote|table|pre|hr|center|section|article|img|iframe|aside|header|footer)\b/i.test(trimmed);
+
+        if (isBlockTag) {
+            // 이미 블록 태그인 경우, 내부 줄바꿈만 <br />로 처리 (단, 태그 사이 줄바꿈은 제외)
+            return trimmed.replace(/\n/g, '<br />').replace(/<\/li>\s*<br \/>\s*<li>/gi, '</li>\n<li>');
+        }
+
+        // 일반 텍스트이거나 인라인 태그(<a>, <strong> 등)로 시작하는 경우 전체를 <p>로 감쌈
+        return `<p>${trimmed.replace(/\n/g, '<br />')}</p>`;
+    }).join('\n\n');
+
     return html;
 }
 
@@ -602,7 +623,7 @@ export async function publishManualAction(data: {
             }
             // Ensure title/content are using the parsed results even if parsing was partial
             title = aiResult.title || targetKeyword;
-            content = aiResult.content && aiResult.content.includes('<') ? aiResult.content : convertMarkdownToHtml(aiResult.content || '');
+            content = convertMarkdownToHtml(aiResult.content || '');
         } catch (err: any) {
             console.error('AI Generation/Parsing failed:', err);
             // Fallback to minimal if everything fails

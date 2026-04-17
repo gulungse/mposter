@@ -496,9 +496,27 @@ function convertMarkdownToHtml(text: string): string {
     html = html.replace(/__((?:(?!__).)+)__/g, '<strong>$1</strong>');
 
     // 3. 리스트 (- item -> <li>item</li>)
-    // <ul> 감싸는 건 복잡하므로 일단 <li>로만 변환하거나, 
-    // 간단히 줄바꿈을 <br>로 처리하는 등 최소한의 조치
     html = html.replace(/^\-\s+(.*$)/gim, '<li>$1</li>');
+
+    // 4. 문단(단락)을 <p> 태그 혹은 블록 태그로 래핑하여 Blogger 에디터(Compose) 버그 방지
+    // 두 번 이상의 줄바꿈(\n\n)을 기준으로 문단을 나눔
+    const blocks = html.split(/\n\s*\n/);
+    html = blocks.map(block => {
+        const trimmed = block.trim();
+        if (!trimmed) return '';
+
+        // Blogger 에디터는 최상단에 <p>, <div>, <h2> 등의 블록 태그가 명시되어 있지 않으면
+        // '작성(Compose)' 모드에서 본문을 렌더링하지 못하는 버그가 있음 (빈 화면 노출)
+        const isBlockTag = /^<(p|div|h[1-6]|ul|ol|li|blockquote|table|pre|hr|center|section|article|img|iframe|aside|header|footer)\b/i.test(trimmed);
+
+        if (isBlockTag) {
+            // 이미 블록 태그인 경우, 내부 줄바꿈만 <br />로 처리
+            return trimmed.replace(/\n/g, '<br />').replace(/<\/li>\s*<br \/>\s*<li>/gi, '</li>\n<li>');
+        }
+
+        // 일반 텍스트이거나 인라인 태그로 시작하면 <p>로 감쌈
+        return `<p>${trimmed.replace(/\n/g, '<br />')}</p>`;
+    }).join('\n\n');
 
     return html;
 }
