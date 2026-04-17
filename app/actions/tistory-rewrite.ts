@@ -82,7 +82,7 @@ export async function tistoryRewritePublishAction(data: {
         if (data.aiModel === 'GPT4O') {
             aiResult = await generateGPTContent(settings.openaiApiKey, systemPrompt, originalTitle, 'gpt-4o', inputContext)
         } else if (data.aiModel === 'GEMINI') {
-            aiResult = await generateGeminiContent(settings.geminiApiKey, systemPrompt, originalTitle, inputContext)
+            aiResult = await generateGeminiContent(settings.geminiApiKey, systemPrompt, originalTitle, 'gemini-1.5-flash', inputContext)
         } else if (data.aiModel === 'CLAUDE') {
             aiResult = await generateClaudeContent(settings.anthropicApiKey, systemPrompt, originalTitle, inputContext)
         } else if (data.aiModel === 'GPT5') {

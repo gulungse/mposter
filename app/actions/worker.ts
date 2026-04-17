@@ -19,7 +19,9 @@ import {
     generateAdvancedContentImage,
     downloadImage
 } from '@/lib/automation'
+import { MODEL_ID_MAP } from '@/lib/ai-models'
 import { fetchRandomImage } from '@/lib/image_providers'
+import { AIModel } from '@prisma/client'
 import axios from 'axios'
 import { scrapeNaverBlog } from '@/lib/scraper'
 
@@ -78,7 +80,7 @@ export async function testPublishAction(data: {
     promptId?: string;
     customPrompt?: string;
     transcript?: string;
-    aiModel: 'GPT4O' | 'GEMINI' | 'CLAUDE' | 'GPT5';
+    aiModel: AIModel;
     imageSource: 'SCRAP' | 'DALLE' | 'FLUX' | 'NONE';
     imageCount?: number;
     wpCategoryId?: number;
@@ -91,6 +93,7 @@ export async function testPublishAction(data: {
     advCustomImages?: string[];
     useThumbnailTemplate?: boolean;
 }) {
+    let log: any = null;
     try {
         noStore();
         const user = await getOrCreateUser()
@@ -130,40 +133,45 @@ export async function testPublishAction(data: {
 
         const targetKeyword = keywords[Math.floor(Math.random() * keywords.length)]
 
+        // 1. 로그 생성 (에러 추적 및 API 사용 통계용)
+        try {
+            log = await prisma.postLog.create({
+                data: { 
+                    userId: user.id, 
+                    keyword: targetKeyword, 
+                    status: 'PROCESSING'
+                }
+            })
+        } catch (e) {
+            console.error('Failed to create post log:', e);
+        }
+
         let title = ''
         let content = ''
         let aiResult: any = {};
         const systemPrompt = finalPromptContent
 
         try {
-            if (data.aiModel === 'GPT4O') {
+            const modelId = MODEL_ID_MAP[data.aiModel as AIModel] || 'gpt-4o'
+            
+            if (data.aiModel.toString().includes('GPT')) {
                 const apiKey = settings.openaiApiKey
                 if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
-                aiResult = await generateGPTContent(apiKey, systemPrompt, targetKeyword, 'gpt-4o', data.transcript)
-                title = aiResult.title || '테스트 제목'
-                content = convertMarkdownToHtml(aiResult.content || '테스트 본문')
-            } else if (data.aiModel === 'CLAUDE') { // Added CLAUDE case
+                aiResult = await generateGPTContent(apiKey, systemPrompt, targetKeyword, modelId, data.transcript)
+            } else if (data.aiModel.toString().includes('CLAUDE')) {
                 const apiKey = settings.anthropicApiKey
                 if (!apiKey) throw new Error('Claude API 키가 설정되어 있지 않습니다.')
-                aiResult = await generateClaudeContent(apiKey, systemPrompt, targetKeyword, data.transcript)
-                title = aiResult.title || '테스트 제목'
-                content = convertMarkdownToHtml(aiResult.content || '테스트 본문')
-            } else if (data.aiModel === 'GEMINI') { // Explicitly handle GEMINI
+                aiResult = await generateClaudeContent(apiKey, systemPrompt, targetKeyword, modelId, data.transcript)
+            } else if (data.aiModel.toString().includes('GEMINI')) {
                 const apiKey = settings.geminiApiKey
                 if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
-                aiResult = await generateGeminiContent(apiKey, systemPrompt, targetKeyword, data.transcript)
-                title = aiResult.title || '테스트 제목'
-                content = convertMarkdownToHtml(aiResult.content || '테스트 본문')
-            } else if (data.aiModel === 'GPT5') { // Added GPT5 case
-                const apiKey = settings.openaiApiKey
-                if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
-                aiResult = await generateGPTContent(apiKey, systemPrompt, targetKeyword, 'gpt-5-mini', data.transcript)
-                title = aiResult.title || '테스트 제목'
-                content = convertMarkdownToHtml(aiResult.content || '테스트 본문')
+                // lib/automation.ts의 generateGeminiContent는 (apiKey, systemPrompt, targetKeyword, model, transcript) 순서임
+                aiResult = await generateGeminiContent(apiKey, systemPrompt, targetKeyword, modelId, data.transcript)
             } else {
-                // Fallback or error for unsupported AI models if needed
                 throw new Error(`지원하지 않는 AI 모델입니다: ${data.aiModel}`);
             }
+            title = aiResult.title || '테스트 제목'
+            content = convertMarkdownToHtml(aiResult.content || '테스트 본문')
         } catch (err: any) {
             console.error('AI Generation Failed:', err)
             throw new Error(`[AI 생성 실패] ${err.response?.status === 401 ? 'API 키가 유효하지 않습니다.' : err.message}`)
@@ -417,6 +425,19 @@ export async function testPublishAction(data: {
             throw new Error(`[발행 실패] ${err.message} ${err.response?.status ? `(Status: ${err.response.status})` : ''} ${err.response?.data?.message ? `(${err.response.data.message})` : ''}`)
         }
 
+        // 성공 시 로그 업데이트 (토큰 사용량 포함)
+        await prisma.postLog.update({
+            where: { id: log.id },
+            data: {
+                status: 'SUCCESS',
+                title: title,
+                inputTokens: aiResult.usage?.promptTokens || 0,
+                outputTokens: aiResult.usage?.completionTokens || 0,
+                aiModelUsed: aiResult.usage?.modelId || MODEL_ID_MAP[data.aiModel as AIModel] || 'gpt-4o',
+                tokensUsed: 1 // 테스트 발행 고정 1토큰
+            }
+        })
+
         // 성공 시 토큰 차감 (-1)
         await (prisma as any).$executeRawUnsafe(
             'UPDATE "users" SET "tokenBalance" = "tokenBalance" - 1 WHERE "id" = $1',
@@ -428,6 +449,15 @@ export async function testPublishAction(data: {
     } catch (error: any) {
         if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
         console.error('Final Catch in testPublishAction:', error)
+        
+        // 에러 발생 시 로그 실패 처리
+        if (log?.id) {
+            await prisma.postLog.update({
+                where: { id: log.id },
+                data: { status: 'FAILED', errorMessage: error.message }
+            }).catch(() => {})
+        }
+
         return { success: false, error: error.message }
     }
 }
@@ -440,7 +470,7 @@ export async function generateManualContentAction(data: {
     originalContent: string;
     promptId?: string;
     customPrompt?: string;
-    aiModel: 'GPT4O' | 'GEMINI' | 'CLAUDE' | 'GPT5';
+    aiModel: AIModel;
 }) {
     try {
         noStore();
@@ -475,22 +505,20 @@ export async function generateManualContentAction(data: {
 
         let aiResult: any = {};
 
-        if (data.aiModel === 'GPT4O') {
+        const modelId = MODEL_ID_MAP[data.aiModel as AIModel] || 'gpt-4o'
+
+        if (data.aiModel.toString().includes('GPT')) {
             const apiKey = settings.openaiApiKey
             if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
-            aiResult = await generateGPTContent(apiKey, promptContent, targetKeyword, 'gpt-4o', inputContext)
-        } else if (data.aiModel === 'CLAUDE') {
+            aiResult = await generateGPTContent(apiKey, promptContent, targetKeyword, modelId, inputContext)
+        } else if (data.aiModel.toString().includes('CLAUDE')) {
             const apiKey = settings.anthropicApiKey
             if (!apiKey) throw new Error('Claude API 키가 설정되어 있지 않습니다.')
-            aiResult = await generateClaudeContent(apiKey, promptContent, targetKeyword, inputContext)
-        } else if (data.aiModel === 'GEMINI') {
+            aiResult = await generateClaudeContent(apiKey, promptContent, targetKeyword, modelId, inputContext)
+        } else if (data.aiModel.toString().includes('GEMINI')) {
             const apiKey = settings.geminiApiKey
             if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
-            aiResult = await generateGeminiContent(apiKey, promptContent, targetKeyword, inputContext)
-        } else if (data.aiModel === 'GPT5') {
-            const apiKey = settings.openaiApiKey
-            if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
-            aiResult = await generateGPTContent(apiKey, promptContent, targetKeyword, 'gpt-5-mini', inputContext)
+            aiResult = await generateGeminiContent(apiKey, promptContent, targetKeyword, modelId, inputContext)
         } else {
             throw new Error(`지원하지 않는 모델입니다: ${data.aiModel}`)
         }
@@ -533,7 +561,9 @@ export async function runAutomationTask(jobId: string) {
         if (!job) return { success: false, error: '작업을 찾을 수 없거나 권한이 없습니다.' }
 
         // 실행 위임
-        return await processAutomationJob(jobId)
+        const result = await processAutomationJob(jobId)
+        revalidatePath('/dashboard')
+        return result
 
     } catch (error: any) {
         if (error.digest?.startsWith('NEXT_REDIRECT')) throw error
@@ -551,7 +581,7 @@ export async function publishManualAction(data: {
     originalContent: string;
     promptId?: string;
     customPrompt?: string;
-    aiModel: 'GPT4O' | 'GEMINI' | 'CLAUDE' | 'GPT5';
+    aiModel: AIModel;
     siteId: string;
     wpCategoryId?: number;
     postStatus: 'publish' | 'draft';
@@ -603,23 +633,21 @@ export async function publishManualAction(data: {
         let content = ''
         let aiResult: any = {};
 
+        const modelId = MODEL_ID_MAP[data.aiModel as AIModel] || 'gpt-4o'
+
         try {
-            if (data.aiModel === 'GPT4O') {
+            if (data.aiModel.toString().includes('GPT')) {
                 const apiKey = settings.openaiApiKey
                 if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
-                aiResult = await generateGPTContent(apiKey, finalPromptContent, targetKeyword, 'gpt-4o', inputContext)
-            } else if (data.aiModel === 'CLAUDE') {
+                aiResult = await generateGPTContent(apiKey, finalPromptContent, targetKeyword, modelId, inputContext)
+            } else if (data.aiModel.toString().includes('CLAUDE')) {
                 const apiKey = settings.anthropicApiKey
                 if (!apiKey) throw new Error('Claude API 키가 설정되어 있지 않습니다.')
-                aiResult = await generateClaudeContent(apiKey, finalPromptContent, targetKeyword, inputContext)
-            } else if (data.aiModel === 'GEMINI') {
+                aiResult = await generateClaudeContent(apiKey, finalPromptContent, targetKeyword, modelId, inputContext)
+            } else if (data.aiModel.toString().includes('GEMINI')) {
                 const apiKey = settings.geminiApiKey
                 if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
-                aiResult = await generateGeminiContent(apiKey, finalPromptContent, targetKeyword, inputContext)
-            } else if (data.aiModel === 'GPT5') {
-                const apiKey = settings.openaiApiKey
-                if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
-                aiResult = await generateGPTContent(apiKey, finalPromptContent, targetKeyword, 'gpt-5-mini', inputContext)
+                aiResult = await generateGeminiContent(apiKey, finalPromptContent, targetKeyword, modelId, inputContext)
             }
             // Ensure title/content are using the parsed results even if parsing was partial
             title = aiResult.title || targetKeyword;

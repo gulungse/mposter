@@ -236,3 +236,31 @@ export async function getUserProfile() {
         return { success: false, error: '프로필을 불러올 수 없습니다.' }
     }
 }
+
+/**
+ * API 사용 통계 조회
+ */
+export async function getApiUsageStats() {
+    try {
+        const user = await getOrCreateUser()
+        const logs = await prisma.postLog.findMany({
+            where: {
+                userId: user.id,
+                status: 'SUCCESS',
+                aiModelUsed: { not: null }
+            },
+            select: {
+                aiModelUsed: true,
+                inputTokens: true,
+                outputTokens: true,
+                createdAt: true
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        })
+        return { success: true, data: logs }
+    } catch (error) {
+        return { success: false, error: '통계를 불러올 수 없습니다.' }
+    }
+}

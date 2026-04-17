@@ -245,8 +245,22 @@ export function NewTaskModal({ isOpen, onClose, sites, keywordGroups, prompts, i
                                     onChange={e => setFormData({ ...formData, aiModel: e.target.value as any })}
                                     className="w-full bg-slate-50 dark:bg-[#1e293b] rounded-2xl px-4 py-3 text-xs font-bold outline-none cursor-pointer"
                                 >
-                                    <option value="GPT4O">GPT-4o (권장)</option>
-                                    <option value="GEMINI">Gemini 1.5</option>
+                                    <optgroup label="OpenAI (GPT-5 / o1)">
+                                        <option value="GPT_5_4">GPT-5.4 (신규)</option>
+                                        <option value="GPT_5_4_MINI">GPT-5.4 Mini (가속)</option>
+                                        <option value="GPT_5_4_THINKING">GPT-5.4 Thinking (추론)</option>
+                                        <option value="GPT4O">GPT-4o (Legacy)</option>
+                                    </optgroup>
+                                    <optgroup label="Google (Gemini 3.1)">
+                                        <option value="GEMINI_3_1_PRO_PREVIEW">Gemini 3.1 Pro (Preview)</option>
+                                        <option value="GEMINI_2_5_PRO">Gemini 2.5 Pro (Balanced)</option>
+                                        <option value="GEMINI_2_5_FLASH">Gemini 2.5 Flash (Fast)</option>
+                                    </optgroup>
+                                    <optgroup label="Anthropic (Claude 4)">
+                                        <option value="CLAUDE_4_OPUS">Claude 4 Opus (Premium)</option>
+                                        <option value="CLAUDE_4_SONNET">Claude 4 Sonnet (Balanced)</option>
+                                        <option value="CLAUDE_4_HAIKU">Claude 4 Haiku (Fast)</option>
+                                    </optgroup>
                                 </select>
                             </div>
                             <div className="space-y-2">

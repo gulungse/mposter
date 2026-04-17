@@ -2,7 +2,6 @@ import { prisma } from '@/lib/prisma'
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import OpenAI from 'openai'
 import axios from 'axios'
-import { revalidatePath } from 'next/cache'
 import * as cheerio from 'cheerio'
 import { fetchRandomImage } from '@/lib/image_providers'
 import sharp from 'sharp'
@@ -11,6 +10,8 @@ import { createElement } from 'react'
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { calculateNextRun } from '@/lib/cron'
+import { AIModel } from '@prisma/client'
+import { MODEL_ID_MAP } from './ai-models'
 
 /**
  * 생성된 제목에서 불필요한 접두어(그대, <, > 등)를 제거합니다.
@@ -198,26 +199,29 @@ export async function getAvailableGeminiModels(apiKey: string) {
     }
 }
 
-export async function generateGeminiContent(apiKey: string, systemPrompt: string, targetKeyword: string, transcript?: string) {
+export async function generateGeminiContent(apiKey: string, systemPrompt: string, targetKeyword: string, model?: string, transcript?: string) {
     const trimmedKey = apiKey.trim()
 
-    // 1. 사용 가능한 모델 목록 조회 (스마트 감지)
+    // 1. 사용 가능한 모델 목록 조회 (스마트 감지) - 모델이 전달되지 않았을 때만 수행하거나 검증용으로 사용
     const availableModels = await getAvailableGeminiModels(trimmedKey);
     const availableNames = availableModels.map((m: any) => m.name); // 예: ['models/gemini-1.5-flash', ...]
     console.log('Available Gemini Models:', availableNames);
 
-    // 2. 우선순위에 따라 최적의 모델 선택
-    // 사용자 요청: 무조건 Gemini Flash 계열만 사용 (비용 절감)
-    // 우선순위: 2.5 Flash > 2.0 Flash > 1.5 Flash > 기타 Flash
-    let selectedModelName = availableNames.find((name: string) => name.includes('gemini-2.5-flash'))
-        || availableNames.find((name: string) => name.includes('gemini-2.0-flash'))
-        || availableNames.find((name: string) => name.includes('gemini-1.5-flash'))
-        || availableNames.find((name: string) => name.includes('flash'));
+    // 2. 모델 선택 로직
+    let modelId = model;
 
-    // 목록이 없거나 찾지 못해도 최신 Flash 모델로 안전장치
-    let modelId = selectedModelName ? selectedModelName.replace('models/', '') : 'gemini-1.5-flash';
+    // 만약 모델이 전달되지 않았거나, 전달된 모델이 availableNames에 없는 경우 스마트 감지 시도
+    if (!modelId || (availableNames.length > 0 && !availableNames.some((name: string) => name.includes(modelId!)))) {
+        console.log(`Requested model [${modelId}] not found or not provided. Trying smart detection...`);
+        let selectedModelName = availableNames.find((name: string) => name.includes('gemini-2.5-flash'))
+            || availableNames.find((name: string) => name.includes('gemini-2.0-flash'))
+            || availableNames.find((name: string) => name.includes('gemini-1.5-flash'))
+            || availableNames.find((name: string) => name.includes('flash'));
 
-    // 1.5/2.0 등 최신 모델은 v1beta 지원
+        modelId = selectedModelName ? selectedModelName.replace('models/', '') : 'gemini-1.5-flash';
+    }
+
+    // 1.5/2.0/3.1 등 최신 모델은 v1beta 지원
     const version = 'v1beta';
 
     console.log(`Selected Target Model: ${modelId} (${version})`);
@@ -257,6 +261,17 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
         })
 
         text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        const usage = response.data?.usageMetadata || {}
+
+        return {
+            ...cleanAndParseJson(text),
+            usage: {
+                promptTokens: usage.promptTokenCount || 0,
+                completionTokens: usage.candidatesTokenCount || 0,
+                totalTokens: usage.totalTokenCount || 0,
+                modelId: modelId
+            }
+        }
     } catch (err: any) {
         const errMsg = err.response?.data?.error?.message || err.message
         console.warn(`Gemini Generation [${modelId}] failed:`, errMsg)
@@ -272,13 +287,13 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
     }
 
     // JSON 응답 정제 (2중 안전장치 + 스마트 따옴표 처리)
-    return cleanAndParseJson(text);
+    // return cleanAndParseJson(text); // [삭제됨] 위에서 통합 반환 처리
 }
 
 /**
  * Claude (Opus)를 사용하여 콘텐츠를 생성합니다.
  */
-export async function generateClaudeContent(apiKey: string, systemPrompt: string, targetKeyword: string, transcript?: string) {
+export async function generateClaudeContent(apiKey: string, systemPrompt: string, targetKeyword: string, model: string = "claude-4-sonnet", transcript?: string) {
     // 동적 import로 SDK 로드 (서버 사이드에서만 필요)
     const { Anthropic } = await import('@anthropic-ai/sdk');
 
@@ -286,11 +301,11 @@ export async function generateClaudeContent(apiKey: string, systemPrompt: string
         apiKey: apiKey,
     });
 
-    console.log(`[Claude] Starting generation for: "${targetKeyword}" with Opus`);
+    console.log(`[Claude] Starting generation for: "${targetKeyword}" with ${model}`);
 
     try {
         const msg = await anthropic.messages.create({
-            model: "claude-3-opus-20240229",
+            model: model,
             max_tokens: 4096,
             system: `${systemPrompt}\n\n반드시 다음 JSON 형식으로만 응답하세요: {"title": "...", "content": "...", "imageKeywords": ["keyword1", ...], "thumbnailText": "..."}`,
             messages: [
@@ -314,9 +329,17 @@ export async function generateClaudeContent(apiKey: string, systemPrompt: string
         }
 
         let text = textBlock.text;
+        const usage = (msg as any).usage || { input_tokens: 0, output_tokens: 0 }
 
-        // JSON 정제
-        return cleanAndParseJson(text);
+        return {
+            ...cleanAndParseJson(text),
+            usage: {
+                promptTokens: usage.input_tokens || 0,
+                completionTokens: usage.output_tokens || 0,
+                totalTokens: (usage.input_tokens || 0) + (usage.output_tokens || 0),
+                modelId: model
+            }
+        };
 
     } catch (error: any) {
         console.error('Claude API Error:', error);
@@ -421,7 +444,17 @@ ${systemPrompt || '별도의 추가 지침 없음. 자유롭게 작성.'}
         };
     }
 
-    return cleanAndParseJson(rawContent);
+    const usage = completion.usage || { prompt_tokens: 0, completion_tokens: 0 }
+
+    return {
+        ...cleanAndParseJson(rawContent),
+        usage: {
+            promptTokens: usage.prompt_tokens || 0,
+            completionTokens: usage.completion_tokens || 0,
+            totalTokens: usage.total_tokens || 0,
+            modelId: model
+        }
+    };
 }
 
 /**
@@ -965,19 +998,18 @@ export async function processAutomationJob(jobId: string) {
         const aiModel = (job as any).aiModel || 'GPT4O'
         const systemPrompt = job.prompt?.content || 'SEO 블로거로서 글을 작성해줘.'
 
-        if (aiModel === 'GEMINI') {
+        const modelId = MODEL_ID_MAP[aiModel as AIModel] || 'gpt-4o'
+
+        if (aiModel.toString().includes('GEMINI')) {
             if (!settings.geminiApiKey) throw new Error('Gemini API 키가 설정되지 않았습니다. API 관리 메뉴에서 키를 입력해주세요.')
-            aiResult = await generateGeminiContent(settings.geminiApiKey, systemPrompt, targetKeyword)
-        } else if (aiModel === 'CLAUDE') {
+            aiResult = await generateGeminiContent(settings.geminiApiKey, systemPrompt, targetKeyword, modelId, (job as any).transcript)
+        } else if (aiModel.toString().includes('CLAUDE')) {
             if (!settings.anthropicApiKey) throw new Error('Claude API 키가 설정되지 않았습니다. API 관리 메뉴에서 키를 입력해주세요.')
-            aiResult = await generateClaudeContent(settings.anthropicApiKey, systemPrompt, targetKeyword)
-        } else if (aiModel === 'GPT5') {
-            if (!settings.openaiApiKey) throw new Error('OpenAI API 키가 설정되지 않았습니다. API 관리 메뉴에서 키를 입력해주세요.')
-            aiResult = await generateGPTContent(settings.openaiApiKey, systemPrompt, targetKeyword, 'gpt-5-mini')
+            aiResult = await generateClaudeContent(settings.anthropicApiKey, systemPrompt, targetKeyword, modelId)
         } else {
-            // Default: GPT4O
+            // Default: GPT models
             if (!settings.openaiApiKey) throw new Error('OpenAI API 키가 설정되지 않았습니다. API 관리 메뉴에서 키를 입력해주세요.')
-            aiResult = await generateGPTContent(settings.openaiApiKey, systemPrompt, targetKeyword, 'gpt-4o')
+            aiResult = await generateGPTContent(settings.openaiApiKey, systemPrompt, targetKeyword, modelId)
         }
 
         title = aiResult.title || targetKeyword
@@ -1217,10 +1249,13 @@ export async function processAutomationJob(jobId: string) {
         await prisma.postLog.update({
             where: { id: log.id },
             data: {
-                status: 'SUCCESS',
                 postUrl,
                 title,
-                tokensUsed: tokensToDeduct
+                tokensUsed: tokensToDeduct,
+                inputTokens: aiResult.usage?.promptTokens || 0,
+                outputTokens: aiResult.usage?.completionTokens || 0,
+                aiModelUsed: aiResult.usage?.modelId || modelId,
+                status: 'SUCCESS'
             }
         })
 
@@ -1237,8 +1272,6 @@ export async function processAutomationJob(jobId: string) {
                 type: 'USAGE'
             }
         })
-
-        revalidatePath('/dashboard')
 
         // 성공 시 다음 실행 시간 및 이미지 인덱스 업데이트
         await (prisma.automationJob as any).update({

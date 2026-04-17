@@ -14,7 +14,8 @@ import {
     Image as ImageIcon,
     Plus,
     X,
-    Images
+    Images,
+    Brain
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -56,7 +57,7 @@ function TaskForm() {
         keywordGroupId: '',
         promptId: '',
         scheduleCron: '0 * * * *',
-        aiModel: 'GPT5',
+        aiModel: 'GPT_5_4',
         imageSource: 'DALLE',
         imageCount: 1,
         wpCategoryId: undefined as number | undefined,
@@ -405,61 +406,116 @@ function TaskForm() {
                         <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary font-black text-xs">3</div>
                         <h3 className="text-lg font-bold text-foreground">글쓰기 AI 선택</h3>
                     </div>
-                    <div className="pl-9 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div
-                            onClick={() => setFormData({ ...formData, aiModel: 'GPT4O' })}
-                            className={`cursor-pointer rounded-lg border p-4 flex items-start gap-3 transition-all ${formData.aiModel === 'GPT4O' ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-primary/50'}`}
-                        >
-                            <div className="h-8 w-8 rounded bg-green-500/10 flex items-center justify-center text-green-500 shrink-0">
-                                <SparklesIcon className="h-4 w-4" />
+                    <div className="pl-9 space-y-10">
+                        {/* OpenAI Section */}
+                        <div className="space-y-4">
+                            <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] px-1 opacity-80">OpenAI (GPT-5 / o1)</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <ModelCard 
+                                    selected={formData.aiModel === 'GPT_5_4'} 
+                                    onClick={() => setFormData({ ...formData, aiModel: 'GPT_5_4' })}
+                                    icon={<SparklesIcon className="h-4 w-4" />}
+                                    iconBg="bg-emerald-500/10"
+                                    iconColor="text-emerald-500"
+                                    title="GPT-5.4"
+                                    description="최신 GPT-5 시리즈. 압도적인 지능과 성능."
+                                />
+                                <ModelCard 
+                                    selected={formData.aiModel === 'GPT_5_4_MINI'} 
+                                    onClick={() => setFormData({ ...formData, aiModel: 'GPT_5_4_MINI' })}
+                                    icon={<ZapIcon className="h-4 w-4" />}
+                                    iconBg="bg-emerald-500/10"
+                                    iconColor="text-emerald-500"
+                                    title="GPT-5.4 mini"
+                                    description="최고의 속도와 효율성을 가진 경량 모델."
+                                />
+                                <ModelCard 
+                                    selected={formData.aiModel === 'GPT_5_4_THINKING'} 
+                                    onClick={() => setFormData({ ...formData, aiModel: 'GPT_5_4_THINKING' })}
+                                    icon={<Brain className="h-4 w-4" />}
+                                    iconBg="bg-emerald-500/10"
+                                    iconColor="text-emerald-500"
+                                    title="GPT-5 Thinking"
+                                    description="복잡한 추론과 깊은 분석이 필요한 작업용."
+                                />
+                                <ModelCard 
+                                    selected={formData.aiModel === 'GPT4O'} 
+                                    onClick={() => setFormData({ ...formData, aiModel: 'GPT4O' })}
+                                    icon={<SparklesIcon className="h-4 w-4" />}
+                                    iconBg="bg-emerald-600/10"
+                                    iconColor="text-emerald-600"
+                                    title="GPT-4o (Legacy)"
+                                    description="검증된 안정성과 창의성을 제공합니다."
+                                />
                             </div>
-                            <div>
-                                <h4 className="font-bold text-sm text-foreground">ChatGPT-4o</h4>
-                                <p className="text-xs text-muted-foreground mt-0.5">창의적이고 매력적인 콘텐츠 생성에 적합합니다.</p>
-                            </div>
-                            {formData.aiModel === 'GPT4O' && <CheckCircle2Icon className="ml-auto h-4 w-4 text-primary" />}
                         </div>
 
-                        <div
-                            onClick={() => setFormData({ ...formData, aiModel: 'CLAUDE' })}
-                            className={`cursor-pointer rounded-lg border p-4 flex items-start gap-3 transition-all ${formData.aiModel === 'CLAUDE' ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-primary/50'}`}
-                        >
-                            <div className="h-8 w-8 rounded bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0">
-                                <BotIcon className="h-4 w-4" />
+                        {/* Google Section */}
+                        <div className="space-y-4">
+                            <h4 className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] px-1 opacity-80">Google (Gemini 3.1 / 2.5)</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <ModelCard 
+                                    selected={formData.aiModel === 'GEMINI_3_1_PRO_PREVIEW'} 
+                                    onClick={() => setFormData({ ...formData, aiModel: 'GEMINI_3_1_PRO_PREVIEW' })}
+                                    icon={<Plus className="h-4 w-4" />}
+                                    iconBg="bg-blue-500/10"
+                                    iconColor="text-blue-500"
+                                    title="Gemini 3.1 Pro"
+                                    description="차세대 초거대 AI 프리뷰. 극강의 컨텍스트."
+                                />
+                                <ModelCard 
+                                    selected={formData.aiModel === 'GEMINI_2_5_PRO'} 
+                                    onClick={() => setFormData({ ...formData, aiModel: 'GEMINI_2_5_PRO' })}
+                                    icon={<ZapIcon className="h-4 w-4" />}
+                                    iconBg="bg-blue-600/10"
+                                    iconColor="text-blue-600"
+                                    title="Gemini 2.5 Pro"
+                                    description="안정적인 비즈니스 추론 및 고도화된 작성."
+                                />
+                                <ModelCard 
+                                    selected={formData.aiModel === 'GEMINI_2_5_FLASH'} 
+                                    onClick={() => setFormData({ ...formData, aiModel: 'GEMINI_2_5_FLASH' })}
+                                    icon={<ZapIcon className="h-4 w-4" />}
+                                    iconBg="bg-blue-400/10"
+                                    iconColor="text-blue-400"
+                                    title="Gemini 2.5 Flash"
+                                    description="대용량 데이터의 즉각적인 처리와 요약에 특화."
+                                />
                             </div>
-                            <div>
-                                <h4 className="font-bold text-sm text-foreground">Claude 3 Opus</h4>
-                                <p className="text-xs text-muted-foreground mt-0.5">가장 자연스럽고 인간적인 글쓰기 능력.</p>
-                            </div>
-                            {formData.aiModel === 'CLAUDE' && <CheckCircle2Icon className="ml-auto h-4 w-4 text-primary" />}
                         </div>
 
-                        <div
-                            onClick={() => setFormData({ ...formData, aiModel: 'GEMINI' })}
-                            className={`cursor-pointer rounded-lg border p-4 flex items-start gap-3 transition-all ${formData.aiModel === 'GEMINI' ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-primary/50'}`}
-                        >
-                            <div className="h-8 w-8 rounded bg-purple-500/10 flex items-center justify-center text-purple-500 shrink-0">
-                                <ZapIcon className="h-4 w-4" />
+                        {/* Anthropic Section */}
+                        <div className="space-y-4">
+                            <h4 className="text-[10px] font-black text-orange-500 uppercase tracking-[0.2em] px-1 opacity-80">Anthropic (Claude 4)</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <ModelCard 
+                                    selected={formData.aiModel === 'CLAUDE_4_OPUS'} 
+                                    onClick={() => setFormData({ ...formData, aiModel: 'CLAUDE_4_OPUS' })}
+                                    icon={<BotIcon className="h-4 w-4" />}
+                                    iconBg="bg-orange-500/10"
+                                    iconColor="text-orange-500"
+                                    title="Claude 4 Opus"
+                                    description="인간과 가장 유사한 최고 수준의 문장력."
+                                />
+                                <ModelCard 
+                                    selected={formData.aiModel === 'CLAUDE_4_SONNET'} 
+                                    onClick={() => setFormData({ ...formData, aiModel: 'CLAUDE_4_SONNET' })}
+                                    icon={<BotIcon className="h-4 w-4" />}
+                                    iconBg="bg-orange-600/10"
+                                    iconColor="text-orange-600"
+                                    title="Claude 4 Sonnet"
+                                    description="속도와 지능의 완벽한 조화를 제공합니다."
+                                />
+                                <ModelCard 
+                                    selected={formData.aiModel === 'CLAUDE_4_HAIKU'} 
+                                    onClick={() => setFormData({ ...formData, aiModel: 'CLAUDE_4_HAIKU' })}
+                                    icon={<ZapIcon className="h-4 w-4" />}
+                                    iconBg="bg-orange-400/10"
+                                    iconColor="text-orange-400"
+                                    title="Claude 4 Haiku"
+                                    description="가장 빠른 속도의 즉각적인 텍스트 생성."
+                                />
                             </div>
-                            <div>
-                                <h4 className="font-bold text-sm text-foreground">Gemini 2.5 Flash</h4>
-                                <p className="text-xs text-muted-foreground mt-0.5">빠르고 효율적이며 무료 티어 한도가 넉넉합니다.</p>
-                            </div>
-                            {formData.aiModel === 'GEMINI' && <CheckCircle2Icon className="ml-auto h-4 w-4 text-primary" />}
-                        </div>
-
-                        <div
-                            onClick={() => setFormData({ ...formData, aiModel: 'GPT5' })}
-                            className={`cursor-pointer rounded-lg border p-4 flex items-start gap-3 transition-all ${formData.aiModel === 'GPT5' ? 'border-primary bg-primary/5' : 'border-border bg-card hover:border-primary/50'}`}
-                        >
-                            <div className="h-8 w-8 rounded bg-teal-500/10 flex items-center justify-center text-teal-500 shrink-0">
-                                <SparklesIcon className="h-4 w-4" />
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-sm text-foreground">GPT-5 mini</h4>
-                                <p className="text-xs text-muted-foreground mt-0.5">GPT-5의 경량화 모델. 빠르고 효율적인 성능.</p>
-                            </div>
-                            {formData.aiModel === 'GPT5' && <CheckCircle2Icon className="ml-auto h-4 w-4 text-primary" />}
                         </div>
                     </div>
 
@@ -831,9 +887,27 @@ function TaskForm() {
     )
 }
 
+function ModelCard({ selected, onClick, icon, iconBg, iconColor, title, description }: { selected: boolean, onClick: () => void, icon: React.ReactNode, iconBg: string, iconColor: string, title: string, description: string }) {
+    return (
+        <div
+            onClick={onClick}
+            className={`cursor-pointer rounded-xl border p-4 flex items-start gap-3 transition-all transform hover:scale-[1.02] active:scale-95 ${selected ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10 ring-1 ring-primary/20' : 'border-border bg-card/50 hover:border-primary/50 hover:bg-card'}`}
+        >
+            <div className={clsx("h-9 w-9 rounded-lg flex items-center justify-center shrink-0 shadow-sm", iconBg, iconColor)}>
+                {icon}
+            </div>
+            <div className="flex-1 min-w-0">
+                <h4 className="font-black text-[13px] text-foreground tracking-tight">{title}</h4>
+                <p className="text-[10px] text-muted-foreground mt-0.5 font-medium leading-tight">{description}</p>
+            </div>
+            {selected && <CheckCircle2Icon className="h-4 w-4 text-primary shrink-0" />}
+        </div>
+    )
+}
+
 export default function NewTaskPage() {
     return (
-        <Suspense fallback={<div className="p-12 text-center text-slate-500 font-bold">로딩 중...</div>}>
+        <Suspense fallback={<div className="p-12 text-center text-slate-500 font-bold uppercase tracking-widest animate-pulse">Initializing Engine...</div>}>
             <TaskForm />
         </Suspense>
     )
