@@ -24,6 +24,7 @@ import { getPrompts } from '@/app/actions/prompt'
 import { createAutomationTask, getAutomationTask, updateAutomationTask } from '@/app/actions/task'
 import { testPublishAction } from '@/app/actions/worker'
 import { getUserProfile } from '@/app/actions/user'
+import { getGlobalSettings } from '@/app/actions/settings'
 import { clsx } from 'clsx'
 
 function TaskForm() {
@@ -42,6 +43,7 @@ function TaskForm() {
     const [prompts, setPrompts] = useState<any[]>([])
     const [categories, setCategories] = useState<{ id: number, name: string }[]>([])
     const [hasAdvancedRights, setHasAdvancedRights] = useState(false)
+    const [costs, setCosts] = useState({ costPerPost: 1, costPerScrap: 1, costPerAIImage: 2 })
 
     const [formData, setFormData] = useState({
         name: '',
@@ -75,16 +77,24 @@ function TaskForm() {
 
     useEffect(() => {
         const loadInitialData = async () => {
-            const [sitesRes, keywordsRes, promptsRes, profileRes] = await Promise.all([
+            const [sitesRes, keywordsRes, promptsRes, profileRes, settingsRes] = await Promise.all([
                 getSites(),
                 getKeywordGroups(),
                 getPrompts(),
-                getUserProfile()
+                getUserProfile(),
+                getGlobalSettings()
             ])
             if (sitesRes.success) setSites(sitesRes.data || [])
             if (keywordsRes.success) setKeywordGroups(keywordsRes.data || [])
             if (promptsRes.success) setPrompts(promptsRes.data || [])
             if (profileRes.success) setHasAdvancedRights(profileRes.data?.hasImageGenRights || false)
+            if (settingsRes.success && settingsRes.data) {
+                setCosts({
+                    costPerPost: settingsRes.data.costPerPost || 1,
+                    costPerScrap: settingsRes.data.costPerScrap || 1,
+                    costPerAIImage: settingsRes.data.costPerAIImage || 2
+                })
+            }
 
             // If editing, load task data
             if (editTaskId) {
@@ -744,11 +754,21 @@ function TaskForm() {
             </div>
 
             {/* Sticky Bottom Actions */}
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/90 backdrop-blur border-t border-border z-20 pl-64">
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/90 backdrop-blur border-t border-border z-20 pl-64 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
                 <div className="max-w-5xl mx-auto flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                        <span className="text-[10px] font-medium text-muted-foreground">자동 저장: <span className="text-foreground">켜짐</span></span>
+                    <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-foreground">💡 예상 소모 비용:</span>
+                            <span className="px-3 py-1.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-lg text-sm font-black flex items-center gap-1.5 shadow-inner">
+                                <ZapIcon className="h-4 w-4" />
+                                1회당 {costs.costPerPost + (formData.imageSource === 'SCRAP' ? costs.costPerScrap * formData.imageCount : (formData.imageSource === 'DALLE' || formData.imageSource === 'FLUX' ? costs.costPerAIImage * formData.imageCount : 0))} 토큰
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2 ml-1">
+                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                            <span className="text-[10px] text-muted-foreground font-medium">자동 저장 설정됨</span>
+                            <span className="text-[10px] text-muted-foreground opacity-60">| 기본 {costs.costPerPost}T + 이미지 추가비용</span>
+                        </div>
                     </div>
                     <div className="flex items-center gap-3">
                         <button
