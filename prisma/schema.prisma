@@ -139,6 +139,8 @@ model AutomationJob {
   advCustomImages   String[]
   advNextImageIdx   Int       @default(0)
   useThumbnailTemplate Boolean @default(true)
+  isAgreed          Boolean   @default(false)
+  agreedAt          DateTime?
   keywordGroup      KeywordGroup? @relation(fields: [keywordGroupId], references: [id], onDelete: Cascade)
   prompt            Prompt?       @relation(fields: [promptId], references: [id])
   site              Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)

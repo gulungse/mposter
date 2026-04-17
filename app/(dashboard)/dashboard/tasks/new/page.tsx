@@ -26,6 +26,8 @@ import { testPublishAction } from '@/app/actions/worker'
 import { getUserProfile } from '@/app/actions/user'
 import { getGlobalSettings } from '@/app/actions/settings'
 import { clsx } from 'clsx'
+import { TaskAgreementModal } from '@/components/task/task-agreement-modal'
+import { ShieldCheck } from 'lucide-react'
 
 function TaskForm() {
     const router = useRouter()
@@ -36,6 +38,9 @@ function TaskForm() {
     const [submitting, setSubmitting] = useState(false)
     const [testing, setTesting] = useState(false)
     const [fetchingCategories, setFetchingCategories] = useState(false)
+    const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false)
+    const [isAgreed, setIsAgreed] = useState(false)
+    const [taskDataFromDb, setTaskDataFromDb] = useState<any>(null)
 
     // Data lists
     const [sites, setSites] = useState<any[]>([])
@@ -130,6 +135,7 @@ function TaskForm() {
                         advCustomImages: (t as any).advCustomImages || [],
                         useThumbnailTemplate: (t as any).useThumbnailTemplate ?? true
                     })
+                    setTaskDataFromDb(t)
                 } else {
                     alert('작업 정보를 불러올 수 없습니다.')
                     router.push('/dashboard/tasks')
@@ -204,7 +210,7 @@ function TaskForm() {
         setTesting(false)
     }
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (bypassAgreement = false) => {
         let finalGroupId: string | undefined = formData.keywordGroupId
         let finalKeywords: string[] | undefined = undefined
 
@@ -222,11 +228,18 @@ function TaskForm() {
             }
         }
 
+        // 새 작업인 경우 동의 팝업 체크
+        if (!editTaskId && !bypassAgreement) {
+            setIsAgreementModalOpen(true)
+            return
+        }
+
         setSubmitting(true)
         const submitData = {
             ...formData,
             keywordGroupId: finalGroupId,
-            keywords: finalKeywords
+            keywords: finalKeywords,
+            isAgreed: true // 명시적 동의 후 등록
         }
 
         let result
@@ -261,6 +274,20 @@ function TaskForm() {
                             {editTaskId ? '자동화 작업 수정' : '새 자동화 작업 만들기'}
                         </h1>
                         <p className="text-muted-foreground mt-1 text-sm">AI 기반 콘텐츠 생성 워크플로우를 설정하세요.</p>
+                        
+                        {editTaskId && (taskDataFromDb as any)?.isAgreed && (
+                            <div className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 rounded-lg w-fit animate-in fade-in slide-in-from-left-2 duration-500">
+                                <ShieldCheck className="h-4 w-4" />
+                                <span className="text-[11px] font-black uppercase tracking-tight">
+                                    자동화작업 서비스 이용 사전 동의 및 제한고지 동의완료
+                                    {(taskDataFromDb as any).agreedAt && (
+                                        <span className="ml-2 font-medium opacity-80">
+                                            ({new Date((taskDataFromDb as any).agreedAt).toLocaleString('ko-KR')})
+                                        </span>
+                                    )}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -772,7 +799,7 @@ function TaskForm() {
                     </div>
                     <div className="flex items-center gap-3">
                         <button
-                            onClick={handleTestPublish}
+                            onClick={() => handleTestPublish()}
                             disabled={testing || submitting}
                             className="px-6 py-4 bg-card hover:bg-muted border border-border text-foreground rounded-xl text-base font-bold flex items-center gap-2 transition-all disabled:opacity-50"
                         >
@@ -780,7 +807,7 @@ function TaskForm() {
                             테스트 발행
                         </button>
                         <button
-                            onClick={handleSubmit}
+                            onClick={() => handleSubmit()}
                             disabled={submitting || testing}
                             className="px-8 py-4 bg-primary hover:opacity-90 text-primary-foreground rounded-xl text-base font-bold shadow-lg shadow-blue-500/20 flex items-center gap-2 transition-all disabled:opacity-50"
                         >
@@ -791,6 +818,15 @@ function TaskForm() {
                 </div>
             </div>
             <div className="h-24" /> {/* Spacer for fixed bottom bar */}
+
+            <TaskAgreementModal 
+                isOpen={isAgreementModalOpen}
+                onClose={() => setIsAgreementModalOpen(false)}
+                onConfirm={() => {
+                    setIsAgreementModalOpen(false)
+                    handleSubmit(true)
+                }}
+            />
         </div >
     )
 }

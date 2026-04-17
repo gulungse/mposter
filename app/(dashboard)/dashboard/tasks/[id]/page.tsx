@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Clock, Globe, Hash, MonitorPlay, Zap, Trash2, Play, Pause, ExternalLink, ClipboardList } from 'lucide-react'
+import { ArrowLeft, Clock, Globe, Hash, MonitorPlay, Zap, Trash2, Play, Pause, ExternalLink, ClipboardList, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import { getAutomationTask, deleteAutomationTask, toggleTaskStatus } from '@/app/actions/task'
 import { runAutomationTask } from '@/app/actions/worker'
@@ -62,8 +62,28 @@ export default function TaskDetailPage() {
                         <ArrowLeft className="h-5 w-5" />
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-black tracking-tight">{task.name}</h1>
-                        <p className="text-slate-500 text-sm mt-1">작업 상세 정보 및 실행 이력</p>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-2xl font-black tracking-tight">{task.name}</h1>
+                            {task.isAgreed && (
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 rounded-full animate-in fade-in zoom-in-95 duration-500 shadow-sm shadow-green-500/10">
+                                    <ShieldCheck className="h-3.5 w-3.5" />
+                                    <span className="text-[10px] font-black uppercase tracking-tight">서비스 이용 동의 완료</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <p className="text-slate-500 text-sm mt-1">작업 상세 정보 및 실행 이력</p>
+                            {task.isAgreed && (
+                                <p className="text-[10px] text-green-600 dark:text-green-400 font-bold flex items-center gap-1.5">
+                                    ✓ 자동화작업 서비스 이용 사전 동의 및 제한고지 동의완료
+                                    {task.agreedAt && (
+                                        <span className="opacity-70 font-medium tracking-tight">
+                                            ({new Date(task.agreedAt).toLocaleString('ko-KR')})
+                                        </span>
+                                    )}
+                                </p>
+                            )}
+                        </div>
                     </div>
                 </div>
                 <div className="flex gap-2">

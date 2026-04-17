@@ -30,6 +30,7 @@ export async function createAutomationTask(data: {
     advImageMode?: string;
     advCustomImages?: string[];
     useThumbnailTemplate?: boolean;
+    isAgreed?: boolean;
 }) {
     try {
         const user = await getOrCreateUser()
@@ -62,6 +63,8 @@ export async function createAutomationTask(data: {
                 advCustomImages: data.advCustomImages || [],
                 useThumbnailTemplate: data.useThumbnailTemplate ?? true,
                 advNextImageIdx: 0,
+                isAgreed: data.isAgreed || false,
+                agreedAt: data.isAgreed ? new Date() : null,
                 // 스케줄에 따른 첫 실행 시간 설정 (등록 직후 실행 방지, 지정된 간격 후 실행)
                 nextRunAt: calculateNextRun(data.scheduleCron)
             }
@@ -217,6 +220,8 @@ export async function copyAutomationTask(id: string) {
             advCustomImages: originalJob.advCustomImages,
             advNextImageIdx: 0,
             useThumbnailTemplate: (originalJob as any).useThumbnailTemplate,
+            isAgreed: false, // 복사본은 새로운 작업으로 간주하여 재동의 필요
+            agreedAt: null,
             // 새 스케줄 계산
             nextRunAt: originalJob.scheduleCron ? calculateNextRun(originalJob.scheduleCron) : null
         }

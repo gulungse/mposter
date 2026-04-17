@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, Zap, Globe, Hash, MonitorPlay, Loader2, Save, Sparkles, Layers, Image as ImageIcon, Clock, LayoutGrid, CheckCircle2, PlayCircle } from 'lucide-react'
 import { clsx } from 'clsx'
 import { getWordPressCategories } from '@/app/actions/site'
+import { TaskAgreementModal } from './task-agreement-modal'
 import { createAutomationTask } from '@/app/actions/task'
 import { testPublishAction } from '@/app/actions/worker'
 import { useRouter } from 'next/navigation'
@@ -22,6 +23,7 @@ export function NewTaskModal({ isOpen, onClose, sites, keywordGroups, prompts, i
     const [submitting, setSubmitting] = useState(false)
     const [testing, setTesting] = useState(false)
     const [fetchingCategories, setFetchingCategories] = useState(false)
+    const [isAgreementModalOpen, setIsAgreementModalOpen] = useState(false)
     const [categories, setCategories] = useState<{ id: number, name: string }[]>([])
 
     const [formData, setFormData] = useState({
@@ -81,13 +83,22 @@ export function NewTaskModal({ isOpen, onClose, sites, keywordGroups, prompts, i
         setTesting(false)
     }
 
-    const handleSubmit = async () => {
+    const handleSubmit = async (bypassAgreement = false) => {
         if (!formData.name || !formData.siteId || !formData.keywordGroupId || !formData.promptId) {
             alert('모든 필수 항목을 선택해주세요.')
             return
         }
+
+        if (!bypassAgreement) {
+            setIsAgreementModalOpen(true)
+            return
+        }
+
         setSubmitting(true)
-        const result = await createAutomationTask(formData as any)
+        const result = await createAutomationTask({
+            ...formData,
+            isAgreed: true
+        } as any)
         if (result.success) {
             onClose()
             router.push('/dashboard/tasks')
@@ -295,7 +306,7 @@ export function NewTaskModal({ isOpen, onClose, sites, keywordGroups, prompts, i
                         실제 사이트 테스트 발행
                     </button>
                     <button
-                        onClick={handleSubmit}
+                        onClick={() => handleSubmit()}
                         disabled={submitting || testing}
                         className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-10 py-4 rounded-2xl font-black text-sm shadow-xl shadow-blue-500/20 flex items-center gap-2 transition-all active:scale-95"
                     >
@@ -304,6 +315,15 @@ export function NewTaskModal({ isOpen, onClose, sites, keywordGroups, prompts, i
                     </button>
                 </div>
             </div>
+
+            <TaskAgreementModal 
+                isOpen={isAgreementModalOpen}
+                onClose={() => setIsAgreementModalOpen(false)}
+                onConfirm={() => {
+                    setIsAgreementModalOpen(false)
+                    handleSubmit(true)
+                }}
+            />
         </div>
     )
 }
