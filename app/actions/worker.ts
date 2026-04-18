@@ -343,7 +343,15 @@ export async function testPublishAction(data: {
                 }
             }
         }
-        content = $.html();
+        // Blogger의 경우 <html><body> 껍데기를 모두 벗기고 body 내부의 순수 블록만 담아야
+        // Blogger 에디터의 '작성(Compose)' 모드에서 정상적으로 표시됩니다.
+        if (site.type === 'BLOGSPOT') {
+            const bodyHtml = $('body').html();
+            content = (bodyHtml || $.html()).trim();
+            content = `<div class="blogger-post-wrapper">\n${content}\n</div>`;
+        } else {
+            content = $.html();
+        }
 
 
         // 실제 사이트 발행
@@ -854,7 +862,14 @@ export async function publishManualAction(data: {
             }
         }
 
-        content = $.html();
+        // Blogger 에디터용 HTML 정리 (HTML 껍데기 제거 및 div 래핑)
+        if (site.type === 'BLOGSPOT') {
+            const bodyHtml = $('body').html();
+            content = (bodyHtml || $.html()).trim();
+            content = `<div class="blogger-post-wrapper">\n${content}\n</div>`;
+        } else {
+            content = $.html();
+        }
 
         // 4. 사이트 발행
         try {

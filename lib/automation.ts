@@ -50,24 +50,25 @@ function cleanAndParseJson(text: string): any {
         const parsed = JSON.parse(cleaned);
         // HTML 태그 정제 (<html>, <head>, <body>, <style>, <script> 제거)
         if (parsed.content) {
-            parsed.content = parsed.content
-                .replace(/\\n/g, '\n') // AI가 이스케이프한 줄바꿈 복원
-                .replace(/<!DOCTYPE[^>]*>/ig, '')
-                .replace(/<html[^>]*>/ig, '')
-                .replace(/<\/html>/ig, '')
-                .replace(/<head>[\s\S]*?<\/head>/ig, '')
-                .replace(/<body[^>]*>/ig, '')
-                .replace(/<\/body>/ig, '')
-                .replace(/<style[\s\S]*?<\/style>/ig, '')
-                .replace(/<script[\s\S]*?<\/script>/ig, '')
-                .trim();
+            // AI가 이스케이프한 줄바꿈 복원
+            let content = parsed.content.replace(/\\n/g, '\n');
+
+            // cheerio를 사용하여 확실하게 body 내부만 추출
+            const $ = cheerio.load(content, { decodeEntities: false });
+            
+            // 위험 태그 제거
+            $('script, style, head, title, meta, link, iframe').remove();
+            
+            // body가 있으면 그 내부만, 없으면 전체에서 body/html 등 검색하여 제거
+            const bodyHtml = $('body').html();
+            parsed.content = (bodyHtml || $.html()).trim();
         }
         if (parsed.title) {
             parsed.title = cleanTitle(parsed.title);
         }
         return parsed;
     } catch (e) {
-        // Fallback: Regex로 최소한 title과 content만이라도 추출 시도 ([\s\S] 사용하여 줄바꿈 포함 매칭)
+        // Fallback: Regex로 최소한 title과 content만이라도 추출 시도
         const titleMatch = cleaned.match(/"title"\s*:\s*"([\s\S]*?)"/);
         const contentMatch = cleaned.match(/"content"\s*:\s*"([\s\S]*?)"/);
 
@@ -75,30 +76,20 @@ function cleanAndParseJson(text: string): any {
             const title = titleMatch ? titleMatch[1].replace(/\\"/g, '"').replace(/\\n/g, ' ') : '';
             let content = contentMatch ? contentMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n') : text;
 
-            content = content
-                .replace(/<!DOCTYPE[^>]*>/ig, '')
-                .replace(/<html[^>]*>/ig, '')
-                .replace(/<\/html>/ig, '')
-                .replace(/<head>[\s\S]*?<\/head>/ig, '')
-                .replace(/<body[^>]*>/ig, '')
-                .replace(/<\/body>/ig, '')
-                .trim();
+            // Failsafe cleaning for fallback
+            const $ = cheerio.load(content, { decodeEntities: false });
+            $('script, style, head, title, meta, link, iframe').remove();
+            const bodyHtml = $('body').html();
+            content = (bodyHtml || $.html()).trim();
 
             return { title: cleanTitle(title), content: content, imageKeywords: [], thumbnailText: '' };
         }
 
-        // 최후의 수단: 전체 텍스트를 content로
-        let content = text;
-        content = content
-            .replace(/<!DOCTYPE[^>]*>/ig, '')
-            .replace(/<html[^>]*>/ig, '')
-            .replace(/<\/html>/ig, '')
-            .replace(/<head>[\s\S]*?<\/head>/ig, '')
-            .replace(/<body[^>]*>/ig, '')
-            .replace(/<\/body>/ig, '')
-            .trim();
-
-        return { title: '', content: content, imageKeywords: [] };
+        // 최후의 수단: 전체 텍스트를 content로 사용하되 태그 정제
+        const $ = cheerio.load(text, { decodeEntities: false });
+        $('script, style, head, title, meta, link, iframe').remove();
+        const bodyHtml = $('body').html();
+        return { title: '', content: (bodyHtml || $.html()).trim(), imageKeywords: [] };
     }
 }
 
@@ -1174,7 +1165,15 @@ export async function processAutomationJob(jobId: string) {
                 }
             }
         }
-        content = $.html();
+        // Blogger의 경우 <html><body> 태그가 포함되면 에디터에서 빈 화면으로 보일 수 있음
+        // 따라서 body 내부의 HTML만 추출하고, 전체를 <div>로 감싸서 전달하여 안정성 확보
+        if (job.site.type === 'BLOGSPOT') {
+            const bodyHtml = $('body').html();
+            content = (bodyHtml || $.html()).trim();
+            content = `<div class="blogger-post-wrapper">\n${content}\n</div>`;
+        } else {
+            content = $.html();
+        }
 
         let postUrl = ''
         if (job.site.type === 'WORDPRESS') {
