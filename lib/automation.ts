@@ -54,7 +54,7 @@ function cleanAndParseJson(text: string): any {
             let content = parsed.content.replace(/\\n/g, '\n');
 
             // cheerio를 사용하여 확실하게 body 내부만 추출
-            const $ = cheerio.load(content, { decodeEntities: false });
+            const $ = cheerio.load(content);
             
             // 위험 태그 제거
             $('script, style, head, title, meta, link, iframe').remove();
@@ -77,7 +77,7 @@ function cleanAndParseJson(text: string): any {
             let content = contentMatch ? contentMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n') : text;
 
             // Failsafe cleaning for fallback
-            const $ = cheerio.load(content, { decodeEntities: false });
+            const $ = cheerio.load(content);
             $('script, style, head, title, meta, link, iframe').remove();
             const bodyHtml = $('body').html();
             content = (bodyHtml || $.html()).trim();
@@ -86,7 +86,7 @@ function cleanAndParseJson(text: string): any {
         }
 
         // 최후의 수단: 전체 텍스트를 content로 사용하되 태그 정제
-        const $ = cheerio.load(text, { decodeEntities: false });
+        const $ = cheerio.load(text);
         $('script, style, head, title, meta, link, iframe').remove();
         const bodyHtml = $('body').html();
         return { title: '', content: (bodyHtml || $.html()).trim(), imageKeywords: [] };
