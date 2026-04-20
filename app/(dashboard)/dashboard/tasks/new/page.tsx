@@ -238,8 +238,15 @@ function TaskForm() {
         }
 
         setSubmitting(true)
+        let finalInitialRunAt = formData.initialRunAt
+        if (finalInitialRunAt) {
+            // 브라우저 로컬 시간을 UTC 기준 ISO 문자열로 변환하여 서버에 전달 (타임존 오류 방지)
+            finalInitialRunAt = new Date(finalInitialRunAt).toISOString()
+        }
+
         const submitData = {
             ...formData,
+            initialRunAt: finalInitialRunAt,
             keywordGroupId: finalGroupId,
             keywords: finalKeywords,
             isAgreed: true // 명시적 동의 후 등록
