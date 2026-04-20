@@ -29,7 +29,15 @@ export async function GET(request: Request) {
 
             // 1. Prevent concurrent executions (Atomic Lock)
             if (job.scheduleCron && job.scheduleCron !== 'MANUAL') {
-                const nextDate = calculateNextRun(job.scheduleCron)
+                // 이전 대기시간 또는 소요시간에 의한 드리프트(밀림 현상) 방지
+                // 설정된 원래 예정 시간을 기준으로 다음 시간을 계산함
+                let nextDate = calculateNextRun(job.scheduleCron, job.nextRunAt || new Date())
+                
+                // 만약 서버 정지 등으로 인해 계산된 다음 시간이 여전히 과거라면 현실적인 현재 시간 기준으로 재조정
+                if (nextDate <= new Date()) {
+                    nextDate = calculateNextRun(job.scheduleCron)
+                }
+
                 const lockResult = await prisma.automationJob.updateMany({
                     where: { id: job.id, nextRunAt: job.nextRunAt },
                     data: { nextRunAt: nextDate }

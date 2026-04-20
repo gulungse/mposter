@@ -1281,7 +1281,8 @@ export async function processAutomationJob(jobId: string) {
             where: { id: jobId },
             data: {
                 lastRunAt: new Date(),
-                nextRunAt: calculateNextRun(job.scheduleCron!),
+                // nextRunAt는 cron 스케줄단(app/api/cron/route.ts)에서 이미 Lock을 걸면서 
+                // 정확한 주기로 지정해두었으므로 여기서 덮어쓰지 않습니다 (종료 시간 기준 밀림 방지).
                 advNextImageIdx: customImages.length > 0 ? (currentImageIdx + imagesUsedCount) % customImages.length : 0
             }
         });
