@@ -31,6 +31,7 @@ export async function createAutomationTask(data: {
     advCustomImages?: string[];
     useThumbnailTemplate?: boolean;
     isAgreed?: boolean;
+    initialRunAt?: string | null;
 }) {
     try {
         const user = await getOrCreateUser()
@@ -65,8 +66,8 @@ export async function createAutomationTask(data: {
                 advNextImageIdx: 0,
                 isAgreed: data.isAgreed || false,
                 agreedAt: data.isAgreed ? new Date() : null,
-                // 스케줄에 따른 첫 실행 시간 설정 (등록 직후 실행 방지, 지정된 간격 후 실행)
-                nextRunAt: calculateNextRun(data.scheduleCron)
+                // 스케줄에 따른 첫 실행 시간 설정 (지정된 최초 시간이 있으면 사용, 없으면 간격 계산)
+                nextRunAt: (data.initialRunAt && data.initialRunAt.trim() !== '') ? new Date(data.initialRunAt) : calculateNextRun(data.scheduleCron)
             }
         })
 
@@ -113,6 +114,7 @@ export async function updateAutomationTask(id: string, data: {
     advImageMode?: string;
     advCustomImages?: string[];
     useThumbnailTemplate?: boolean;
+    initialRunAt?: string | null;
 }) {
     try {
         const user = await getOrCreateUser()
@@ -127,8 +129,11 @@ export async function updateAutomationTask(id: string, data: {
         }
 
         let nextRunAt = undefined
-        // 스케줄(Cron)이 변경된 경우 다음 실행 시간 재계산
-        if (data.scheduleCron && data.scheduleCron !== existingJob.scheduleCron) {
+        // 명시적으로 최초 지정 시간을 업데이트한 경우 우선 적용
+        if (data.initialRunAt && data.initialRunAt.trim() !== '') {
+            nextRunAt = new Date(data.initialRunAt)
+        } else if (data.scheduleCron && data.scheduleCron !== existingJob.scheduleCron) {
+            // 스케줄(Cron)이 변경된 경우 다음 실행 시간 재계산
             // 마지막 실행 시간이 있으면 그 기준으로, 없으면 현재 시간 기준으로 다음 실행 시간 계산
             const baseTime = existingJob.lastRunAt || new Date()
             nextRunAt = calculateNextRun(data.scheduleCron, baseTime)

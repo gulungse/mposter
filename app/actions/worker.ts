@@ -386,12 +386,16 @@ export async function testPublishAction(data: {
                 }
             } else if (site.type === 'BLOGSPOT') {
                 const blogId = site.username || site.url.split('blogId=')[1] || site.url.replace(/[^0-9]/g, '');
+                const targetStatus = data.postStatus || 'publish';
+                const requestUrl = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts`;
                 const postToBlogger = async (token: string) => {
-                    return axios.post(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/`, {
+                    return axios.post(requestUrl, {
+                        kind: 'blogger#post',
                         title: `[테스트] ${title}`,
                         content: content
                     }, {
                         headers: { 'Authorization': `Bearer ${token}` },
+                        params: { isDraft: targetStatus === 'draft' },
                         timeout: 30000
                     });
                 };
@@ -895,13 +899,15 @@ export async function publishManualAction(data: {
                 }
             } else if (site.type === 'BLOGSPOT') {
                 const blogId = site.username || site.url.split('blogId=')[1] || site.url.replace(/[^0-9]/g, '');
+                const requestUrl = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts`;
                 const postToBlogger = async (token: string) => {
-                    return axios.post(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/`, {
+                    return axios.post(requestUrl, {
+                        kind: 'blogger#post',
                         title: title,
-                        content: content,
-                        status: data.postStatus === 'publish' ? 'LIVE' : 'DRAFT'
+                        content: content
                     }, {
                         headers: { 'Authorization': `Bearer ${token}` },
+                        params: { isDraft: data.postStatus === 'draft' },
                         timeout: 30000
                     });
                 };

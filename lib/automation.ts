@@ -1207,12 +1207,16 @@ export async function processAutomationJob(jobId: string) {
             }
         } else if (job.site.type === 'BLOGSPOT') {
             const blogId = job.site.username || job.site.url.split('blogId=')[1] || job.site.url.replace(/[^0-9]/g, '');
+            const targetStatus = (job as any).postStatus || 'publish';
+            const requestUrl = `https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts`;
             const postToBlogger = async (token: string) => {
-                return axios.post(`https://www.googleapis.com/blogger/v3/blogs/${blogId}/posts/`, {
+                return axios.post(requestUrl, {
+                    kind: 'blogger#post',
                     title: title,
                     content: content
                 }, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    params: { isDraft: targetStatus === 'draft' }
                 });
             };
 

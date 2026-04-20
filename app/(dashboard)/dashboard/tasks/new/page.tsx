@@ -57,6 +57,7 @@ function TaskForm() {
         keywordGroupId: '',
         promptId: '',
         scheduleCron: '0 * * * *',
+        initialRunAt: '',
         aiModel: 'GPT_5_4',
         imageSource: 'DALLE',
         imageCount: 1,
@@ -124,6 +125,7 @@ function TaskForm() {
                         keywordGroupId: t.keywordGroupId || '',
                         promptId: t.promptId || '',
                         scheduleCron: t.scheduleCron || '0 * * * *',
+                        initialRunAt: '', // 수정 시 최초 재시작 시간 지정
                         aiModel: (t as any).aiModel || 'GPT4O',
                         imageSource: (t as any).imageSource || 'DALLE',
                         imageCount: (t as any).imageCount || 1,
@@ -332,11 +334,11 @@ function TaskForm() {
                         </div>
                     </div>
 
-                    {/* WordPress Post Status Option */}
-                    {sites.find(s => s.id === formData.siteId)?.type === 'WORDPRESS' && (
+                    {/* Publish Status Option */}
+                    {['WORDPRESS', 'BLOGSPOT'].includes(sites.find(s => s.id === formData.siteId)?.type || '') && (
                         <div className="pl-9 mt-4 w-1/2 pr-2">
                             <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-muted-foreground">발행 상태 (워드프레스)</label>
+                                <label className="text-xs font-medium text-muted-foreground">발행 상태</label>
                                 <select
                                     value={formData.postStatus}
                                     onChange={e => setFormData({ ...formData, postStatus: e.target.value })}
@@ -580,6 +582,21 @@ function TaskForm() {
                                 <option value="0 0 */2 * *">📅 48시간마다 (이틀에 한번)</option>
                             </select>
                         </div>
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                                최초 실행 시간 <span className="text-[10px] px-1.5 py-0.5 bg-secondary text-secondary-foreground rounded-full">선택사항</span>
+                            </label>
+                            <input
+                                type="datetime-local"
+                                value={formData.initialRunAt || ''}
+                                onChange={e => setFormData({ ...formData, initialRunAt: e.target.value })}
+                                className="w-full bg-card border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+                            />
+                            <p className="text-[10px] text-muted-foreground leading-tight mt-1">
+                                비워두면 저장 즉시 주기가 시작됩니다. 시간을 지정하면 해당 시간에 동작 후 주기가 적용됩니다.
+                            </p>
+                        </div>
+                    </div>
                     <div className="pl-9 grid grid-cols-1 md:grid-cols-2 gap-4 relative">
                         {formData.advImageMode === 'PREMIUM' && (
                             <div className="absolute inset-0 z-10 bg-background/60 backdrop-blur-[1px] flex items-center justify-center rounded-xl border-2 border-dashed border-orange-500/30">
@@ -642,7 +659,6 @@ function TaskForm() {
                                 </p>
                             </div>
                         </div>
-                    </div>
                     </div>
 
                     {/* 고급 이미지 생성 옵션 (권한 보유자 전용) */}
