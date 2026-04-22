@@ -35,19 +35,16 @@ function cleanAndParseJson(text: string): any {
     // 1. Remove markdown code blocks (```json ... ```)
     let cleaned = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '');
 
-    // 2. Replace smart quotes with standard quotes
-    cleaned = cleaned.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+    // Internal helper for parsing and final processing
+    const parseAndFinalize = (jsonStr: string) => {
+        const firstOpen = jsonStr.indexOf('{');
+        const lastClose = jsonStr.lastIndexOf('}');
 
-    // 3. Find the first '{' and last '}' to isolate JSON object
-    const firstOpen = cleaned.indexOf('{');
-    const lastClose = cleaned.lastIndexOf('}');
+        if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
+            jsonStr = jsonStr.substring(firstOpen, lastClose + 1);
+        }
 
-    if (firstOpen !== -1 && lastClose !== -1 && lastClose > firstOpen) {
-        cleaned = cleaned.substring(firstOpen, lastClose + 1);
-    }
-
-    try {
-        const parsed = JSON.parse(cleaned);
+        const parsed = JSON.parse(jsonStr);
         // HTML 태그 정제 (<html>, <head>, <body>, <style>, <script> 제거)
         if (parsed.content) {
             // AI가 이스케이프한 줄바꿈 복원
@@ -55,10 +52,10 @@ function cleanAndParseJson(text: string): any {
 
             // cheerio를 사용하여 확실하게 body 내부만 추출
             const $ = cheerio.load(content);
-            
+
             // 위험 태그 제거
             $('script, style, head, title, meta, link, iframe').remove();
-            
+
             // body가 있으면 그 내부만, 없으면 전체에서 body/html 등 검색하여 제거
             const bodyHtml = $('body').html();
             parsed.content = (bodyHtml || $.html()).trim();
@@ -67,29 +64,42 @@ function cleanAndParseJson(text: string): any {
             parsed.title = cleanTitle(parsed.title);
         }
         return parsed;
+    };
+
+    // 1. 먼저 치환 없이 시도 (콘텐츠 내의 스마트 따옴표 보존을 위해)
+    try {
+        return parseAndFinalize(cleaned);
     } catch (e) {
-        // Fallback: Regex로 최소한 title과 content만이라도 추출 시도
-        const titleMatch = cleaned.match(/"title"\s*:\s*"([\s\S]*?)"/);
-        const contentMatch = cleaned.match(/"content"\s*:\s*"([\s\S]*?)"/);
+        // 2. 실패 시 스마트 따옴표를 일반 따옴표로 치환하여 재시도 (구조 자체가 깨진 경우 대비)
+        try {
+            let retryCleaned = cleaned.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+            return parseAndFinalize(retryCleaned);
+        } catch (e2) {
+            // 3. 최후의 수단: Regex로 최소한 title과 content만이라도 추출 시도
+            // (치환된 버전인 retryCleaned를 사용하여 매칭 확률 높임)
+            let finalCleaned = cleaned.replace(/[\u201C\u201D]/g, '"').replace(/[\u2018\u2019]/g, "'");
+            const titleMatch = finalCleaned.match(/"title"\s*:\s*"([\s\S]*?)"/);
+            const contentMatch = finalCleaned.match(/"content"\s*:\s*"([\s\S]*?)"/);
 
-        if (titleMatch || contentMatch) {
-            const title = titleMatch ? titleMatch[1].replace(/\\"/g, '"').replace(/\\n/g, ' ') : '';
-            let content = contentMatch ? contentMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n') : text;
+            if (titleMatch || contentMatch) {
+                const title = titleMatch ? titleMatch[1].replace(/\\"/g, '"').replace(/\\n/g, ' ') : '';
+                let content = contentMatch ? contentMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n') : text;
 
-            // Failsafe cleaning for fallback
-            const $ = cheerio.load(content);
+                // Failsafe cleaning for fallback
+                const $ = cheerio.load(content);
+                $('script, style, head, title, meta, link, iframe').remove();
+                const bodyHtml = $('body').html();
+                content = (bodyHtml || $.html()).trim();
+
+                return { title: cleanTitle(title), content: content, imageKeywords: [], thumbnailText: '' };
+            }
+
+            // 최후의 최후 수단: 전체 텍스트를 content로 사용하되 태그 정제
+            const $ = cheerio.load(text);
             $('script, style, head, title, meta, link, iframe').remove();
             const bodyHtml = $('body').html();
-            content = (bodyHtml || $.html()).trim();
-
-            return { title: cleanTitle(title), content: content, imageKeywords: [], thumbnailText: '' };
+            return { title: '', content: (bodyHtml || $.html()).trim(), imageKeywords: [] };
         }
-
-        // 최후의 수단: 전체 텍스트를 content로 사용하되 태그 정제
-        const $ = cheerio.load(text);
-        $('script, style, head, title, meta, link, iframe').remove();
-        const bodyHtml = $('body').html();
-        return { title: '', content: (bodyHtml || $.html()).trim(), imageKeywords: [] };
     }
 }
 
