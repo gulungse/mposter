@@ -94,11 +94,9 @@ function cleanAndParseJson(text: string): any {
                 return { title: cleanTitle(title), content: content, imageKeywords: [], thumbnailText: '' };
             }
 
-            // 최후의 최후 수단: 전체 텍스트를 content로 사용하되 태그 정제
-            const $ = cheerio.load(text);
-            $('script, style, head, title, meta, link, iframe').remove();
-            const bodyHtml = $('body').html();
-            return { title: '', content: (bodyHtml || $.html()).trim(), imageKeywords: [] };
+            // 최후의 최후 수단: 토큰 한계로 완전히 잘린 텍스트라고 판단되므로 (JSON 포맷 붕괴 등)
+            // 비정상적인 미완성 글이 블로그에 발행되는 것을 100% 방지하기 위해 예외를 던집니다.
+            throw new Error('AI 생성 토큰 제한(Max Tokens) 도달 또는 응답 붕괴 오류가 발생하여 안전을 위해 발행을 중단합니다. (글이 너무 깁니다)');
         }
     }
 }
@@ -307,7 +305,7 @@ export async function generateClaudeContent(apiKey: string, systemPrompt: string
     try {
         const msg = await anthropic.messages.create({
             model: model,
-            max_tokens: 4096,
+            max_tokens: 8192,
             system: `${systemPrompt}\n\n반드시 다음 JSON 형식으로만 응답하세요: {"title": "...", "content": "...", "imageKeywords": ["keyword1", ...], "thumbnailText": "..."}`,
             messages: [
                 {
@@ -394,7 +392,7 @@ ${systemPrompt || '별도의 추가 지침 없음. 자유롭게 작성.'}
         params.max_completion_tokens = 60000;
         // params.response_format = { type: "json_object" }; // Keep disabled for new reasoning models (often unsupported or redundant)
     } else {
-        params.max_tokens = 4096;
+        params.max_tokens = 16384;
         params.response_format = { type: "json_object" };
     }
 

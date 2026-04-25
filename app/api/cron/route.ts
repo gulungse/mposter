@@ -4,6 +4,7 @@ import { processAutomationJob } from '@/lib/automation'
 import { calculateNextRun } from '@/lib/cron'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300 // Vercel Timeout 연장 (최대 5분)
 
 export async function GET(request: Request) {
     try {
@@ -23,17 +24,13 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: true, ran: 0, message: 'No pending jobs' })
         }
 
-        const results = []
-        for (const job of jobs) {
-            console.log(`[CRON] Executing Job: ${job.name} (${job.id})`)
+        let results: any[] = []
+        let lockedJobs = []
 
-            // 1. Prevent concurrent executions (Atomic Lock)
+        // 1. 모든 유효한 Job에 대해 Lock을 먼저 겁니다. (중복 실행 방지)
+        for (const job of jobs) {
             if (job.scheduleCron && job.scheduleCron !== 'MANUAL') {
-                // 이전 대기시간 또는 소요시간에 의한 드리프트(밀림 현상) 방지
-                // 설정된 원래 예정 시간을 기준으로 다음 시간을 계산함
                 let nextDate = calculateNextRun(job.scheduleCron, job.nextRunAt || new Date())
-                
-                // 만약 서버 정지 등으로 인해 계산된 다음 시간이 여전히 과거라면 현실적인 현재 시간 기준으로 재조정
                 if (nextDate <= new Date()) {
                     nextDate = calculateNextRun(job.scheduleCron)
                 }
@@ -43,37 +40,53 @@ export async function GET(request: Request) {
                     data: { nextRunAt: nextDate }
                 })
                 
-                // If count is 0, another cron instance already picked it up
-                if (lockResult.count === 0) {
+                if (lockResult.count > 0) {
+                    lockedJobs.push(job)
+                } else {
                     console.log(`[CRON] Job skipped (already locked): ${job.name} (${job.id})`)
-                    continue;
                 }
-            } else {
-                continue; // MANUAL shouldn't be executed via background CRON ideally, but skipped for safety
             }
+        }
 
-            // 2. Run Task (Auth Free)
-            let start = Date.now()
-            let res: any = { success: false, error: 'Unknown' }
-            try {
-                res = await processAutomationJob(job.id)
-            } catch (e: any) {
-                res = { success: false, error: e.message }
-            }
+        if (lockedJobs.length === 0) {
+            return NextResponse.json({ success: true, ran: 0, message: 'All pending jobs were already locked' })
+        }
 
-            // 3. Record lastRunAt
-            await prisma.automationJob.update({
-                where: { id: job.id },
-                data: {
-                    lastRunAt: new Date()
+        console.log(`[CRON] Processing ${lockedJobs.length} locked jobs in chunks...`)
+
+        // 2. 3개 단위(Chunk)로 병렬 처리하여 타임아웃 방지 및 Rate Limit 방어
+        const chunkSize = 3;
+        for (let i = 0; i < lockedJobs.length; i += chunkSize) {
+            const chunk = lockedJobs.slice(i, i + chunkSize);
+            console.log(`[CRON] Processing chunk ${Math.floor(i / chunkSize) + 1} (${chunk.length} jobs)`)
+            
+            const chunkResults = await Promise.all(chunk.map(async (job) => {
+                let start = Date.now()
+                let res: any = { success: false, error: 'Unknown' }
+                try {
+                    console.log(`[CRON] Executing Job: ${job.name} (${job.id})`)
+                    res = await processAutomationJob(job.id)
+                } catch (e: any) {
+                    res = { success: false, error: e.message }
                 }
-            })
 
-            results.push({
-                id: job.id,
-                success: res.success,
-                duration: Date.now() - start
-            })
+                try {
+                    await prisma.automationJob.update({
+                        where: { id: job.id },
+                        data: { lastRunAt: new Date() }
+                    })
+                } catch (updateErr) {
+                    console.error(`[CRON] Failed to update lastRunAt for ${job.id}:`, updateErr)
+                }
+
+                return {
+                    id: job.id,
+                    success: res.success,
+                    duration: Date.now() - start
+                }
+            }));
+            
+            results = results.concat(chunkResults);
         }
 
         return NextResponse.json({ success: true, ran: results.length, details: results })
