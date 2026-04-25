@@ -11,11 +11,13 @@ function formatSchedule(cron: string | null) {
     if (!cron) return '수동'
     if (cron === '*/5 * * * *') return '5분 간격'
     if (cron === '*/10 * * * *') return '10분 간격'
+    if (cron === '*/15 * * * *') return '15분 간격'
     if (cron === '*/30 * * * *') return '30분 간격'
     if (cron === '0 * * * *') return '1시간 간격'
-    if (cron === '0 */3 * * *') return '3시간 간격'
-    if (cron === '0 */6 * * *') return '6시간 간격'
-    if (cron === '0 */12 * * *') return '12시간 간격'
+    if (cron.startsWith('0 */') && cron.endsWith(' * * *')) {
+        const hours = parseInt(cron.split('*/')[1].split(' ')[0], 10);
+        if (!isNaN(hours)) return `${hours}시간 간격`
+    }
     if (cron === '0 0 * * *') return '24시간 간격'
     if (cron === '0 0 */2 * *') return '48시간 간격'
     if (cron === 'MANUAL') return '수동'

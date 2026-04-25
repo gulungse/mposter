@@ -9,16 +9,19 @@ export function calculateNextRun(cron: string, fromDate: Date = new Date()): Dat
         next.setMinutes(next.getMinutes() + 5)
     } else if (cron.startsWith('*/10')) {
         next.setMinutes(next.getMinutes() + 10)
+    } else if (cron.startsWith('*/15')) {
+        next.setMinutes(next.getMinutes() + 15)
     } else if (cron.startsWith('*/30')) {
         next.setMinutes(next.getMinutes() + 30)
     } else if (cron === '0 * * * *') {
         next.setHours(next.getHours() + 1)
-    } else if (cron === '0 */3 * * *') {
-        next.setHours(next.getHours() + 3)
-    } else if (cron === '0 */6 * * *') {
-        next.setHours(next.getHours() + 6)
-    } else if (cron === '0 */12 * * *') {
-        next.setHours(next.getHours() + 12)
+    } else if (cron.startsWith('0 */') && cron.endsWith(' * * *')) {
+        const hours = parseInt(cron.split('*/')[1].split(' ')[0], 10);
+        if (!isNaN(hours)) {
+            next.setHours(next.getHours() + hours)
+        } else {
+            next.setHours(next.getHours() + 1)
+        }
     } else if (cron === '0 0 * * *') {
         next.setDate(next.getDate() + 1)
     } else if (cron === '0 0 */2 * *') {

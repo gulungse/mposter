@@ -579,13 +579,21 @@ function TaskForm() {
                             >
                                 <option value="*/5 * * * *">🔥 5분마다</option>
                                 <option value="*/10 * * * *">🔥 10분마다</option>
+                                <option value="*/15 * * * *">📦 15분마다</option>
                                 <option value="*/30 * * * *">⏰ 30분마다</option>
                                 <option value="0 * * * *">🕒 1시간마다</option>
+                                <option value="0 */2 * * *">🕒 2시간마다</option>
                                 <option value="0 */3 * * *">🕒 3시간마다</option>
+                                <option value="0 */4 * * *">🕒 4시간마다</option>
+                                <option value="0 */5 * * *">🕒 5시간마다</option>
                                 <option value="0 */6 * * *">🕒 6시간마다</option>
+                                <option value="0 */7 * * *">🕒 7시간마다</option>
+                                <option value="0 */8 * * *">🕒 8시간마다</option>
+                                <option value="0 */9 * * *">🕒 9시간마다</option>
+                                <option value="0 */10 * * *">🕒 10시간마다</option>
+                                <option value="0 */11 * * *">🕒 11시간마다</option>
                                 <option value="0 */12 * * *">🌗 12시간마다</option>
                                 <option value="0 0 * * *">🌙 24시간마다 (매일)</option>
-                                <option value="0 0 */2 * *">📅 48시간마다 (이틀에 한번)</option>
                                 <option value="0 0 */2 * *">📅 48시간마다 (이틀에 한번)</option>
                             </select>
                         </div>
