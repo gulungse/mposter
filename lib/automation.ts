@@ -292,7 +292,7 @@ export async function generateGeminiContent(apiKey: string, systemPrompt: string
 /**
  * Claude (Opus)를 사용하여 콘텐츠를 생성합니다.
  */
-export async function generateClaudeContent(apiKey: string, systemPrompt: string, targetKeyword: string, model: string = "claude-4-sonnet", transcript?: string) {
+export async function generateClaudeContent(apiKey: string, systemPrompt: string, targetKeyword: string, model: string = "claude-sonnet-4-6", transcript?: string) {
     // 동적 import로 SDK 로드 (서버 사이드에서만 필요)
     const { Anthropic } = await import('@anthropic-ai/sdk');
 

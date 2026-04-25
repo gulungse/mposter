@@ -36,7 +36,7 @@ function PromptTestForm() {
         siteId: '',
         keywordGroupId: '',
         customPrompt: '',
-        aiModel: 'GPT4O',
+        aiModel: 'GPT_5_4',
         imageSource: 'DALLE',
         imageCount: 1,
         wpCategoryId: undefined as number | undefined,
@@ -249,10 +249,22 @@ function PromptTestForm() {
                                     onChange={e => setFormData({ ...formData, aiModel: e.target.value })}
                                     className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl px-3 py-2 text-xs font-bold text-slate-900 dark:text-white outline-none"
                                 >
-                                    <option value="GPT4O">GPT-4o</option>
-                                    <option value="CLAUDE">Claude 3.5</option>
-                                    <option value="GEMINI">Gemini 2.5</option>
-                                    <option value="GPT5">GPT-5 mini</option>
+                                    <optgroup label="OpenAI (GPT-5 / o1)">
+                                        <option value="GPT_5_4">GPT-5.4</option>
+                                        <option value="GPT_5_4_MINI">GPT-5.4 mini</option>
+                                        <option value="GPT_5_4_THINKING">GPT-5.4 Thinking</option>
+                                        <option value="GPT4O">GPT-4o (Legacy)</option>
+                                    </optgroup>
+                                    <optgroup label="Google (Gemini)">
+                                        <option value="GEMINI_3_1_PRO_PREVIEW">Gemini 3.1 Pro</option>
+                                        <option value="GEMINI_2_5_PRO">Gemini 2.5 Pro</option>
+                                        <option value="GEMINI_2_5_FLASH">Gemini 2.5 Flash</option>
+                                    </optgroup>
+                                    <optgroup label="Anthropic (Claude 4)">
+                                        <option value="CLAUDE_4_OPUS">Claude 4 Opus</option>
+                                        <option value="CLAUDE_4_SONNET">Claude 4 Sonnet</option>
+                                        <option value="CLAUDE_4_HAIKU">Claude 4 Haiku</option>
+                                    </optgroup>
                                 </select>
                             </div>
                             <div className="space-y-1">
