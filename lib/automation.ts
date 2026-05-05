@@ -402,18 +402,21 @@ ${systemPrompt || '별도의 추가 지침 없음. 자유롭게 작성.'}
         completion = await openai.chat.completions.create(params)
         console.log(`OpenAI Response for ${model}: `, JSON.stringify(completion, null, 2)); // FULL DEBUG LOG
     } catch (e: any) {
+        // 429(Quota) 또는 401(Auth) 에러인 경우 폴백해도 실패하므로 즉시 중단
+        const isAuthOrQuotaError = e.status === 429 || e.status === 401 || e.message?.toLowerCase().includes('quota') || e.message?.includes('429');
+
         // gpt-5 failed (e.g. 400 Bad Request if params invalid). Fallback to gpt-4o immediately if it was gpt-5
-        if (isNewModel) {
-            console.warn(`GPT - 5 generation failed with error: ${e.message}. Falling back to GPT - 4o - mini.`);
+        if (isNewModel && !isAuthOrQuotaError) {
+            console.warn(`GPT-5 generation failed with error: ${e.message}. Falling back to GPT-4o-mini.`);
             try {
                 // Try GPT-4o-mini first as a fast fallback
                 return await generateGPTContent(apiKey, systemPrompt, targetKeyword, 'gpt-4o-mini');
             } catch (innerE: any) {
-                console.warn(`GPT - 4o - mini fallback failed: ${innerE.message}. Trying GPT - 4o.`);
+                console.warn(`GPT-4o-mini fallback failed: ${innerE.message}. Trying GPT-4o.`);
                 return await generateGPTContent(apiKey, systemPrompt, targetKeyword, 'gpt-4o');
             }
         }
-        // If it's not a new model (e.g. gpt-4o failing), return the error as content so user sees it
+        // If it's not a new model (e.g. gpt-4o failing), or it's a quota error, return the error as content so user sees it
         console.error(`GPT Content Generation Error(${model}): `, e);
         return {
             title: `Error(${model})`,
