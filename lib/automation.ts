@@ -808,7 +808,8 @@ export async function generateAdvancedThumbnail(backgroundUrl: string, lines: st
             createElement('div', {
                 style: {
                     backgroundColor: '#fbbf24', color: '#000000', padding: '10px 28px',
-                    fontSize: 56, fontWeight: 900, borderRadius: '8px', marginBottom: '20px'
+                    fontSize: 56, fontWeight: 900, borderRadius: '8px', marginBottom: '20px',
+                    maxWidth: '90%', textAlign: 'center', lineHeight: 1.2, wordBreak: 'keep-all'
                 }
             }, lines[0]),
             // Line 2 & 3: White Text
@@ -882,12 +883,12 @@ export async function generateAdvancedContentImage(backgroundUrl: string, keywor
         createElement('div', {
             style: {
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
-                padding: '15px', textAlign: 'center', gap: '4px'
+                padding: '15px', textAlign: 'center', gap: '4px', width: '100%'
             }
         }, [
             createElement('div', { style: { color: '#ffffff', fontSize: 28, fontWeight: 900 } }, phraseA),
             createElement('div', {
-                style: { color: '#fbbf24', fontSize: 42, fontWeight: 900, padding: '4px 16px', border: '3px solid #fbbf24', borderRadius: '4px' }
+                style: { color: '#fbbf24', fontSize: 42, fontWeight: 900, padding: '4px 16px', border: '3px solid #fbbf24', borderRadius: '4px', maxWidth: '90%', textAlign: 'center', lineHeight: 1.2, wordBreak: 'keep-all' }
             }, keyword),
             createElement('div', { style: { color: '#ffffff', fontSize: 28, fontWeight: 900 } }, phraseB),
         ])
@@ -1025,7 +1026,7 @@ export async function processAutomationJob(jobId: string) {
         const headings = $('h2, h3');
 
         // 헤딩태그가 없으면 이미지 생성 안 함 (요구사항)
-        if (headings.length > 0 && imageSource !== 'NONE') {
+        if (headings.length > 0 && (imageSource !== 'NONE' || (job as any).advImageMode === 'PREMIUM')) {
 
             const insertionRules = [
                 { imgIdx: 1, headIdx: 0, pos: 'before' },
@@ -1066,9 +1067,11 @@ export async function processAutomationJob(jobId: string) {
                                     bgUrl = searchedBg || `https://picsum.photos/600/600?random=${Date.now()}`;
                                 }
 
-                                // 1번 라인은 항상 현재 키워드로 고정
+                                // 1번 라인은 비어있을 때만 현재 키워드로 자동 고정
                                 const finalLines = [...(job as any).advThumbnailLines];
-                                finalLines[0] = targetKeyword;
+                                if (!finalLines[0] || finalLines[0].trim() === '') {
+                                    finalLines[0] = targetKeyword;
+                                }
 
                                 const thumbBuffer = await generateAdvancedThumbnail(bgUrl, finalLines);
                                 const uploaded = await uploadToWordPress(job.site, thumbBuffer, `${targetKeyword}-adv-thumb-${Date.now()}`);
@@ -1090,9 +1093,14 @@ export async function processAutomationJob(jobId: string) {
                 }
 
                 // 2. 템플릿 안 쓰기로 했거나 본문 이미지일 때
-                if (!imageUrl && !isPremium) {
-                    try {
-                        if (imageSource === 'DALLE') {
+                if (!imageUrl) {
+                    if (isPremium && customImages.length > 0) {
+                        const searchKeyword = targetKeyword.split(' ')[0] || 'korea';
+                        imageUrl = getNextBgUrl(searchKeyword) || '';
+                        if (imageUrl) success = true;
+                    } else {
+                        try {
+                            if (imageSource === 'DALLE') {
                             if (!settings.openaiApiKey) throw new Error('OpenAI API 키가 없습니다.');
                             const openai = new OpenAI({ apiKey: settings.openaiApiKey })
                             const imgPrompt = i === 1 ? `${targetKeyword} minimal vector art` : `${targetKeyword} detailed photo ${i}`;
@@ -1121,6 +1129,7 @@ export async function processAutomationJob(jobId: string) {
                     } catch (e) {
                         console.warn(`Image ${i} Generation/Scrape Failed`, e);
                     }
+                    }
                 }
 
                 // 외부 이미지를 무조건 WP에 다운로드&업로드 처리
@@ -1142,15 +1151,11 @@ export async function processAutomationJob(jobId: string) {
                 // 고급 권한: 본문 이미지 특수 처리 (나머지 이미지들, 위에서 가져온 imageUrl을 bgUrl로 활용)
                 if (hasRights && i > 1 && (job as any).advContentPhraseA && (job as any).advContentPhraseB) {
                     try {
-                        const searchKeyword = targetKeyword.split(' ')[0] || 'korea';
                         let bgUrl = imageUrl;
 
-                        if ((job as any).advImageMode === 'PREMIUM' && customImages.length > 0) {
-                            bgUrl = getNextBgUrl(searchKeyword);
-                        }
-
                         if (bgUrl) {
-                            const advancedImgBuffer = await generateAdvancedContentImage(bgUrl, targetKeyword, (job as any).advContentPhraseA, (job as any).advContentPhraseB);
+                            const centerPhrase = (job as any).advThumbnailLines?.[4] || targetKeyword;
+                            const advancedImgBuffer = await generateAdvancedContentImage(bgUrl, centerPhrase, (job as any).advContentPhraseA, (job as any).advContentPhraseB);
                             if (job.site.type === 'WORDPRESS') {
                                 const uploaded = await uploadToWordPress(job.site, advancedImgBuffer, `${targetKeyword}-adv-img-${i}-${Date.now()}`);
                                 imageUrl = uploaded.url;

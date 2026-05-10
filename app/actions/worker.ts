@@ -185,7 +185,7 @@ export async function testPublishAction(data: {
         const $ = cheerio.load(content);
         const headings = $('h2, h3');
 
-        if (headings.length > 0 && imageSource !== 'NONE') {
+        if (headings.length > 0 && (imageSource !== 'NONE' || data.advImageMode === 'PREMIUM')) {
 
             const insertionRules = [
                 { imgIdx: 1, headIdx: 0, pos: 'before' },
@@ -228,9 +228,11 @@ export async function testPublishAction(data: {
                                     bgUrl = searchedBg || `https://picsum.photos/600/600?random=${Date.now()}`;
                                 }
 
-                                // 1번 라인은 항상 현재 키워드로 고정
+                                // 1번 라인은 비어있을 때만 현재 키워드로 자동 고정
                                 const finalLines = [...data.advThumbnailLines];
-                                finalLines[0] = targetKeyword;
+                                if (!finalLines[0] || finalLines[0].trim() === '') {
+                                    finalLines[0] = targetKeyword;
+                                }
 
                                 const thumbBuffer = await generateAdvancedThumbnail(bgUrl, finalLines);
                                 const uploaded = await uploadToWordPress(site, thumbBuffer, `${targetKeyword}-adv-thumb-${Date.now()}`);
@@ -252,9 +254,13 @@ export async function testPublishAction(data: {
                 }
 
                 // 2. 템플릿을 쓰지 않기로 했거나 (썸네일 포함), 2번째 이후의 이미지일 때
-                if (!imageUrl && !isPremium) {
-                    try {
-                        if (imageSource === 'DALLE') {
+                if (!imageUrl) {
+                    if (isPremium && data.advCustomImages?.length) {
+                        imageUrl = data.advCustomImages[Math.floor(Math.random() * data.advCustomImages.length)];
+                        if (imageUrl) success = true;
+                    } else {
+                        try {
+                            if (imageSource === 'DALLE') {
                             const apiKey = settings.openaiApiKey
                             if (apiKey) {
                                 const openai = new OpenAI({ apiKey })
@@ -289,6 +295,7 @@ export async function testPublishAction(data: {
                     } catch (e) {
                         console.warn(`Image ${i} Generation/Scrape Failed`, e);
                     }
+                    }
                 }
 
                 // 외부 이미지를 직접 본문에 넣지 않고 무조건 다운로드 & 업로드 처리
@@ -314,13 +321,9 @@ export async function testPublishAction(data: {
                     try {
                         let bgUrl = imageUrl;
 
-                        // 프리미엄 모드이고 커스텀 이미지가 있으면 랜덤하게 이미지 사용 (테스트용)
-                        if (data.advImageMode === 'PREMIUM' && data.advCustomImages?.length) {
-                            bgUrl = data.advCustomImages[Math.floor(Math.random() * data.advCustomImages.length)];
-                        }
-
                         if (bgUrl) {
-                            const advancedImgBuffer = await generateAdvancedContentImage(bgUrl, targetKeyword, data.advContentPhraseA, data.advContentPhraseB);
+                            const centerPhrase = data.advThumbnailLines?.[4] || targetKeyword;
+                            const advancedImgBuffer = await generateAdvancedContentImage(bgUrl, centerPhrase, data.advContentPhraseA, data.advContentPhraseB);
                             if (site.type === 'WORDPRESS') {
                                 const uploaded = await uploadToWordPress(site, advancedImgBuffer, `${targetKeyword}-adv-img-${i}-${Date.now()}`);
                                 imageUrl = uploaded.url;

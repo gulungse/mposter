@@ -789,14 +789,19 @@ function TaskForm() {
                                         <div className="space-y-3">
                                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest px-1">전용 썸네일 문구 설정</label>
                                             <div className="space-y-2">
-                                                <div className="relative opacity-60 grayscale-[0.8]">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-orange-600">1</span>
-                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-orange-600 uppercase">자동 키워드</span>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">1</span>
+                                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-slate-400 uppercase">타이틀</span>
                                                     <input
                                                         type="text"
-                                                        readOnly
-                                                        value="[ 포스팅 키워드 자동 삽입 ]"
-                                                        className="w-full h-10 bg-orange-50 shadow-inner border border-orange-100 rounded-lg pl-8 pr-20 text-[10px] font-black text-orange-800 outline-none cursor-not-allowed"
+                                                        value={formData.advThumbnailLines[0] || ''}
+                                                        onChange={e => {
+                                                            const newLines = [...formData.advThumbnailLines];
+                                                            newLines[0] = e.target.value;
+                                                            setFormData({ ...formData, advThumbnailLines: newLines });
+                                                        }}
+                                                        placeholder="[빈칸 시 포스팅 키워드 자동삽입]"
+                                                        className="w-full h-10 bg-orange-50 border border-orange-200 rounded-lg pl-8 pr-16 text-[10px] font-bold text-orange-900 outline-none focus:ring-2 focus:ring-orange-500/20 placeholder:text-orange-900/40"
                                                     />
                                                 </div>
                                                 {[1, 2, 3].map(i => (
@@ -835,8 +840,19 @@ function TaskForm() {
                                                             />
                                                         </div>
                                                         
-                                                        <div className="h-10 border-2 border-dashed border-border rounded-lg flex items-center justify-center bg-muted/30">
-                                                            <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">[ 키워드 한글 타이포그래피 ]</span>
+                                                        <div className="relative">
+                                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-orange-600/70 uppercase">중앙</span>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="[빈칸 시 포스팅 키워드 자동 삽입]"
+                                                                value={formData.advThumbnailLines[4] || ''}
+                                                                onChange={e => {
+                                                                    const newLines = [...formData.advThumbnailLines];
+                                                                    newLines[4] = e.target.value;
+                                                                    setFormData({ ...formData, advThumbnailLines: newLines });
+                                                                }}
+                                                                className="w-full h-10 bg-orange-50/50 border border-orange-200/50 rounded-lg px-3 text-xs font-bold text-orange-900 outline-none focus:ring-2 focus:ring-orange-500/20 placeholder:text-orange-900/40"
+                                                            />
                                                         </div>
 
                                                         <div className="relative">
