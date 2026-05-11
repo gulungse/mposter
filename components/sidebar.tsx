@@ -110,7 +110,8 @@ export function Sidebar({ className, isOpen, onClose }: SidebarProps) {
                 { href: '/dashboard/tasks', icon: 'Cpu', label: '자동화 발행' },
                 // Conditional permissions
                 ...(user?.hasManualPostRights || user?.role === 'ADMIN' ? [
-                    { href: '/dashboard/prompts/manual', icon: 'Wand2', label: '수동 발행' }
+                    { href: '/dashboard/prompts/manual', icon: 'Wand2', label: '수동 발행' },
+                    { href: '/dashboard/prompts/seo-machine', icon: 'Wand2', label: 'SEO 머신 발행' }
                 ] : []),
                 ...(user?.hasYoutubeRights || user?.role === 'ADMIN' ? [
                     { href: '/dashboard/tasks/youtube', icon: 'Youtube', label: '유튜브 > 블로그발행' }
