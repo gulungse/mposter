@@ -4,7 +4,7 @@ import * as cheerio from 'cheerio';
 /**
  * 네이버 블로그 URL에서 제목과 내용을 추출합니다.
  */
-export async function scrapeNaverBlog(url: string) {
+export async function scrapeNaverBlog(url: string, keepHtml: boolean = false) {
     try {
         // 모바일 URL로 변환하면 추출이 더 용이한 경우가 많음
         let mobileUrl = url;
@@ -31,6 +31,9 @@ export async function scrapeNaverBlog(url: string) {
 
         // 2. 본문 및 이미지 추출 (Smart Editor One 위주)
         let content = '';
+        
+        console.log(`[Scraper] Fetching Naver Blog: ${mobileUrl}`);
+        console.log(`[Scraper] .se-main-container exists: ${$('.se-main-container').length > 0}`);
 
         if ($('.se-main-container').length > 0) {
             $('.se-main-container .se-component').each((_, el) => {
@@ -64,14 +67,24 @@ export async function scrapeNaverBlog(url: string) {
                             }
                         }
 
-                        content += `<img src="${imgUrl}" style="max-width: 100%; height: auto; display: block; margin: 20px auto; border-radius: 8px;" />\n\n`;
+                        // HTML 모드일 경우 \n\n을 넣으면 타겟 에디터에서 빈 줄로 인식될 수 있으므로 \n만 추가합니다.
+                        content += `<img src="${imgUrl}" style="max-width: 100%; height: auto; display: block; margin: 20px auto; border-radius: 8px;" />${keepHtml ? '\n' : '\n\n'}`;
                     }
                 }
                 // 텍스트 처리
                 else if ($comp.hasClass('se-text')) {
                     $comp.find('p').each((_, pEl) => {
-                        const text = $(pEl).text().trim();
-                        if (text) content += text + '\n\n';
+                        if (keepHtml) {
+                            const innerHtml = $(pEl).html()?.trim();
+                            if (innerHtml) {
+                                // 네이버는 <p> 마진이 0이지만 워드프레스는 <p> 마진이 커서 줄이 심하게 벌어집니다.
+                                // 따라서 <p>로 감싸지 않고 원본 내용 + <br> 태그 조합으로 처리하여 줄간격을 완벽하게 보존합니다.
+                                content += `${innerHtml}<br>\n`;
+                            }
+                        } else {
+                            const text = $(pEl).text().trim();
+                            if (text) content += text + '\n\n';
+                        }
                     });
                 }
             });
@@ -83,10 +96,10 @@ export async function scrapeNaverBlog(url: string) {
         }
         // 구버전 또는 다른 포맷 대응
         else if ($('#post-view').length > 0) {
-            content = $('#post-view').text().trim();
+            content = keepHtml ? ($('#post-view').html()?.trim() || '') : $('#post-view').text().trim();
         }
         else if ($('.se_component_wrap').length > 0) {
-            content = $('.se_component_wrap').text().trim();
+            content = keepHtml ? ($('.se_component_wrap').html()?.trim() || '') : $('.se_component_wrap').text().trim();
         }
 
         if (!content) {

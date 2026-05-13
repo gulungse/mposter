@@ -38,7 +38,8 @@ export default function NaverRewritePage() {
         wpCategoryId: 0,
         postStatus: 'draft' as 'publish' | 'draft',
         imageSource: 'ORIGINAL' as 'NONE' | 'ORIGINAL' | 'AI' | 'SCRAP' | 'DALLE' | 'FLUX',
-        imageCount: 1
+        imageCount: 1,
+        copyOriginal: false
     })
 
     useEffect(() => {
@@ -89,7 +90,7 @@ export default function NaverRewritePage() {
             alert('발행할 사이트를 선택해주세요.')
             return
         }
-        if (!formData.promptId && !formData.customPrompt.trim()) {
+        if (!formData.copyOriginal && !formData.promptId && !formData.customPrompt.trim()) {
             alert('사용할 프롬프트를 선택하거나 직접 입력해주세요.')
             return
         }
@@ -99,7 +100,7 @@ export default function NaverRewritePage() {
         setPublishing(true)
         try {
             // 1. 스크랩 실행
-            const scrapeRes = await scrapeNaverBlogAction(naverUrl)
+            const scrapeRes = await scrapeNaverBlogAction(naverUrl, formData.copyOriginal)
             if (!scrapeRes.success || !scrapeRes.data) {
                 alert(scrapeRes.error || '네이버 블로그 내용 추출에 실패했습니다.')
                 setPublishing(false)
@@ -229,81 +230,101 @@ export default function NaverRewritePage() {
                     <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
                         <TerminalIcon className="h-4 w-4 text-blue-600" /> 3. 프롬프트 및 AI 모델
                     </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase">프롬프트 선택</label>
-                            <select
-                                value={formData.promptId}
-                                onChange={e => setFormData({ ...formData, promptId: e.target.value, customPrompt: '' })}
-                                className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2.5 text-sm font-bold outline-none transition-all"
-                            >
-                                <option value="">직접 입력...</option>
-                                {prompts.map(p => (
-                                    <option key={p.id} value={p.id}>{p.title}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase">AI 모델</label>
-                            <select
-                                value={formData.aiModel}
-                                onChange={e => setFormData({ ...formData, aiModel: e.target.value as any })}
-                                className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2.5 text-sm font-bold outline-none transition-all"
-                            >
-                                <option value="GPT4O">GPT-4o</option>
-                                <option value="CLAUDE">Claude 3.5</option>
-                                <option value="GEMINI">Gemini 2.5</option>
-                                <option value="GPT5">GPT-5 mini</option>
-                            </select>
-                        </div>
+                    
+                    <div className="flex items-center gap-2 mb-2 p-3 bg-slate-50 dark:bg-[#1e293b] rounded-xl border border-slate-200 dark:border-[#324467]">
+                        <input
+                            type="checkbox"
+                            id="copyOriginal"
+                            checked={formData.copyOriginal}
+                            onChange={e => setFormData({ ...formData, copyOriginal: e.target.checked })}
+                            className="w-4 h-4 text-indigo-600 bg-white border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+                        />
+                        <label htmlFor="copyOriginal" className="text-sm font-bold text-slate-700 dark:text-slate-300 cursor-pointer select-none">
+                            원본 글/사진 그대로 복사 (AI 재작성 안함)
+                        </label>
                     </div>
-                    {!formData.promptId && (
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase">직접 입력 프롬프트</label>
-                            <textarea
-                                value={formData.customPrompt}
-                                onChange={e => setFormData({ ...formData, customPrompt: e.target.value })}
-                                placeholder="적용할 프롬프트 지시 내용을 입력하세요..."
-                                className="w-full h-32 p-4 text-sm font-medium bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 resize-none leading-relaxed transition-all"
-                            />
-                        </div>
+
+                    {!formData.copyOriginal && (
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">프롬프트 선택</label>
+                                    <select
+                                        value={formData.promptId}
+                                        onChange={e => setFormData({ ...formData, promptId: e.target.value, customPrompt: '' })}
+                                        className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2.5 text-sm font-bold outline-none transition-all"
+                                    >
+                                        <option value="">직접 입력...</option>
+                                        {prompts.map(p => (
+                                            <option key={p.id} value={p.id}>{p.title}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">AI 모델</label>
+                                    <select
+                                        value={formData.aiModel}
+                                        onChange={e => setFormData({ ...formData, aiModel: e.target.value as any })}
+                                        className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2.5 text-sm font-bold outline-none transition-all"
+                                    >
+                                        <option value="GPT4O">GPT-4o</option>
+                                        <option value="CLAUDE">Claude 3.5</option>
+                                        <option value="GEMINI">Gemini 2.5</option>
+                                        <option value="GPT5">GPT-5 mini</option>
+                                    </select>
+                                </div>
+                            </div>
+                            {!formData.promptId && (
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase">직접 입력 프롬프트</label>
+                                    <textarea
+                                        value={formData.customPrompt}
+                                        onChange={e => setFormData({ ...formData, customPrompt: e.target.value })}
+                                        placeholder="적용할 프롬프트 지시 내용을 입력하세요..."
+                                        className="w-full h-32 p-4 text-sm font-medium bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 resize-none leading-relaxed transition-all"
+                                    />
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
 
                 {/* 4. Image Settings */}
-                <div className="bg-white dark:bg-[#111722] rounded-3xl border border-slate-200 dark:border-[#324467] shadow-xl p-6 space-y-4">
-                    <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
-                        <ImageIcon className="h-4 w-4 text-green-600" /> 4. 이미지 설정
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase">이미지 소스</label>
-                            <select
-                                value={formData.imageSource}
-                                onChange={e => setFormData({ ...formData, imageSource: e.target.value as any })}
-                                className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2.5 text-sm font-bold outline-none transition-all"
-                            >
-                                <option value="NONE">사용 안 함</option>
-                                <option value="ORIGINAL">원본 가져오기 (권장)</option>
-                                <option value="DALLE">AI 이미지 생성 (DALL-E)</option>
-                                <option value="FLUX">AI 이미지 생성 (FLUX)</option>
-                                <option value="SCRAP">무료 이미지 스크랩</option>
-                            </select>
-                        </div>
-                        <div className="space-y-2">
-                            <label className={`text-[10px] font-bold uppercase ${['NONE', 'ORIGINAL'].includes(formData.imageSource) ? 'text-slate-200 dark:text-slate-800' : 'text-slate-400'}`}>삽입 갯수</label>
-                            <input
-                                type="number"
-                                min={1}
-                                max={5}
-                                value={formData.imageCount}
-                                onChange={e => setFormData({ ...formData, imageCount: parseInt(e.target.value) })}
-                                disabled={['NONE', 'ORIGINAL'].includes(formData.imageSource)}
-                                className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2.5 text-sm font-bold outline-none disabled:opacity-30 transition-all"
-                            />
+                {!formData.copyOriginal && (
+                    <div className="bg-white dark:bg-[#111722] rounded-3xl border border-slate-200 dark:border-[#324467] shadow-xl p-6 space-y-4">
+                        <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-2">
+                            <ImageIcon className="h-4 w-4 text-green-600" /> 4. 이미지 설정
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase">이미지 소스</label>
+                                <select
+                                    value={formData.imageSource}
+                                    onChange={e => setFormData({ ...formData, imageSource: e.target.value as any })}
+                                    className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2.5 text-sm font-bold outline-none transition-all"
+                                >
+                                    <option value="NONE">사용 안 함</option>
+                                    <option value="ORIGINAL">원본 가져오기 (권장)</option>
+                                    <option value="DALLE">AI 이미지 생성 (DALL-E)</option>
+                                    <option value="FLUX">AI 이미지 생성 (FLUX)</option>
+                                    <option value="SCRAP">무료 이미지 스크랩</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className={`text-[10px] font-bold uppercase ${['NONE', 'ORIGINAL'].includes(formData.imageSource) ? 'text-slate-200 dark:text-slate-800' : 'text-slate-400'}`}>삽입 갯수</label>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    max={5}
+                                    value={formData.imageCount}
+                                    onChange={e => setFormData({ ...formData, imageCount: parseInt(e.target.value) })}
+                                    disabled={['NONE', 'ORIGINAL'].includes(formData.imageSource)}
+                                    className="w-full bg-slate-50 dark:bg-[#1e293b] border border-slate-200 dark:border-[#324467] rounded-xl px-4 py-2.5 text-sm font-bold outline-none disabled:opacity-30 transition-all"
+                                />
+                            </div>
                         </div>
                     </div>
-                </div>
+                )}
 
                 {/* Run Button */}
                 <button

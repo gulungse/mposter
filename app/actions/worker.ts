@@ -602,6 +602,7 @@ export async function publishManualAction(data: {
     postStatus: 'publish' | 'draft';
     imageSource: 'ORIGINAL' | 'AI' | 'SCRAP' | 'NONE' | 'DALLE' | 'FLUX'; // mapping user input to internal keys
     imageCount: number;
+    copyOriginal?: boolean;
 }) {
     try {
         noStore();
@@ -638,9 +639,9 @@ export async function publishManualAction(data: {
         if (!site) throw new Error('대상 사이트를 찾을 수 없습니다.')
 
         const finalPromptContent = data.customPrompt || promptByDb?.content
-        if (!finalPromptContent) throw new Error('사용할 프롬프트가 없습니다.')
+        if (!data.copyOriginal && !finalPromptContent) throw new Error('사용할 프롬프트가 없습니다.')
 
-        // 2. AI 텍스트 생성 (원본 내용을 기반으로)
+        // 2. AI 텍스트 생성 또는 원본 사용
         const targetKeyword = data.originalTitle || '제공된 제목'
         const inputContext = `[원본 제목]: ${data.originalTitle}\n\n[원본 내용]:\n${data.originalContent}`;
 
@@ -648,30 +649,35 @@ export async function publishManualAction(data: {
         let content = ''
         let aiResult: any = {};
 
-        const modelId = MODEL_ID_MAP[data.aiModel as AIModel] || 'gpt-4o'
+        if (data.copyOriginal) {
+            title = data.originalTitle;
+            content = data.originalContent;
+        } else {
+            const modelId = MODEL_ID_MAP[data.aiModel as AIModel] || 'gpt-4o'
 
-        try {
-            if (data.aiModel.toString().includes('GPT')) {
-                const apiKey = settings.openaiApiKey
-                if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
-                aiResult = await generateGPTContent(apiKey, finalPromptContent, targetKeyword, modelId, inputContext)
-            } else if (data.aiModel.toString().includes('CLAUDE')) {
-                const apiKey = settings.anthropicApiKey
-                if (!apiKey) throw new Error('Claude API 키가 설정되어 있지 않습니다.')
-                aiResult = await generateClaudeContent(apiKey, finalPromptContent, targetKeyword, modelId, inputContext)
-            } else if (data.aiModel.toString().includes('GEMINI')) {
-                const apiKey = settings.geminiApiKey
-                if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
-                aiResult = await generateGeminiContent(apiKey, finalPromptContent, targetKeyword, modelId, inputContext)
+            try {
+                if (data.aiModel.toString().includes('GPT')) {
+                    const apiKey = settings.openaiApiKey
+                    if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
+                    aiResult = await generateGPTContent(apiKey, finalPromptContent, targetKeyword, modelId, inputContext)
+                } else if (data.aiModel.toString().includes('CLAUDE')) {
+                    const apiKey = settings.anthropicApiKey
+                    if (!apiKey) throw new Error('Claude API 키가 설정되어 있지 않습니다.')
+                    aiResult = await generateClaudeContent(apiKey, finalPromptContent, targetKeyword, modelId, inputContext)
+                } else if (data.aiModel.toString().includes('GEMINI')) {
+                    const apiKey = settings.geminiApiKey
+                    if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
+                    aiResult = await generateGeminiContent(apiKey, finalPromptContent, targetKeyword, modelId, inputContext)
+                }
+                // Ensure title/content are using the parsed results even if parsing was partial
+                title = aiResult.title || targetKeyword;
+                content = convertMarkdownToHtml(aiResult.content || '');
+            } catch (err: any) {
+                console.error('AI Generation/Parsing failed:', err);
+                // Fallback to minimal if everything fails
+                title = targetKeyword;
+                content = convertMarkdownToHtml(data.originalContent);
             }
-            // Ensure title/content are using the parsed results even if parsing was partial
-            title = aiResult.title || targetKeyword;
-            content = convertMarkdownToHtml(aiResult.content || '');
-        } catch (err: any) {
-            console.error('AI Generation/Parsing failed:', err);
-            // Fallback to minimal if everything fails
-            title = targetKeyword;
-            content = convertMarkdownToHtml(data.originalContent);
         }
 
         // 3. 이미지 처리
@@ -692,7 +698,7 @@ export async function publishManualAction(data: {
             })
         }
 
-        if (imageSource !== 'NONE' && (headings.length > 0 || imageSource === 'ORIGINAL')) {
+        if (!data.copyOriginal && imageSource !== 'NONE' && (headings.length > 0 || imageSource === 'ORIGINAL')) {
             const insertionRules = [
                 { imgIdx: 1, headIdx: 0, pos: 'before' },
                 { imgIdx: 2, headIdx: 2, pos: 'after' },
@@ -946,11 +952,11 @@ export async function publishManualAction(data: {
 /**
  * 네이버 블로그 URL로부터 내용을 추출합니다.
  */
-export async function scrapeNaverBlogAction(url: string) {
+export async function scrapeNaverBlogAction(url: string, keepHtml: boolean = false) {
     try {
         noStore();
         await getOrCreateUser();
-        const result = await scrapeNaverBlog(url);
+        const result = await scrapeNaverBlog(url, keepHtml);
         return { success: true, data: result };
     } catch (error: any) {
         console.error('scrapeNaverBlogAction error:', error);
