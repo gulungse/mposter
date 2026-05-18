@@ -659,15 +659,15 @@ export async function publishManualAction(data: {
                 if (data.aiModel.toString().includes('GPT')) {
                     const apiKey = settings.openaiApiKey
                     if (!apiKey) throw new Error('OpenAI API 키가 설정되어 있지 않습니다.')
-                    aiResult = await generateGPTContent(apiKey, finalPromptContent, targetKeyword, modelId, inputContext)
+                    aiResult = await generateGPTContent(apiKey, finalPromptContent as string, targetKeyword, modelId, inputContext)
                 } else if (data.aiModel.toString().includes('CLAUDE')) {
                     const apiKey = settings.anthropicApiKey
                     if (!apiKey) throw new Error('Claude API 키가 설정되어 있지 않습니다.')
-                    aiResult = await generateClaudeContent(apiKey, finalPromptContent, targetKeyword, modelId, inputContext)
+                    aiResult = await generateClaudeContent(apiKey, finalPromptContent as string, targetKeyword, modelId, inputContext)
                 } else if (data.aiModel.toString().includes('GEMINI')) {
                     const apiKey = settings.geminiApiKey
                     if (!apiKey) throw new Error('Gemini API 키가 설정되어 있지 않습니다.')
-                    aiResult = await generateGeminiContent(apiKey, finalPromptContent, targetKeyword, modelId, inputContext)
+                    aiResult = await generateGeminiContent(apiKey, finalPromptContent as string, targetKeyword, modelId, inputContext)
                 }
                 // Ensure title/content are using the parsed results even if parsing was partial
                 title = aiResult.title || targetKeyword;
